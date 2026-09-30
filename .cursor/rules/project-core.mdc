@@ -1,0 +1,33 @@
+---
+description: Core project context, stack, layering, and non-negotiable invariants for the FX Target Payment demo
+alwaysApply: true
+---
+
+# Project Core
+
+Demo on an Airwallex **sandbox** account. Each foreign-currency bill is a "position" with a target rate or max cost. The worker watches the rate, locks a quote on a target hit and asks for approval. On the execution-deadline day it asks for approval at market, and at the cutoff it **auto-settles** under the standing instruction. Every armed bill is paid by its deadline.
+
+## Source of truth
+- Design lives in `docs/`. Read `docs/README.md` first, then the doc for the task (`03-domain-model.md` for state/math/schemas, `04-airwallex-integration.md` for API calls, `06`/`07` for UI).
+- If code and docs disagree, stop and flag it. If a change alters behaviour described in `docs/`, update the doc **in the same commit**.
+- Unverified Airwallex behaviour: `docs/01-feasibility-airwallex.md` §7 (V1–V17) and `docs/09` (Q-xx). When a spike or `pnpm airwallex:smoke` resolves one, update those files.
+- Track task IDs (`U4.2`, `B8.1`) come from `docs/tracks/*`; mention them in commits.
+
+## Stack
+Next.js App Router + TypeScript strict, MongoDB 7 (replica set) via Mongoose, Redis 7 + BullMQ + pub/sub, a separate worker process, Tailwind v4 + Radix + Motion, Lightweight Charts v5, TanStack Query + Zustand (UI state only), zod, decimal.js, date-fns-tz, pnpm. New dependencies or infrastructure need a D-xx entry in `docs/09` first.
+
+## Invariants (never break)
+- Airwallex calls are **server-side only** (`src/server/**`, `src/worker/**`) through `src/server/adapters/airwallex/client.ts`.
+- No JS `number` for money or rates: `decimal.js` in code, `Decimal128` in Mongo, decimal strings in contracts and on the wire.
+- Canonical price `p = sell_amount / buy_amount` (CLIENT level, H per F). Lower is better.
+- All bill state changes go through `transition()` in `src/server/domain/stateMachine.ts` plus a conditional, versioned `findOneAndUpdate`.
+- Deterministic `request_id`s and BullMQ `jobId`s. A retry never creates a second payment.
+- Time comes from the injected `Clock` only. Timers are Mongo fields, and the sweeper turns them into jobs.
+- The deadline overrides every non-terminal state. Nothing executes without approval of a valid quote or the standing instruction. The only exception is the demo Simulate auto-approval (`docs/08` §1.1, `DEMO_MODE` only).
+- Charge amounts and quote requests are derived from the stored bill, never from client input.
+
+## Layering
+- Server: `app/api` route handlers (auth + zod validate + call service + map to contract) → `server/services` (use cases) → `server/domain` (pure: state machine, rate math, strategy) + `server/db` (models, repositories) + `server/adapters` (Airwallex, rates, history, extraction, notify, clock). Keep route handlers thin.
+- Worker: `src/worker` (poller, sweeper, BullMQ processors, executor, reconciler) calls the same services. No business logic is duplicated between the API and the worker.
+- Client: `app/**/page.tsx` (thin) → `features/**` (composition + hooks) → `DataSource` (`mock` | `api`) → `/api/*` + SSE. `src/ui/**` is props-only.
+- Shared contract: `src/contracts` (zod schemas, types, currencies, `permissions.ts`) is the only thing both sides import. Contract changes update `docs/03` §5–6 in the same commit.

@@ -1,0 +1,53 @@
+---
+description: Bill state machine, safe transitions, rate math, money precision, strategy and deadline rules
+globs: src/server/domain/**,src/server/services/**,src/server/db/**,src/contracts/**,src/worker/**
+alwaysApply: false
+---
+
+# Bill State and Money
+
+The state machine, invariants, rate math, trigger and deadline rules are defined in `docs/03-domain-model.md`. Implement them exactly. If they need to change, update the doc first.
+
+## Transitions
+- `transition(bill, event)` in `src/server/domain/stateMachine.ts` is pure and returns `{ to, allowedFrom, patch, event }` or throws `InvalidStateError`. Nothing else decides the next state.
+- Services apply it with **one conditional update** on the expected state and version:
+```ts
+const updated = await Bill.findOneAndUpdate(
+  { _id: billId, state: { $in: t.allowedFrom }, version: bill.version },
+  { $set: { state: t.to, ...t.patch }, $inc: { version: 1 }, $push: { recentEvents: { $each: [t.event], $slice: -20 } } },
+  { new: true },
+);
+if (!updated) throw new InvalidStateError(`bill ${billId} changed concurrently`);
+```
+- Then insert the `bill_events` document and publish `bill.updated` on Redis `app_events`.
+- **Claim the transition before calling Airwallex** (e.g. `APPROVED → EXECUTING`), then record the returned IDs and statuses.
+- Multi-document transactions are used **only** for approve (approval + bill) and execution-create (execution + bill).
+- Guards backed by indexes: one `PENDING` approval per bill, and one `active` execution per bill (partial unique indexes). Don't work around them.
+- Transfer status updates are **monotonic** (the rank map in `docs/04` §2.4). `FAILED` overrides anything, including `PAID` (72 h late-failure window). Airwallex auto-cancels failed transfers, so `CANCELLED` applies only from a non-terminal status and never replaces `FAILED`. Status → state map: `docs/13` §4.3.
+- Role guards: only the `approver` role approves or rejects. The standing instruction is captured at arming, and a bill can't be armed without it.
+
+## Deadline guarantee
+- `executionDeadline = subtractBusinessDays(dueDate, leadDays)` in `AIRWALLEX_ACCOUNT_TZ` (date-fns-tz). Store UTC instants in `timers.deadlineOpenAt` / `timers.autosettleAt` at arming.
+- The deadline overrides `PAUSED`, `TARGET_HIT` and `WATCHING`. Only terminal states escape it.
+- Every code path that can fail on the deadline day (a quote, the balance, a transfer error) must leave the bill in a state the sweeper, the retry logic or the operator can still settle before the cutoff. Surface it loudly (banner + notification). Never silently drop it.
+
+## Rate math (`src/server/domain/rates.ts`, pure + unit-tested)
+- Canonical price `p = sell_amount / buy_amount` (H per F, CLIENT level). Lower is better.
+- Cost `A × p + feeEst`; savings `A × (pEntry − pNow)`; distance `(pNow − pTarget) / pNow`.
+- `MAX_COST` mode derives `pTarget = (M − feeEst) / A` and recomputes it when `feeEst` changes.
+- Trigger: threshold with buffer, `TRIGGER_CONFIRM_TICKS` consecutive ticks, fresh tick (< 2 × poll interval), cooldown after a reject or near miss, then **quote check** (`pQuote ≤ pTarget`) before `TARGET_HIT`.
+- Demo exception (`DEMO-ONLY:`): for a `SIMULATED` triggering tick, the quote check uses the simulated price, and the approval stores both the trigger price and the real quote. Never widen this to real ticks.
+
+## Simulate runs (demo)
+- A Simulate run only **feeds ticks** into the normal pipeline and **calls the normal approve service**. It never transitions bills, creates quotes or creates transfers itself.
+- Auto-approval uses actor `system:demo-sim`, requires a valid quote like any approval, and only applies to approvals created from a tick with the same `simId`.
+- Inverted display (`p < 0.01`) is display-only. Logic always uses `p`.
+
+## Money types
+- `decimal.js` for all arithmetic; `Decimal128` in Mongoose schemas; decimal strings in contracts and JSON. The shared Mongoose plugin serialises `Decimal128` to a string.
+- Convert between `Decimal128` and `Decimal` only at the repository boundary. Never `Number(x)`, `parseFloat`, or `+x` on a money or rate value.
+- Round with the currency precision table in `src/contracts/currencies.ts`. Prices are stored with 10 significant digits.
+- Quote requests and transfer amounts are derived from the stored bill, never from request bodies.
+
+## Time
+- Use the injected `Clock` (`clock.now()`) everywhere in domain, services and the worker, so the demo warp clock works. `new Date()` is only allowed at the adapter edge (e.g. HTTP timestamps).

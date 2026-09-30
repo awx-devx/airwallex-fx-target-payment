@@ -1,0 +1,49 @@
+---
+description: UI kit conventions (props-only components, tokens, glow, number formatting, favourable colours, showcase, layout widths, a11y)
+globs: src/ui/**,src/app/dev/**
+alwaysApply: false
+---
+
+# UI Kit
+
+Specs: `docs/05-design-system.md` (tokens, glow, typography, motion, chart styling), `docs/06-ui-kit-spec.md` (inventory, `/dev/ui-kit`, review gate).
+
+## Boundaries
+- `src/ui/**` is **props-only**: no `fetch`, no TanStack Query, no Zustand, no imports from `src/server/**`, `src/features/**` or `src/mocks/**` (fixtures come in through `*.fixtures.ts` files, which may import `src/mocks`). The ESLint `no-restricted-imports` rule enforces this.
+- Types for domain data come from `src/contracts`. Don't hand-write `Bill`-like shapes in components.
+- Layers: `tokens` → `primitives` (Radix-based) → `trading` → `chart` → `patterns`. A lower layer never imports a higher one.
+
+## Showcase (required)
+- Every new component, variant or state is added to its `showcase.tsx` on `/dev/ui-kit` **in the same commit**, with realistic fixtures (`*.fixtures.ts`).
+- The showcase covers the full variant × size × state matrix, including loading (skeleton), empty, error, stale, and long/short/0-3-decimal amounts.
+- Anything live (ticks, countdowns) honours the kit toolbar's **freeze time** switch, so visual snapshots are deterministic.
+- After the review gate, visual changes update the Playwright baseline in a separate, deliberate commit.
+
+## Look
+- **Dark only.** There's a single dark theme; don't add light-mode branches. All colours come from tokens (`--bg-*`, `--fg-*`, `--orange-*`, `--up`, `--down`, `--warn`, `--info`). **No hex values in components.**
+- **Glow is rationed:** only for the target line, the active selection, live/pending states (`WATCHING`, `TARGET_HIT`) and primary actions. At most three glowing elements on any composite screen. Use the `--glow-*` tokens; don't hand-roll box-shadows.
+- Direction colours always go through `favorable(delta)`. For a bill, a **lower price is green**. Never map "up = green" directly.
+- Bill state labels and colours come from one state-meta map used by `StateBadge`. Components don't switch on `BillState` for styling.
+
+## Numbers
+- Money and rates arrive as **decimal strings**. Format only through `src/ui/format/*` (`formatPrice`, `formatMoney`, `formatDelta`, `formatCountdown`). Never `Number()`/`toFixed()` for display.
+- Numbers are tabular (`.num`), `whitespace-nowrap`, and prices use pip emphasis on the last two digits. Pair-dependent decimals (default 5, 3 for JPY-quoted pairs); inverted display is a prop.
+
+## Motion
+- Use the motion tokens and the `useTickFlash`/`useTween` hooks. Pulses only for `WATCHING` (subtle) and `TARGET_HIT` (strong).
+- Respect `prefers-reduced-motion` and the kit's reduced-motion toggle: no pulse, odometer or flash, and colour changes are instant.
+
+## Chart (`src/ui/chart`)
+- Lightweight Charts v5. Overlays (entry, target, target zone, quote band, deadline, due date, now, markers) are price lines or series primitives. No DOM overlays positioned on top of the canvas.
+- Chart colours are read from tokens at mount. Instances are reused when switching bills (switching must take < 100 ms).
+- Draggable target line: emit `onTargetDrag` with a decimal string; the component never mutates the strategy itself.
+
+## Layout and a11y
+- A desktop terminal. Check at **1280, 1440 and 1920** (the kit's width presets). The minimum supported width is 1280; below 1440 the right rail collapses to a drawer. Mobile is a non-goal.
+- No page-level horizontal scroll. Wide content scrolls inside its own container. Truncating flex children use `min-w-0`.
+- Keyboard-first: every primary action has a shortcut (`Kbd` hints). Focus is visible, and dialogs trap focus (Radix).
+- Text contrast ≥ 4.5:1 for `--fg-1`/`--fg-2` on `--bg-1`. `--fg-3` is for labels only.
+
+## Copy
+- Pairs are shown as `F/H` (e.g. `EUR/USD`). Say "target hit", "quote locked · 29:59", "auto-settles at 14:00 (standing instruction)", "paid".
+- Buttons name the outcome and amount ("Approve · pay USD 271,430.12"). The simulated market is always labelled (`EnvBadge`: `DEMO · SIMULATED MARKET`).

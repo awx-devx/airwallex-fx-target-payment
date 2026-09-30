@@ -1,0 +1,30 @@
+---
+description: Seed, test-data generator, reset, smoke, spike and index-sync script conventions
+globs: scripts/**,src/mocks/generators/**
+alwaysApply: false
+---
+
+# Scripts (seed, generator, reset, smoke, spike)
+
+Spec: `docs/11-test-data-and-seeding.md` (generator), `docs/08-demo-plan.md` §1–2 (curated demo seed), `docs/04-airwallex-integration.md` §4, `docs/tracks/B-track.md` (B0.2, B2, B9.4, B9.7).
+
+- Scripts reuse `src/server/*` (services, adapters, models). Never duplicate Airwallex, state-machine or rate logic in scripts.
+- Every script loads env through the same zod env validator as the app and **fails fast** with a helpful message (missing env, Airwallex login failure, quotes not enabled, Mongo not a replica set).
+- Scripts that write data refuse to run unless `DEMO_MODE=true` and (`AIRWALLEX_ENV=sandbox` or the gateway is `mock`).
+
+## Seeds and the generator
+- **Idempotent**: bills carry a `seedKey` (`demo:…` or `gen:v{generatorVersion}:{seed}:{index}`) and are skipped when it exists. Beneficiaries are pooled and reused (`gen:bf:{corridor}:{slot}`). Airwallex `request_id`s are derived from those keys.
+- **Deterministic**: all randomness comes from the seeded PRNG in `src/mocks/generators/rng.ts` (Faker is seeded from it). Never call `Math.random()` or unseeded Faker. A new random seed is always printed.
+- **States only through services**: reach `WATCHING`, `TARGET_HIT`, `PAID`, … by calling the real services, market moves and Simulate runs (`docs/11` §3). Never set `state` directly, and **never write fake Airwallex IDs** into a sandbox-backed DB.
+- `src/mocks/generators/**` is pure and browser-safe (no Node APIs, no I/O). Rendering (Playwright, `sharp`) and Airwallex calls live in `scripts/generate/**`.
+- Money in generated invoices uses `decimal.js` and currency precision; line items must sum exactly to the totals.
+- Generated data is fictional (`.example` email domains, bank ids from the V12 allowlist) and tagged `DEMO-ONLY:`.
+- Large runs (`stress`) force `PAYMENTS_GATEWAY=mock` and `RATE_SOURCE=simulated`.
+- `seed:demo` uses cached extraction results by default for determinism (`--live-extraction` to call the LLM).
+
+## Reset, indexes, smoke, spikes
+- Reset (`/api/demo/reset`, `pnpm seed:reset --generated`) keeps beneficiaries, cancels still-cancellable in-flight transfers first, obliterates the BullMQ queues (full reset only), and resets the clock and market.
+- `db:indexes` is idempotent (`syncIndexes()` + creating the time-series collection if missing), and is safe to run on every deploy.
+- `airwallex:smoke` runs V1–V10 and V12–V17, prints a pass/fail table, writes `docs/verification-results.md`, and records redacted raw responses to `src/server/adapters/airwallex/__fixtures__/`. Resolved findings also update `docs/01` §7 and the related `docs/09` Q-xx.
+- Spike scripts write raw responses to `scripts/spike/out/` (gitignored) and findings to `scripts/spike/FINDINGS.md`.
+- Output under `generated/` is gitignored.

@@ -1,0 +1,33 @@
+---
+description: Tag every demo-only shortcut, sandbox dependency, and Airwallex quirk with grep-able comments
+globs: src/**,scripts/**
+alwaysApply: false
+---
+
+# Demo Comment Tags
+
+This codebase is a base for others (humans and LLMs). Shortcuts must be tagged **where they live**.
+
+| Tag | Use for |
+| --- | --- |
+| `DEMO-ONLY:` | Unsafe or incorrect in production. Must be followed by `PROD:`. |
+| `PROD:` | What production should do instead (or a missing production concern). |
+| `SANDBOX:` | Depends on sandbox-only Airwallex behaviour (simulation endpoints, simulated FX pricing, pre-funded wallet, deposit simulation). |
+| `AIRWALLEX:` | Non-obvious API behaviour/constraint the code relies on, with a docs link when possible. |
+
+```ts
+// DEMO-ONLY: role switcher; anyone can act as the approver.
+// PROD: real auth with approver permissions and an approval audit trail.
+const role = session.role ?? 'approver';
+
+// SANDBOX: moves the transfer to the next status on demand.
+await awx.simulation.transitionTransfer(transferId, 'SENT');
+
+// AIRWALLEX: rates are size-aware; always pass the bill amount (default is 10,000).
+// https://www.airwallex.com/docs/api/transactional_fx/rates/api
+```
+
+Rules:
+- Short and specific: what, and what instead. No decision history, and no comments narrating obvious code.
+- Adding a new `DEMO-ONLY:` means adding a row to the inventory in `docs/08-demo-plan.md` §5 in the same commit.
+- Audit: `rg -n "DEMO-ONLY:|SANDBOX:" src scripts`.

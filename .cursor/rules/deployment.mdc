@@ -1,0 +1,19 @@
+---
+description: Docker, Compose, Caddy, Redis config, health checks and env for the single-server deployment
+globs: Dockerfile,docker-compose*.yml,Caddyfile,redis.conf,.env.example,src/app/api/health/**,src/worker/index.ts,next.config.*
+alwaysApply: false
+---
+
+# Deployment
+
+Spec: `docs/10-deployment.md`. Keep that doc in sync with any change to these files.
+
+- One Dockerfile with two targets: `web` (Next.js `output: 'standalone'`) and `worker` (tsup bundle + prod `node_modules`). Images are tagged with the git SHA.
+- Compose: `caddy`, `web`, `worker` (**exactly one**, never scaled), `redis`; optional `mongo` (rs0 + keyfile + auth). Services use `restart: unless-stopped`; the worker has `stop_grace_period: 60s`; logs rotate.
+- Only Caddy publishes ports (80/443). Redis and Mongo are never exposed on the host.
+- Redis: `appendonly yes`, `maxmemory-policy noeviction` (required by BullMQ), `requirepass`.
+- Caddy: `flush_interval -1` and no read timeout for `/api/stream`; the Airwallex webhook IP allowlist on `/api/webhooks/airwallex`; an upload body limit.
+- `TZ=UTC` in every container. Business time zones come from `AIRWALLEX_ACCOUNT_TZ`.
+- `/api/health` returns 200 only when the Mongo ping, the Redis ping, a fresh `worker:heartbeat` and an Airwallex token are all OK.
+- New env vars go into `.env.example`, the zod env schema, `docs/02` §8 and `docs/10` §8 together. `NEXT_PUBLIC_*` values are build-time.
+- Never bake secrets into images. `.env.production` lives only on the server.

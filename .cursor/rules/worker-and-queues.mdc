@@ -1,0 +1,45 @@
+---
+description: Worker process, BullMQ queues, sweeper timers, poller, leader lock, SSE fan-out, graceful shutdown
+globs: src/worker/**,src/server/queue/**,src/server/events/**,src/app/api/stream/**
+alwaysApply: false
+---
+
+# Worker, Queues and Realtime
+
+Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (deadline rules), `docs/10-deployment.md` §5–7.
+
+## Queues (`src/server/queue`)
+- Queue names, job names and **typed payloads** (zod) live in `src/server/queue`. Producers and processors import them from there; no string literals elsewhere.
+- Every `add` uses a **deterministic `jobId`** from the table in `docs/02` §9.2 (`execute:{billId}:{attempt}`, `deadline.open:{billId}`, `webhook:{eventId}`, …). A duplicate `add` is a no-op, which is the point.
+- Processors are **idempotent and state-guarded**: reload the bill, check its state/version, and exit quietly if the work is already done. A retry must never double-act.
+- One processor file per queue in `src/worker/processors/`. Processors call `server/services`; business logic doesn't live in processors.
+- Worker Redis connections use `maxRetriesPerRequest: null`. Pub/sub subscribers use their own connection.
+- Bound retention: `removeOnComplete: { age: 86400, count: 1000 }`, `removeOnFail: { age: 604800 }`.
+
+## Timers and the sweeper
+- Deadline open, auto-settle and approval expiry are **timestamps in Mongo** (`timers.*`, `approvals.expiresAt`), not BullMQ delayed jobs. This keeps them warp-clock safe and restart safe.
+- The sweeper (1 s loop) queries due timers with `clock.now()` and enqueues jobs. The job sets `*FiredAt` when it completes. Catch-up after downtime needs no special code.
+- Anything new that must happen "at time T" follows the same pattern: a field + a sweeper query + an index.
+
+## Poller
+- A plain loop (not a queue) at `POLL_INTERVAL_MS`, one `rates/current` call per **distinct (F, H, amount bucket)**, going through the Airwallex limiter.
+- It writes to the `rate_ticks` time-series collection, publishes `tick`, and hands trigger candidates to the `strategy` queue.
+
+## Demo Simulate loop (`src/worker/demoSim.ts`)
+- Runs every 1 s, only on the leader, only while a `demo:sim:*` key exists, and only in `DEMO_MODE`. Spec: `docs/08` §1.1.
+- Pacing uses wall-clock seconds even under the warp clock. This is the one allowed exception to "time from `Clock`"; tag it `DEMO-ONLY:`.
+- It produces ticks for sim bills through `RoutingRateSource`, auto-approves through the approve service, advances the transfer through the sandbox simulation endpoint, and applies the status with `applyTransferStatus`. Any pipeline error ends the run (`SIM_ENDED`, phase `ABORTED`).
+
+## Singleton
+- The poller and the sweeper start only while holding the Redis leader lock (`SET worker:leader <id> NX PX 15000`, renewed every 5 s). They stop immediately if the lock is lost.
+- BullMQ processors run regardless of leadership.
+- Write `worker:heartbeat` every 10 s; `/api/health` reads it.
+
+## Shutdown (SIGTERM/SIGINT)
+Stop the poller and sweeper → release the lock → `await worker.close()` on every BullMQ worker → close Redis and Mongo → exit 0. Must finish within the Compose `stop_grace_period` (60 s).
+
+## SSE (`/api/stream`)
+- `export const runtime = 'nodejs'` and `export const dynamic = 'force-dynamic'`.
+- Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`. Heartbeat `: ping` every 15 s.
+- Subscribe to Redis `app_events`; unsubscribe on `request.signal` abort. Event names and payloads come from the SSE union in `src/contracts`.
+- Events are notifications, not the source of truth. The client refetches or patches from the event and survives dropped or reordered events.

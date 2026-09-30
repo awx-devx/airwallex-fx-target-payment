@@ -1,0 +1,28 @@
+---
+description: Airwallex webhook route and processor requirements (signature, dedupe, async processing, ordering)
+globs: src/app/api/webhooks/**,src/server/adapters/airwallex/webhooks.ts,src/worker/processors/webhook*,src/worker/reconciler.ts
+alwaysApply: false
+---
+
+# Webhooks
+
+Full spec: `docs/04-airwallex-integration.md` §3.
+
+## Route (`src/app/api/webhooks/airwallex/route.ts`)
+- `export const runtime = 'nodejs'`.
+- Read the body with `await req.text()` and verify **before** parsing: HMAC-SHA256 hex of `x-timestamp + rawBody` with `AIRWALLEX_WEBHOOK_SECRET`, `crypto.timingSafeEqual`, and a 5-minute timestamp tolerance. Invalid → 400.
+- Store it: `WebhookEvent.create({ _id: event.id, name, payload, receivedAt })`. Duplicate-key `11000` → return 200 without enqueuing again.
+- Enqueue a BullMQ `webhook` job (`jobId: webhook:{eventId}`) and **return 200 immediately**. Never call Airwallex or run business logic in the route.
+- Normalise payloads in one place (`webhooks.ts`): `data.object ?? data`, `account_id ?? accountId`.
+
+## Processor
+- Look up the execution by our stored `airwallexTransferId` first, then fall back to `metadata.bill_id`.
+- Apply the status through the **same** function the reconciler uses (`applyTransferStatus`). Never duplicate that logic.
+- Monotonic (status rank) and tolerant of out-of-order delivery: compare the object's `updated_at` with the stored `awxUpdatedAt`, and ignore older ones. `FAILED` beats `PAID`; `CANCELLED` never replaces `FAILED`.
+- `data.object` has the Retrieve response shape: reuse the transfer mapper in `mappers.ts` (`docs/13` §7).
+- On failure, record `error` on the `webhook_events` document and let BullMQ retry. The reconciler (every 60 s, and on boot) is the backstop.
+- Mark `processedAt` on success; publish `execution.updated` / `bill.updated`.
+
+## Ops
+- Local development: a tunnel URL registered in the sandbox web app with API version `AIRWALLEX_API_VERSION`.
+- Deployed: Caddy only allows the Airwallex webhook IPs on this path (`docs/10` §7).

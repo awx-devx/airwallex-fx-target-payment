@@ -1,0 +1,56 @@
+---
+description: Commit frequently using Conventional Commits 1.0.0 so history is easy to track and revert
+alwaysApply: true
+---
+
+# Commits (Conventional Commits 1.0.0)
+
+Spec: https://www.conventionalcommits.org/en/v1.0.0/
+
+## Ask before committing
+- **Always ask the user before running `git commit`** (and before amend, rebase, or anything else that rewrites history). Show the proposed message(s) and the files included, then wait for approval.
+- Exception: skip asking only after the user **explicitly** grants ongoing permission (for example "keep committing without asking"). That permission lasts for the current conversation only, and the user can revoke it at any time.
+- An instruction to do a task is not permission to commit it.
+
+## When to commit
+- Propose a commit after **each logical, working unit** (a contract, a UI kit component plus its showcase, a model, a service function plus its tests, a processor, a page, a doc update). Don't batch unrelated changes.
+- Each commit should build/typecheck on its own so `git revert <sha>` is safe.
+- Separate refactors and formatting from behaviour changes.
+- Commit docs changes together with the code they describe.
+- Never commit secrets (`.env*` except `.env.example`), `node_modules`, `.next`, `dist`, uploads, `generated/`, `scripts/spike/out/`, or Playwright reports. Visual baselines are committed deliberately, in their own commit.
+- Don't push, amend pushed commits, or force-push unless the user asks.
+
+## Format
+```
+<type>(<scope>): <imperative summary, lowercase, no period, ≤72 chars>
+
+<optional body: what and why, wrapped at 72>
+
+<optional footers: Refs: U4.2, Refs: Q-05, BREAKING CHANGE: ...>
+```
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`, `ci`, `perf`, `style`, `revert`.
+Breaking changes: `feat(contracts)!: ...` and/or a `BREAKING CHANGE:` footer.
+
+Scopes:
+- Shared: `contracts`, `mocks`
+- UI: `tokens`, `ui-kit`, `chart`, `terminal`, `upload`, `approvals-ui`, `settings`
+- Backend: `bills`, `strategy`, `rates`, `quotes`, `approvals`, `execution`, `deadline`, `worker`, `queue`, `sse`, `webhooks`, `airwallex`, `beneficiaries`, `extraction`, `notify`, `db`
+- Ops: `demo`, `seed`, `spike`, `deploy`, `config`, `deps`, `docs`, `rules`
+
+## Examples
+```
+feat(chart): add target zone and deadline line primitives
+
+Refs: U4.3
+```
+```
+fix(webhooks): verify signature against raw request body
+feat(deadline): auto-settle at cutoff under standing instruction
+test(strategy): cover confirm-ticks and stale-feed trigger rules
+docs(feasibility): record V4 transfer-with-quote findings
+chore(deps): add lightweight-charts v5
+revert: feat(deadline): auto-settle at cutoff under standing instruction
+
+Refs: 1a2b3c4
+```
