@@ -100,7 +100,7 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Shortcut | Tag | Where | Production approach |
 | --- | --- | --- | --- |
 | Simulated market drives the chart and triggers (`RATE_SOURCE=simulated`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/rates/simulated` | Poll bill-sized `rates/current`; triggers only from real ticks |
-| Warp clock (`CLOCK=warp`) | `DEMO-ONLY` | `server/adapters/clock` | System clock; demo endpoints removed |
+| Warp clock (`CLOCK=warp`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/clock` | System clock; demo endpoints removed |
 | Role switcher instead of real auth; anyone can be the approver | `DEMO-ONLY` | session helper, `TopBar` | SSO/real auth, approver permissions, approval limits and dual control |
 | `/dev/*` and `/api/demo/*` routes | `DEMO-ONLY` | `src/app/dev`, `src/app/api/demo` | Not deployed (`DEMO_MODE=false`) |
 | Standing instruction is a single checkbox at arming | `DEMO-ONLY` | `ArmConfirm`, `arm` service | A formal payment mandate with limits, stored with an audit trail |
@@ -108,10 +108,10 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Generated vendors, bank accounts and invoices; mock extractor returns truth by file hash | `DEMO-ONLY` | `src/mocks/generators`, `scripts/generate`, mock `BillExtractor` | Real vendor onboarding and live extraction |
 | Uploads on a local Docker volume | `DEMO-ONLY` | uploads storage adapter | Encrypted object storage with retention rules |
 | Single server, one worker (single point of failure) | `DEMO-ONLY` | `docs/10` | Multi-instance web, managed Redis, `DEADLINE_SAFETY_NET=airwallex` |
-| Transfer status advanced by the simulation endpoint | `SANDBOX` | `simulation.ts`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
+| Transfer status advanced by the simulation endpoint | `SANDBOX` | `src/mocks/mock-data-source.ts`, `simulation.ts`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
 | Pre-funded wallet topped up by deposit simulation | `SANDBOX` | `/api/demo/scenario`, seed scripts | Real funding; low-balance alerts before the deadline day |
 | Sandbox FX pricing is simulated, so quote rates may not track the market | `SANDBOX` | quote adapter, `ApprovalCard` | Real quotes; show the trigger rate and the quote rate side by side |
-| Simulate button: per-bill scripted price path | `DEMO-ONLY` | `worker/demoSim.ts`, `RoutingRateSource` | Removed; triggers only from real ticks |
-| Simulated trigger skips the "real quote ≤ target" check | `DEMO-ONLY` | strategy engine (simulated ticks only) | Always require `p_quote ≤ p_target` |
-| Simulated trigger is auto-approved by `system:demo-sim` | `DEMO-ONLY` | `worker/demoSim.ts` → approve service | Human approval only (or the standing instruction at the cutoff) |
+| Simulate button: per-bill scripted price path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `worker/demoSim.ts`, `RoutingRateSource` | Removed; triggers only from real ticks |
+| Simulated trigger skips the "real quote ≤ target" check | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, strategy engine (simulated ticks only) | Always require `p_quote ≤ p_target` |
+| Simulated trigger is auto-approved by `system:demo-sim` | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `worker/demoSim.ts` → approve service | Human approval only (or the standing instruction at the cutoff) |
 | Sim reads transfer status immediately instead of waiting for webhooks | `SANDBOX` | `worker/demoSim.ts` | Webhooks + reconciler |
