@@ -119,6 +119,14 @@ Rules:
 
 ## 6. Motion
 
+All animation runs through **Motion** (`motion` on npm, formerly Framer Motion; D-11a). CSS handles the few things that are purely decorative (`glow-pulse`, skeleton shimmer); everything stateful — numbers, layout, enter/exit, gestures — is a Motion component so it shares one timing system and honours reduced motion automatically.
+
+Rules:
+- Durations and easings come from the tokens below; components never hardcode timings.
+- Only animate `transform` and `opacity`. Width, height and colour animations are reserved for the tokenised patterns below (tick flash, glow border).
+- `MotionConfig reducedMotion="user"` wraps the app: under `prefers-reduced-motion` (and the kit's reduced-motion toggle) there is no pulse, odometer, flash or layout animation; colour changes are instant.
+- `src/ui/**` imports `motion/react` directly. No fetching and no stores inside animated components.
+
 | Token | Value | Use |
 | --- | --- | --- |
 | `--ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Entrances |
@@ -133,7 +141,9 @@ Patterns:
 - **Number tween:** savings and cost tween over 300 ms.
 - **State change:** badges crossfade. On a transition to `TARGET_HIT`, the card border animates into `--glow-lg` and the target line on the chart brightens briefly (one pulse).
 - **Countdown:** in the final 60 s the chip turns `--warn` and ticks with a subtle scale of 1 → 1.03.
-- **Reduced motion:** there is no pulse, odometer or flash; colour changes are instant.
+- **Enter/exit:** lists, toasts, popovers, drawers and modals use `AnimatePresence` (fade + 8 px rise, `--dur-2`/`--dur-3`).
+- **Layout:** bill selection and rail collapse use `layout` transitions on `--ease-in-out` so panels glide instead of snapping.
+- **Reduced motion:** there is no pulse, odometer, flash or layout animation; colour changes are instant.
 
 ---
 

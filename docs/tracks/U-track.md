@@ -35,7 +35,7 @@ Owned jointly. It blocks U2 onwards, so do it first.
 | ID | Task | Done when |
 | --- | --- | --- |
 | U0.1 | Next.js (App Router, TS strict), pnpm, ESLint + Prettier, path aliases (`@/ui`, `@/contracts`, …) | `pnpm dev` runs |
-| U0.2 | Tailwind v4 + `tokens.css` wiring, fonts (Inter, JetBrains Mono / Geist Mono) via `next/font` | Tokens visible in devtools |
+| U0.2 | Tailwind v4 + `tokens.css` wiring, fonts (Inter, JetBrains Mono / Geist Mono) via `next/font`, and the `motion` dependency (Motion, [05 §6](../05-design-system.md#6-motion)) | Tokens visible in devtools |
 | U0.3 | `/dev/ui-kit` shell: nav tree, section registry, global toolbar (density, reduced motion, freeze time, bg, width presets) | Empty sections render |
 | U0.4 | ESLint boundary rule (`no-restricted-imports`) that enforces the `src/ui` isolation | Lint fails on a violation |
 | U0.5 | Playwright set up with a `ui-kit` screenshot spec (runs per anchor) | `pnpm test:visual` runs |
@@ -48,7 +48,7 @@ Owned jointly. It blocks U2 onwards, so do it first.
 | U1.2 | Glow/elevation tokens + `glow-pulse` keyframes + reduced-motion overrides |
 | U1.3 | Typography roles + number utilities (`.num`, pip emphasis) |
 | U1.4 | Spacing, radius, density (compact/comfortable via a `data-density` attribute) |
-| U1.5 | Motion tokens + `useTickFlash`, `useTween` hooks (UI-only) |
+| U1.5 | Motion tokens + `MotionConfig` (reduced motion from `prefers-reduced-motion` and the kit toggle) + `useTickFlash`, `useTween` hooks built on Motion (UI-only) |
 | U1.6 | Formatters: `formatPrice(pair, value, {inverted})`, `formatMoney(ccy, value, {signed})`, `formatDelta`, `formatCountdown`, `favorable(delta)` + unit tests |
 | U1.7 | Tokens showcase sections ([06 §1](../06-ui-kit-spec.md#1-tokens-showcase)) incl. the **favourable semantics** story |
 
@@ -64,7 +64,7 @@ All components in [06 §2](../06-ui-kit-spec.md#2-primitives), on Radix where ap
 | U2.2 | Input, AmountInput, RateInput, Textarea, Checkbox/Radio/Switch, Slider |
 | U2.3 | Select/Combobox (incl. async search with a "keep typing" truncated state), CurrencySelect (capability groups, account-disabled state), DateInput/DatePicker, TransferMethodPicker (flight time + limits, [13 §5.3](../13-airwallex-contracts.md#53-method-lead-days-and-limits)) |
 | U2.4 | Badge, Chip, Avatar, Spinner, Skeleton, ProgressBar, Divider |
-| U2.5 | Tooltip, Popover, DropdownMenu, Dialog (default/glow/danger), Drawer |
+| U2.5 | Tooltip, Popover, DropdownMenu, Dialog (default/glow/danger), Drawer — all enter/exit through Motion `AnimatePresence` ([05 §6](../05-design-system.md#6-motion)) |
 | U2.6 | Tabs, Card/Panel (incl. glow-border), ScrollArea, Table base |
 | U2.7 | Toast system (incl. the rich `target-hit` variant), Banner, EmptyState |
 | U2.8 | FileDropzone, Stepper |
@@ -77,7 +77,7 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 
 | ID | Group |
 | --- | --- |
-| U3.1 | PairLabel, PriceDisplay (incl. hero odometer), PriceTicker, DeltaText |
+| U3.1 | PairLabel, PriceDisplay (incl. hero odometer via Motion), PriceTicker, DeltaText |
 | U3.2 | MoneyDisplay, SavingsCell, CostBreakdown (estimated / tentative / locked; fee paid by, SWIFT charges, "vendor receives"), KeyValueList |
 | U3.3 | DistanceToTarget, CountdownChip, DeadlineMeter (skipped non-conversion days) |
 | U3.4 | StateBadge (all states), TransferStatusPill (every `TransferStatus` + late failure), ConnectionIndicator, EnvBadge, BalancePill (available/pending/reserved tooltip) |
@@ -122,7 +122,7 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 | ID | Task |
 | --- | --- |
 | U6.1 | Data hooks against `DataSource` (`useBills`, `useBill`, `useChart`, `useStream`, `useApprovals`, `useBalances`) with TanStack Query; Zustand UI store (selection, layout, density) |
-| U6.2 | Terminal layout grid (3 columns + bottom panel, resizable splitters, collapse right rail < 1440) |
+| U6.2 | Terminal layout grid (3 columns + bottom panel, resizable splitters, collapse right rail < 1440) with Motion `layout` transitions on selection and rail collapse |
 | U6.3 | Selection + deep links `/bills/:id`; chart instance cache; `J`/`K` navigation |
 | U6.4 | Ticket state machine rendering per [07 §1](../07-pages-spec.md#behaviour) |
 | U6.5 | Upload → review → strategy → arm flow (mock extraction with delays and low-confidence fields); demo-only **Add sample invoices** button in `UploadModal` |
@@ -146,4 +146,4 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 
 ## U8 — Polish · ~1.5 days
 
-Motion polish (target-hit choreography), empty-state art, perf pass (React profiler, memoised rows), a11y pass, final visual baseline, and screenshots for the pitch deck.
+Motion polish: target-hit choreography (card glow, chart target-line pulse, toast, sequenced), list and toast enter/exit, and a pass confirming every animation is transform/opacity-only and disabled under reduced motion. Plus empty-state art, perf pass (React profiler, memoised rows), a11y pass, final visual baseline, and screenshots for the pitch deck.

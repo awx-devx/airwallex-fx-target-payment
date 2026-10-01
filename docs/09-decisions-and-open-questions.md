@@ -16,6 +16,7 @@ Status values: **Proposed** (default, open for objection), **Accepted**, **Super
 | D-08 | Standing instruction consent is **required to arm** a bill | Accepted | Reconciles "request approval on the final day" with "must be settled by the deadline in any case". |
 | D-09 | Canonical price = `sell_amount / buy_amount` (H per F) from the CLIENT level | Accepted | Avoids `currency_pair` orientation bugs. |
 | D-10 | Display pair `F/H`, lower = better; auto-offer inversion when price < 0.01 | Accepted | Consistent "buy low" mental model for the target line. |
+| D-11a | Animation runs through **Motion** (`motion` on npm, formerly Framer Motion); CSS keyframes only for `glow-pulse` and skeleton shimmer | Accepted | One timing system, layout animations and reduced-motion support for free. Spec: [05 §6](./05-design-system.md#6-motion). |
 | D-11 | Charts use TradingView Lightweight Charts v5 + custom series primitives | Accepted | Performance + price lines built in. Alternative: ECharts/visx (heavier or more work). |
 | D-12 | UI kit rendered on our own `/dev/ui-kit` page (no Storybook) | Accepted | Stays in the app's real theme/runtime and is faster to set up. The showcase configs can later generate Storybook stories. |
 | D-13 | Hybrid demo mode: simulated market + real sandbox quotes/transfers | Accepted | Keeps the demo lively while the money path stays real. Clearly labelled in the UI. |
