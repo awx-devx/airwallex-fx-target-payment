@@ -21,6 +21,15 @@ test('screenshots every ui-kit anchor with time frozen', async ({ page }) => {
     await expect(page.locator('[data-freeze-time="true"]')).toBeVisible();
     const section = page.locator(`[data-kit-anchor="${anchor}"]`);
     await section.scrollIntoViewIfNeeded();
+    const box = await section.boundingBox();
+    if (anchor.startsWith('patterns/') && box && box.height + 80 > 900) {
+      await page.setViewportSize({
+        width: 1600,
+        height: Math.min(8000, Math.ceil(box.height + 160)),
+      });
+      await section.scrollIntoViewIfNeeded();
+    }
     await expect(section).toHaveScreenshot(`ui-kit-${anchor}.png`);
+    await page.setViewportSize({ width: 1600, height: 900 });
   }
 });
