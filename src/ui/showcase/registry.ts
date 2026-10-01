@@ -8,6 +8,9 @@ import { overlayShowcases } from '@/ui/primitives/showcase/overlays';
 import { pickerShowcases } from '@/ui/primitives/showcase/pickers';
 import { statusShowcases } from '@/ui/primitives/showcase/status';
 import { tokensShowcase } from '@/ui/tokens/showcase';
+import { bookShowcases } from '@/ui/trading/showcase/books';
+import { marketShowcases } from '@/ui/trading/showcase/market';
+import { statusShowcases as tradingStatusShowcases } from '@/ui/trading/showcase/status';
 
 /** Each component adds its showcase export to this list. */
 export const showcases: Showcase[] = [
@@ -20,4 +23,7 @@ export const showcases: Showcase[] = [
   ...layoutShowcases,
   ...feedbackShowcases,
   ...fileShowcases,
+  ...marketShowcases,
+  ...bookShowcases,
+  ...tradingStatusShowcases,
 ];

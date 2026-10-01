@@ -53,7 +53,7 @@ export function Badge({
   appearance?: BadgeStyle;
   size?: 'xs' | 'sm';
   dot?: boolean;
-  pulse?: boolean;
+  pulse?: boolean | 'strong';
   children: ReactNode;
 }) {
   const palette =
@@ -72,7 +72,7 @@ export function Badge({
           aria-hidden
           className={cx(
             'size-1.5 rounded-full bg-current',
-            pulse && 'glow-pulse',
+            pulse === 'strong' ? 'glow-pulse-strong' : pulse && 'glow-pulse',
           )}
         />
       ) : null}
