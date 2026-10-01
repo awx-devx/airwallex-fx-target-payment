@@ -1,0 +1,24 @@
+---
+description: Keep controls above the grain aurora. A fixed z-0 layer paints over in-flow content.
+globs: src/**/*.tsx
+alwaysApply: false
+---
+
+# Stack above the page ground
+
+`AuroraBand` is `position: fixed` with `z-0`. A positioned `z-0` layer paints **above** in-flow content that has no `position` and no z-index. A footer, button, or bar left in normal flow at the bottom of the page disappears under the grain, even when it comes later in the DOM.
+
+- The ground stays `z-0` and `pointer-events-none`. Do not raise it.
+- The sheet (terminal, settings, kit stage) is one `relative z-10` wrapper. Every control that must stay visible lives **inside** that wrapper.
+- A floating control is `absolute z-20` inside that wrapper, not a sibling of the aurora. A bottom bar, if there is one, is the same: `relative z-20` and an opaque `--bg-*`.
+- Portaled overlays (dialog, drawer, toast) use `z-[60]` or higher so they sit above the sheet.
+
+```tsx
+<div className="relative isolate flex h-dvh flex-col">
+  <AuroraBand />
+  <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+    {/* header, columns */}
+    <div className="absolute right-4 bottom-4 z-20">{/* Demo */}</div>
+  </div>
+</div>
+```

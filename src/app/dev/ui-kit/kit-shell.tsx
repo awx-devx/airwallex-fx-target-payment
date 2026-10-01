@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useSyncExternalStore } from 'react';
-import { AuroraBand } from '@/app/dev/ui-kit/aurora';
+import { AuroraBand } from '@/ui/patterns/grain-aurora';
 import { MotionProvider } from '@/ui/motion/provider';
 import { KIT_GROUPS, kitAnchor, showcases } from '@/ui/showcase';
 
