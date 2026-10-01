@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { MotionProvider } from '@/ui/motion/provider';
+import { ToastProvider } from '@/ui/primitives/toast';
+import { TooltipProvider } from '@/ui/primitives/tooltip';
 import './globals.css';
 
 const inter = Inter({
@@ -25,7 +27,11 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
       <body>
-        <MotionProvider>{children}</MotionProvider>
+        <MotionProvider>
+          <TooltipProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </TooltipProvider>
+        </MotionProvider>
       </body>
     </html>
   );
