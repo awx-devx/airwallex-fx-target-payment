@@ -483,15 +483,28 @@ export const patternShowcases: Showcase[] = [
           <div className="grid gap-4 lg:grid-cols-2">
             {(
               [
-                ['idle', []],
-                ['dragging', []],
-                ['uploading', [{ name: 'acme.pdf', progress: 40 }]],
-                ['extracting', [{ name: 'acme.pdf', progress: 100 }]],
-                ['partial', [{ name: 'acme.pdf', progress: 100 }, { name: 'bad.xml', error: 'Unreadable' }]],
-                ['samples', []],
-              ] as [UploadPhase, { name: string; progress?: number; error?: string }[]][]
-            ).map(([phase, files]) => (
-              <Cell key={phase} label={phase}>
+                ['idle', 'idle', []],
+                ['dragging', 'dragging', []],
+                ['uploading', 'uploading', [{ name: 'acme.pdf', progress: 40 }]],
+                [
+                  'extracting',
+                  'extracting',
+                  [
+                    { name: 'queued.pdf', extraction: 'working' },
+                    { name: 'readers.pdf', extraction: 'searching' },
+                    { name: 'model.pdf', extraction: 'solving' },
+                  ],
+                ],
+                ['ready', 'extracting', [{ name: 'acme.pdf', progress: 100 }]],
+                ['partial', 'partial', [{ name: 'acme.pdf', progress: 100 }, { name: 'bad.xml', error: 'Unreadable' }]],
+                ['samples', 'samples', []],
+              ] as [
+                string,
+                UploadPhase,
+                { name: string; progress?: number; error?: string; extraction?: 'working' | 'searching' | 'solving' }[],
+              ][]
+            ).map(([label, phase, files]) => (
+              <Cell key={label} label={label}>
                 <UploadPreview phase={phase} files={files} />
               </Cell>
             ))}

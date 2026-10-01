@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/ui/primitives/button';
 import { Dialog, DialogPreview } from '@/ui/primitives/dialog';
 import { FileDropzone, type DropFile } from '@/ui/primitives/file-dropzone';
+import { ExtractionOrb } from '@/ui/patterns/extraction-orb';
 
 export type UploadPhase =
   | 'idle'
@@ -34,6 +35,9 @@ export function UploadBody({
         dragging={phase === 'dragging'}
         error={phase === 'partial' ? 'Some files could not be read.' : undefined}
         onFiles={onFiles}
+        mark={(file) =>
+          file.extraction ? <ExtractionOrb state={file.extraction} size={20} /> : null
+        }
       />
       {/* DEMO-ONLY: sample invoices are generated. PROD: only uploaded documents are extracted. */}
       <div className="flex flex-wrap gap-2">
