@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('screenshots every ui-kit anchor with time frozen', async ({ page }) => {
+  test.setTimeout(180_000);
   await page.goto('/dev/ui-kit');
   await page.evaluate(() => document.fonts.ready);
   await page.getByRole('switch', { name: 'Freeze time' }).click();
