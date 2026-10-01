@@ -35,7 +35,7 @@ Owned jointly. It blocks U2 onwards, so do it first.
 | ID | Task | Done when |
 | --- | --- | --- |
 | U0.1 | Next.js (App Router, TS strict), pnpm, ESLint + Prettier, path aliases (`@/ui`, `@/contracts`, …) | `pnpm dev` runs |
-| U0.2 | Tailwind v4 + `tokens.css` wiring, fonts (Inter, JetBrains Mono / Geist Mono) via `next/font`, and the `motion` dependency (Motion, [05 §6](../05-design-system.md#6-motion)) | Tokens visible in devtools |
+| U0.2 | Tailwind v4 + `tokens.css` wiring, fonts (Inter, JetBrains Mono / Geist Mono) via `next/font`, and the `motion` and `thinking-orbs` dependencies (Motion, [05 §6](../05-design-system.md#6-motion); ThinkingOrb, [07 §2](../07-pages-spec.md#2-upload--review-flow-upload-also-a-modal-over-the-terminal)) | Tokens visible in devtools |
 | U0.3 | `/dev/ui-kit` shell: nav tree, section registry, global toolbar (density, reduced motion, freeze time, bg, width presets) | Empty sections render |
 | U0.4 | ESLint boundary rule (`no-restricted-imports`) that enforces the `src/ui` isolation | Lint fails on a violation |
 | U0.5 | Playwright set up with a `ui-kit` screenshot spec (runs per anchor) | `pnpm test:visual` runs |
@@ -110,7 +110,7 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 | U5.2 | BillTicket (all state variants), ArmConfirm, StrategyWizardStep |
 | U5.3 | ApprovalCard (all variants), ApprovalModal, TransferTracker (funding sub-row, failure category + next step, short reference) |
 | U5.4 | PositionsPanel + PositionsTable (tick flash rows) |
-| U5.5 | UploadModal, ExtractionReview (reason select, reference, inline `FieldError`s), **SchemaForm** (renders `BeneficiaryFormSchema`: all five field types, `refresh`, async bank search, error mapping by `path`; [13 §5.2](../13-airwallex-contracts.md#52-dynamic-form--beneficiaryformschema--schemaform)) |
+| U5.5 | UploadModal (extraction rows show a `ThinkingOrb` whose `state` follows the extraction stage, paused under reduced motion; [07 §2](../07-pages-spec.md#2-upload--review-flow-upload-also-a-modal-over-the-terminal)), ExtractionReview (reason select, reference, inline `FieldError`s), **SchemaForm** (renders `BeneficiaryFormSchema`: all five field types, `refresh`, async bank search, error mapping by `path`; [13 §5.2](../13-airwallex-contracts.md#52-dynamic-form--beneficiaryformschema--schemaform)) |
 | U5.6 | NotificationCenter, CommandPalette, ShortcutsSheet |
 | U5.7 | DemoControlBar, SimulateButton / SimProgress, SettingsForm |
 | U5.8 | **Review gate**: run the checklist in [06 §6](../06-ui-kit-spec.md#6-ui-kit-review-page), fix feedback, capture the visual baseline, record the sign-off in [09](../09-decisions-and-open-questions.md#sign-offs) |

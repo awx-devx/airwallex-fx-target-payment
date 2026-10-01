@@ -83,6 +83,7 @@ Other pages follow the same split: the upload review's document preview stacks a
 ## 2. Upload & review flow (`/upload`, also a modal over the terminal)
 
 1. **Drop** (`UploadModal`): multi-file PDF/PNG/JPG (≤ 20 MB each). Each file gets a row with upload → extraction progress. Files process in parallel (max 4). The user can close the modal; progress continues and a toast appears on completion.
+   - While a file's extraction `status` is `RUNNING`, the row shows a [`ThinkingOrb`](https://libraries.dev/orbs) (`thinking-orbs`, D-21) instead of the generic spinner, since a model is reading the document. The orb's `state` follows the stage the server reports: `working` while queued, `searching` while the deterministic readers run, `solving` while Claude (or the escalation model) reads the document, and it is removed the moment the status becomes `DONE` or `FAILED`. Size 20 inline in the file row, size 64 on the extraction screen itself. `dark`, `speed` 1. Under reduced motion the orb is `paused` and the row falls back to the status text.
 2. **Review** (`ExtractionReview`), one bill at a time with a stepper (1 of n):
    - Left: document preview with extracted-field highlights (bounding boxes if the extractor returns them).
    - Right: fields for vendor, invoice #, currency, amount, issue date, due date, payment reference (defaults to the invoice #), transfer reason (Airwallex `reason` enum, default "Bill payment"), and bank details. Low-confidence fields are outlined in `--warn`.
