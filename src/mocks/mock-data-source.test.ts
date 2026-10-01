@@ -132,4 +132,26 @@ describe('MockDataSource', () => {
       (await source.getBill('bill-watching')).events.at(-1)?.payload,
     ).toMatchObject({ aborted: true });
   });
+
+  it('keeps a readable chart after the market ticks', async () => {
+    const source = sourceAt(FIXTURE_NOW);
+    source.stepMarket();
+    const chart = await source.getChart('bill-watching', { range: 'TO_DUE' });
+    expect(chart.series.length).toBeGreaterThan(24);
+    const bill = await source.getBill('bill-watching');
+    expect(chart.series.at(-1)?.value).toBe(bill.lastPrice);
+    for (let index = 1; index < chart.series.length; index += 1) {
+      expect(chart.series[index]!.time).toBeGreaterThan(chart.series[index - 1]!.time);
+    }
+  });
+
+  it('jumps a watching bill onto its deadline day', () => {
+    const source = sourceAt(FIXTURE_NOW);
+    source.jumpToDeadline('bill-watching');
+    expect(source.clock.now().toISOString().slice(0, 10)).toBe('2026-10-09');
+    return source.getBill('bill-watching').then((bill) => {
+      expect(bill.state).toBe('DEADLINE_WINDOW');
+      expect(bill.activeApproval?.kind).toBe('DEADLINE');
+    });
+  });
 });

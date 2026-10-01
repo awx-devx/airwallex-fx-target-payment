@@ -79,7 +79,7 @@ These variables stay in the token file so the kit can show them. They are not ap
 
 ### Grain aurora
 
-The page ground, behind the sheet (D-22). A Paper Shaders `GrainGradient` (`@paper-design/shaders-react`, pinned `0.0.81`) fills a fixed band on the bottom 40vh and fades out through a mask before mid-screen. Panels stay opaque and sit above it.
+The page ground, behind the sheet (D-22). A Paper Shaders `GrainGradient` (`@paper-design/shaders-react`, pinned `0.0.81`) fills a fixed band on the bottom 40vh and fades out through a mask before mid-screen. Panels stay opaque and sit above it. The band is `position: fixed` at `z-0`, and that layer paints over in-flow content that has no position of its own. The sheet is one `relative z-10` wrapper; controls, including a floating demo bar, live inside it.
 
 | Prop | Value |
 | --- | --- |
@@ -134,9 +134,11 @@ Rules:
 - Spacing scale (px): 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56.
 - Radius: `--r-xs` through `--r-md` are `0` (the sheet: buttons, inputs, badges, chips, cards, stepper marks). `--r-lg` and `--r-xl` are `4` (the only soft layer: dialogs, menus, popovers, toasts, tooltips, select menus, the date popup, and the crosshair card). `--r-pill 999` is only for dots, flags, avatars, and tracks (progress, slider, switch, radio).
 - The kit stage is the scroll pane. No outer padding, no panel shadow. Sections share one `border-b` in `--line-1` and sit flush. The nav edge is that same 1px line.
+- Scrollbars are a 1px `--orange-500` rule. Native chrome stays hidden. The line is drawn only while a pane is scrolling, then it fades. The kit `ScrollArea` uses the same rule (`type="scroll"`).
 - Density: the default is **compact** (row height 36, input height 32). A **comfortable** variant (row 44, input 40) is used for modals and forms.
-- Terminal grid (≥ 1440 px): left rail 280 px (bills), centre flexible (chart + bottom panel), right rail 360 px (ticket). Minimum supported width is 1280 px; below that the right rail collapses to a drawer.
-- **Breakpoints** (plain Tailwind, no container queries): `lg` 1024, `xl` 1280, `2xl` 1440. Below `xl` the terminal rails move into drawers opened from the top bar (a bills button on the left, a ticket button on the right) and the top bar drops to icon buttons with labels in tooltips. Below `lg` the chart and the bottom panel stack vertically. Nothing overflows or overlaps at any width down to 360 px; horizontal scrolling is limited to wide tables. Layouts reflow, they don't get a separate mobile design. Spec: [07 §1](./07-pages-spec.md#responsive-behaviour).
+- Terminal grid (≥ 1024 px): left rail 320 px (bills), centre flexible (chart + bottom panel). The ticket is a right drawer at every width, opened from a row's **Open ticket** item or the top-bar Ticket button. Below 1024 px the bill list is a drawer too.
+- The sheet is at most **1600px**, centered. From `md` up, 16px of the ground shows outside it (24px from `xl`), and a `--line-1` rule on each side runs from the top bar through the body. The top bar's own rule runs the full viewport and the side rules meet it. Below `md` the sheet is flush with the window. The grain stays full-bleed behind the sheet. The bill list has no fill, so the ground shows through it. Hover on a bill row or a positions row is a 6% white veil; a selected row's hover is orange at 15%. Neither is a solid surface, so the grain keeps moving underneath.
+- **Breakpoints** (plain Tailwind, no container queries): `lg` 1024, `xl` 1280, `2xl` 1440. The ticket is always a drawer. Below `lg` the bill list is a drawer opened from the top bar, and the chart stacks above the bottom panel. Below `xl` the top bar drops balances, the role switch, and the connection label into the bill list. Nothing overflows or overlaps at any width down to 360 px; horizontal scrolling is limited to wide tables. Layouts reflow, they don't get a separate mobile design. Spec: [07 §1](./07-pages-spec.md#responsive-behaviour).
 
 ---
 
@@ -183,9 +185,8 @@ Patterns:
 | **Target line** | horizontal, `--orange-500`, dashed 6/4 at 1.5 px **with a glow** (drawn twice: 6 px blurred at 30% opacity + crisp line), label chip filled orange "TARGET 1.07500" |
 | **Target zone** | fill between the target line and the bottom of the pane with `--orange-wash` (the "favourable zone") |
 | **Max-cost line** | when in `MAX_COST` mode, the target line label reads "MAX COST ≙ 1.07500 · 268,750 USD" |
-| **Quote band** | when a quote is locked: a horizontal band at the quote price from `valid_from` to `valid_to`, in `--up` at 15% (or `--warn` on deadline day), with a label showing the countdown |
 | **Execution deadline** | vertical line, `--warn`, solid 1 px; label "EXECUTE BY · Oct 14"; the area after it is hatched at 4% |
-| **Due date** | vertical line, `--down` at 70%, dashed; label "DUE · Oct 16" |
+| **Due date** | vertical line, `--down` at 70%, dashed, with the same glow as the target line (6 px blurred at 30%); label "DUE · Oct 16". Everything after the line is a `--down` wash at 8%, the same hint as `--orange-wash` under the target |
 | **Now line** | vertical, `--fg-3`, dotted |
 | Markers | circles at the price: armed (info), near miss (hollow warn), target hit (orange filled + glow), approved (up), rejected (muted ×), executed (up ✓), auto-settle (warn ⚡) |
 | Crosshair | `--line-3`; tooltip card shows the price, the Δ vs entry, the Δ vs target and the cost at that price |

@@ -109,7 +109,7 @@ interface FxChartProps {
   inverted?: boolean;
   series: ChartSeriesPoint[];            // live/own ticks
   reference?: ChartSeriesPoint[];        // third-party history
-  overlays: ChartOverlays;               // entry, target, quote band, deadline, due, now, markers
+  overlays: ChartOverlays;               // entry, target, deadline, due, now, markers
   strategyMode?: 'TARGET_RATE' | 'MAX_COST';
   range: '1H' | '1D' | '1W' | '1M' | 'ALL' | 'TO_DUE';
   type?: 'area' | 'line' | 'candles';
@@ -142,9 +142,9 @@ interface FxChartProps {
 
 1. **Watching, far from target**: price hovering above the target, deadline 12 days out
 2. **Approaching target**: distance < 0.25%, near-miss marker
-3. **Target hit**: price through the target, quote band active with a countdown
+3. **Target hit**: price through the target
 4. **Rejected & re-armed**: rejected marker, price bounced, still watching
-5. **Final day**: now line on the deadline line, amber quote band, autosettle countdown
+5. **Final day**: now line on the deadline line, autosettle countdown
 6. **Auto-settled**: ⚡ marker, executed
 7. **Paid**: executed ✓ marker, lines frozen, post-execution series dimmed
 8. **Max-cost mode**: target label shows cost
@@ -164,13 +164,13 @@ interface FxChartProps {
 | `BillListItem` (market row) | `PairLabel`, vendor, amount, `Sparkline`, `PriceTicker` mini, `DistanceToTarget` mini, `CountdownChip` (deadline), `StateBadge` | every state; selected (orange wash + 2px inset rule); hover; compact vs comfortable |
 | `BillList` (left rail) | Search, filter chips (All / Watching / Needs approval / Final day / Paid), group-by-pair toggle, sort (deadline, distance, amount), list of `BillListItem`, "Upload bills" CTA | empty, loading, many (virtualised) |
 | `PairGroupHeader` | When grouped: pair, total exposure in F and H, count | — |
-| `BillTicket` (right rail) | Tabbed: **Strategy** (mode toggle rate/max cost, `RateInput`/`AmountInput`, equivalents, advanced: buffer, confirm ticks, validity, cutoff), **Details** (bill fields, documents, beneficiary), **Activity** | per bill state: READY (arm form), WATCHING (edit + pause/pay now), TARGET_HIT (shows `ApprovalCard` inline), DEADLINE_WINDOW, IN_FLIGHT (transfer tracker), PAID (receipt), FAILED (error + fix) |
+| `BillTicket` (right drawer) | Tabbed: **Strategy** (mode toggle rate/max cost, `RateInput`/`AmountInput`, equivalents, advanced: buffer, confirm ticks, validity, cutoff), **Details** (bill fields, documents, beneficiary), **Activity** | per bill state: READY (arm form), WATCHING (edit + pause/pay now), TARGET_HIT (shows `ApprovalCard` inline), DEADLINE_WINDOW, IN_FLIGHT (transfer tracker), PAID (receipt), FAILED (error + fix) |
 | `ArmConfirm` | Summary + **standing instruction consent** checkbox ("If not approved by 14:00 on Oct 14, pay at market") | valid, missing consent, target already met |
 | `ApprovalCard` | `QuoteCard` + `CostBreakdown` + savings vs entry + balance check + Approve (primary, `A`) / Hold for better (`H`) / Cancel bill | target-hit, deadline, expired, insufficient balance, approving (loading), approved, as preparer (read-only "waiting for approver"), **simulated trigger** (shows "Triggered at … (simulated) · Airwallex quote … (actual)"), **auto-approved (simulation)** |
 | `ApprovalModal` | `ApprovalCard` in a `glow` dialog, opened from a toast or a notification | — |
 | `TransferTracker` | `TransferStatusPill` + timeline + Airwallex IDs (short ref first; transfer and quote UUIDs) + amounts + funding sub-row (shown when not `FUNDED`) + dispatch date | each status; tentative vs confirmed amounts; failed per `FailureCategory` with next step ([13 §4.5](./13-airwallex-contracts.md#45-failure-categories)); late failure after paid; demo "advance status" button slot |
 | `PositionsPanel` (bottom) | Tabs: **Positions** (active bills table), **Approvals** (pending), **Executed**, **Activity** (global feed) | each tab: loading, empty, populated |
-| `PositionsTable` | Columns: Pair, Vendor, Amount, Entry, Mark, Target, Distance, Savings, Est. cost, Execute by, State, Actions | sortable; row selected; row flashing on tick; row actions menu |
+| `PositionsTable` | Columns: row menu, Pair, Vendor, Amount, Entry, Mark, Target, Savings, Est. cost, Execute by, State | sortable; row selected; row flashing on tick; every row has a three-dot menu whose first item is Open ticket; other items from `allowedActions`, sentence case, Cancel in `--down` |
 | `UploadModal` | `FileDropzone` multi-file → per-file extraction progress → "Review n bills"; demo-only "Add sample invoices" (1–5 generated files, [11 §7](./11-test-data-and-seeding.md#7-interfaces)). The extracting state shows a `ThinkingOrb` (`thinking-orbs`) per file, `state` following the stage (`working` → `searching` → `solving`), paused under reduced motion ([07 §2](./07-pages-spec.md#2-upload--review-flow-upload-also-a-modal-over-the-terminal)) | idle, dragging, uploading, extracting (each orb state), partial failure, generating samples |
 | `ExtractionReview` | Split view: document preview (PDF/image) on the left, `ExtractionField` form on the right, bill n of m stepper, transfer reason `Select` + payment reference, beneficiary resolution (match existing, or `SchemaForm`), "Save as draft" / "Continue to strategy" | high confidence, low-confidence fields highlighted, missing bank details, duplicate invoice warning, Airwallex `FieldError`s inline (from validate-at-arm) |
 | `SchemaForm` | Renders a `BeneficiaryFormSchema` ([13 §5.2](./13-airwallex-contracts.md#52-dynamic-form--beneficiaryformschema--schemaform)): `INPUT`/`SELECT`/`DYNAMIC_SELECT`/`RADIO`/`TRANSFER_METHOD` fields, required markers, help tips, regex validation, `refresh` refetch, bank search; maps `FieldError.path` onto fields | fixtures EUR/IBAN (DE), GBP/sort code, INR/IFSC, USD/ACH; loading schema; refetching after a `refresh` field; field errors; submit → validate → verify |

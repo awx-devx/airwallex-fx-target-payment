@@ -101,6 +101,7 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | --- | --- | --- | --- |
 | Simulated market drives the chart and triggers (`RATE_SOURCE=simulated`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/rates/simulated` | Poll bill-sized `rates/current`; triggers only from real ticks |
 | Warp clock (`CLOCK=warp`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/clock` | System clock; demo endpoints removed |
+| Jump to deadline opens the final-day approval immediately | `DEMO-ONLY` | `src/mocks/mock-data-source.ts` `jumpToDeadline` | The sweeper opens the window from the stored deadline |
 | Role switcher instead of real auth; anyone can be the approver | `DEMO-ONLY` | session helper, `TopBar` | SSO/real auth, approver permissions, approval limits and dual control |
 | `/dev/*` and `/api/demo/*` routes | `DEMO-ONLY` | `src/app/dev`, `src/app/api/demo` | Not deployed (`DEMO_MODE=false`) |
 | Standing instruction is a single checkbox at arming | `DEMO-ONLY` | `ArmConfirm`, `arm` service | A formal payment mandate with limits, stored with an audit trail |

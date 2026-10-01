@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import { AppProviders } from '@/features/data/provider';
+import { ScrollLine } from '@/features/scroll-line';
 import { MotionProvider } from '@/ui/motion/provider';
 import { ToastProvider } from '@/ui/primitives/toast';
 import { TooltipProvider } from '@/ui/primitives/tooltip';
@@ -29,7 +31,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body>
         <MotionProvider>
           <TooltipProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <AppProviders>{children}</AppProviders>
+              <ScrollLine />
+            </ToastProvider>
           </TooltipProvider>
         </MotionProvider>
       </body>

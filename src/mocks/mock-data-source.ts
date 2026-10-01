@@ -323,7 +323,7 @@ export class MockDataSource implements DataSource {
     const bill = this.requireBill(id);
     this.guard(bill, 'PAY_NOW', role);
     if (!bill.lastPrice) fail(409, 'INVALID_STATE', 'Bill has no price');
-    const approval = this.pendingApproval(bill, bill.lastPrice, false);
+    const approval = this.pendingApproval(bill, bill.lastPrice, false, 'TARGET_HIT');
     bill.state = 'TARGET_HIT';
     bill.activeApproval = approval;
     this.remember(approval);
@@ -550,9 +550,41 @@ export class MockDataSource implements DataSource {
     this.emit({ type: 'clock', now: this.iso(), warp: { speed } });
   }
 
+  /** DEMO-ONLY: rehearsal jump onto the bill's deadline day. PROD: the sweeper opens the window from the stored deadline. */
+  jumpToDeadline(billId: string): void {
+    const bill = this.requireBill(billId);
+    const at = new Date(`${bill.executionDeadline}T16:00:00.000Z`);
+    if (this.clock instanceof WarpClock) this.clock.jumpTo(at);
+    else if (this.clock instanceof ManualClock) this.clock.set(at.getTime());
+    else throw new Error('jumpToDeadline needs a controllable clock');
+    this.emit({
+      type: 'clock',
+      now: this.iso(),
+      warp: {
+        speed: this.clock instanceof WarpClock ? this.clock.warpSpeed : 1,
+      },
+    });
+    if (
+      (bill.state === 'WATCHING' || bill.state === 'PAUSED') &&
+      bill.lastPrice
+    ) {
+      const approval = this.pendingApproval(
+        bill,
+        bill.lastPrice,
+        false,
+        'DEADLINE',
+      );
+      bill.state = 'DEADLINE_WINDOW';
+      bill.activeApproval = approval;
+      this.remember(approval);
+      this.emit({ type: 'approval.requested', approval, billId: bill.id });
+      this.publish(bill, 'APPROVAL_REQUESTED', 'system');
+    }
+  }
+
   private triggerSim(bill: BillDetail, run: SimRun): void {
     const price = bill.lastPrice ?? run.to;
-    const approval = this.pendingApproval(bill, price, true);
+    const approval = this.pendingApproval(bill, price, true, 'TARGET_HIT');
     run.approvalId = approval.id;
     run.phase = 'TRIGGERED';
     bill.state = 'TARGET_HIT';
@@ -729,6 +761,7 @@ export class MockDataSource implements DataSource {
     bill: BillDetail,
     price: string,
     simulated: boolean,
+    kind: ApprovalSummary['kind'],
   ): ApprovalSummary {
     const now = this.clock.now();
     const quote = mockQuote({
@@ -740,7 +773,7 @@ export class MockDataSource implements DataSource {
     });
     return {
       id: `ap-${bill.id}-${this.seq}`,
-      kind: 'TARGET_HIT',
+      kind,
       status: 'PENDING',
       quote,
       expiresAt: quote.validToAt,
@@ -867,14 +900,18 @@ export class MockDataSource implements DataSource {
               ? 90 * 86_400
               : Math.max(dueSec - nowSec + 86_400, 86_400);
     const history = this.market.history(bill.pair.base, bill.pair.quote);
-    const points =
-      history.length > 0
-        ? history.map((tick) => ({
-            time: Math.floor(tick.time / 1000),
-            value: tick.price,
-          }))
-        : seededSeries(bill, nowSec);
-    return points.filter((point) => point.time >= nowSec - span);
+    const byTime = new Map<number, string>();
+    for (const point of seededSeries(bill, nowSec, span)) {
+      byTime.set(point.time, point.value);
+    }
+    for (const tick of history) {
+      const time = Math.floor(tick.time / 1000);
+      if (time < nowSec - span) continue;
+      byTime.set(time, tick.price);
+    }
+    return [...byTime.entries()]
+      .sort((left, right) => left[0] - right[0])
+      .map(([time, value]) => ({ time, value }));
   }
 
   private summary(bill: BillDetail): BillSummary {
@@ -995,16 +1032,30 @@ function mockQuote(input: {
   };
 }
 
-function seededSeries(bill: BillDetail, nowSec: number): ChartSeriesPoint[] {
+function seededSeries(
+  bill: BillDetail,
+  nowSec: number,
+  spanSec: number,
+): ChartSeriesPoint[] {
+  const span = Math.min(Math.max(spanSec, 3_600), 90 * 86_400);
+  const count = 96;
+  const step = Math.max(60, Math.floor(span / count));
   const rng = createRng(hash(bill.id));
   const last = D(bill.lastPrice ?? '1');
-  const points: ChartSeriesPoint[] = [];
-  for (let i = 23; i >= 0; i -= 1) {
+  const walked = [last];
+  let cursor = last;
+  for (let i = 0; i < count; i += 1) {
     const wobble = new Decimal(rng.int(-8, 8)).div(10000);
-    const value = i === 0 ? last : last.mul(D('1').plus(wobble));
-    points.push({ time: nowSec - i * 3600, value: significantPrice(value) });
+    cursor = cursor.mul(D('1').plus(wobble));
+    if (cursor.lessThanOrEqualTo(0)) cursor = last;
+    walked.push(cursor);
   }
-  return points;
+  walked.reverse();
+  const start = nowSec - count * step;
+  return walked.map((value, index) => ({
+    time: start + index * step,
+    value: significantPrice(index === count ? last : value),
+  }));
 }
 
 function hash(value: string): number {

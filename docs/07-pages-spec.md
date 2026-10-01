@@ -24,17 +24,19 @@ The main screen, modelled on a perps trading terminal.
 │ ▸ GBP/USD    │                                                          │ [Pause] [Pay now]│
 │ ▸ INR/USD    │──────────────────────────────────────────────────────────│                 │
 │   …          │ PositionsPanel: Positions | Approvals(1) | Executed | Activity             │
-│ [+ Upload]   │ Pair  Vendor  Amount  Entry  Mark  Target  Dist  Savings  Exec by  State  │
+│ [+ Upload]   │ Pair  Vendor  Amount  Entry  Mark  Target  Savings  Exec by  State        │
 └──────────────┴──────────────────────────────────────────────────────────┴─────────────────┘
 ```
 
-The sheet sits on `--bg-0` with the grain aurora from [05 §2](./05-design-system.md#grain-aurora) along the bottom edge, behind the panels. It pauses under reduced motion.
+The sheet sits on `--bg-0` with the grain aurora from [05 §2](./05-design-system.md#grain-aurora) along the bottom edge, behind the panels. It pauses under reduced motion. The diagram's ticket column is a right drawer, not a docked rail, at every width. The sheet is at most 1600px wide. From `md` up a gutter shows the ground on either side, and a hairline on each edge runs from the top bar through the body. The top bar rule continues across the full viewport. Below `md` the sheet is flush. The grain is not inset. The bill list has no background fill.
 
 ### Behaviour
 
 - **Selection:** clicking a bill in the list or a table row selects it. The URL updates to `/bills/:id` (shallow) and the chart and ticket switch instantly. The previous chart instance is kept warm for fast back-and-forth, like switching markets.
+- **Row menu:** every table row has a three-dot menu. The first item is **Open ticket**, which selects the bill and opens the ticket drawer. Further items come from `allowedActions`, in sentence case (Arm, Pay now, Pause). Cancel is last and uses `--down`. Review, Edit, Edit strategy, and Resolve beneficiary (except on a failed bill, which re-arms) also open the ticket.
 - **Grouping:** "Group by pair" in the list shows `PairGroupHeader` with the total exposure. Bills in the same pair share the reference series but keep **their own** entry and target lines and their own deadline.
 - **Live updates:** SSE `tick` updates the list sparkline, the table row (flash), the chart and the ticket. `bill.updated` re-renders the state badges. `approval.requested` raises a **target-hit toast** with Approve/Review actions, and adds a badge to the Approvals tab.
+- **Bottom tabs partition the list.** Every bill is on exactly one of Positions (still working, including drafts), Approvals (`TARGET_HIT` and `DEADLINE_WINDOW`), or Executed (`IN_FLIGHT`, `PAID`, `FAILED`, `CANCELLED`). Activity is the selected bill's events, not another slice of the book. From `lg` up the panel is a fixed `18rem` and the active tab scrolls inside it, so switching tabs does not resize the chart. Below `lg` the panel sizes to its content and the column scrolls.
 - **Chart interactions:** in `WATCHING`/`READY`, the user can drag the target line to edit the target. A cost preview bubble follows the cursor, and releasing it opens a confirm popover. The range defaults to `TO_DUE` (from arming until the due date + padding).
 - **Ticket by state:**
 
@@ -56,10 +58,10 @@ Desktop is the design target (the pitch runs at 1440+), but every page must stay
 
 | Width | Terminal |
 | --- | --- |
-| ≥ 1440 px (`2xl`) | Full three-column grid |
-| 1280–1439 px (`xl`) | Right rail (ticket) collapses to a right drawer, opened from a ticket button in the top bar |
-| 1024–1279 px (`lg`) | Both rails collapse: a **menu button** in the top bar opens the bill list as a left drawer, the ticket stays a right drawer. The centre (chart + bottom panel) fills the width |
-| < 1024 px | As above, and the chart stacks above the bottom panel instead of beside it. The top bar keeps the wordmark, the menu button, the ticket button and the notification bell; balances and the connection indicator move into the menu drawer |
+| ≥ 1440 px (`2xl`) | Bill list and centre (chart + bottom panel). The ticket is a right drawer, opened from **Open ticket** on a row or the Ticket button in the top bar |
+| 1280–1439 px (`xl`) | Same. The ticket stays a drawer |
+| 1024–1279 px (`lg`) | The bill list collapses too: a **menu button** in the top bar opens it as a left drawer. The centre fills the width |
+| < 1024 px | As above, and the chart stacks above the bottom panel instead of beside it. The top bar keeps the wordmark, the menu button, the ticket button and the notification bell. Below `xl`, balances, the role switch, and the connection label leave the bar and sit at the top of the bill list — the rail while it is open, otherwise the menu drawer |
 
 Other pages follow the same split: the upload review's document preview stacks above the fields below `lg`, and settings uses a single column. Dialogs that are wider than the viewport shrink to full width. Touch targets stay at least 32 px, which the comfortable density already gives.
 
