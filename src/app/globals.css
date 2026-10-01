@@ -26,3 +26,43 @@ body {
      extend the root scroll height even when a pane already scrolls. */
   contain: paint;
 }
+
+/*
+ * Tailwind's preflight sets `cursor: default` on buttons. Anything you can
+ * activate gets the pointer; disabled controls stay the arrow.
+ */
+/*
+ * Native scrollbars stay hidden. A 1px orange line is drawn over the pane
+ * only while it scrolls (`ScrollLine`), then it fades, same as an overlay bar.
+ * `scrollbar-width: thin` is a thick thumb — don't use it.
+ */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+[role='tab']:not([data-disabled]),
+[role='menuitem']:not([data-disabled]),
+[role='menuitemcheckbox']:not([data-disabled]),
+[role='menuitemradio']:not([data-disabled]),
+[role='option']:not([data-disabled]),
+[role='switch']:not([data-disabled]),
+[role='checkbox']:not([data-disabled]),
+[role='radio']:not([data-disabled]),
+a[href],
+summary,
+label:has(button, input, select),
+select:not(:disabled),
+input[type='checkbox']:not(:disabled),
+input[type='radio']:not(:disabled),
+input[type='file']:not(:disabled),
+input[type='range']:not(:disabled) {
+  cursor: pointer;
+}

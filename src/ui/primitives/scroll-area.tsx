@@ -13,7 +13,7 @@ export function ScrollArea({
   className?: string;
 }) {
   return (
-    <ScrollAreaPrimitive.Root className={className ?? 'h-32 w-full'}>
+    <ScrollAreaPrimitive.Root type="scroll" className={className ?? 'h-32 w-full'}>
       <ScrollAreaPrimitive.Viewport
         className={orientation === 'horizontal' ? 'w-full' : 'h-full w-full'}
       >
@@ -23,11 +23,11 @@ export function ScrollArea({
         orientation={orientation}
         className={
           orientation === 'horizontal'
-            ? 'flex h-2 touch-none flex-col p-0.5'
-            : 'flex w-2 touch-none p-0.5'
+            ? 'flex h-px touch-none flex-col'
+            : 'flex w-px touch-none'
         }
       >
-        <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-line-3" />
+        <ScrollAreaPrimitive.Thumb className="relative flex-1 bg-orange-500" />
       </ScrollAreaPrimitive.Scrollbar>
     </ScrollAreaPrimitive.Root>
   );

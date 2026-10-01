@@ -14,15 +14,17 @@ export function MoneyDisplay({
   size = 'md',
   signed = false,
   masked = false,
+  className,
 }: {
   currency: string;
   value: string;
   size?: keyof typeof SIZE;
   signed?: boolean;
   masked?: boolean;
+  className?: string;
 }) {
   return (
-    <span className={cx('num', SIZE[size], masked && 'tracking-widest text-fg-3')}>
+    <span className={cx('num', SIZE[size], className, masked && 'tracking-widest text-fg-3')}>
       {masked ? `•••• ${currency}` : formatMoney(currency, value, { signed })}
     </span>
   );

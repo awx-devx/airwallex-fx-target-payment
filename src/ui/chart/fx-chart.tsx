@@ -4,7 +4,7 @@ import type { ChartOverlays, ChartRange, ChartSeriesPoint } from '@/contracts/ch
 import type { Pair, StrategyMode } from '@/contracts/bill';
 import { roundToPayout } from '@/contracts/currencies';
 import { D, decimalString } from '@/contracts/money';
-import { favorable, formatCountdown, formatMoney, formatPrice, priceFractionDigits } from '@/ui/format';
+import { favorable, formatMoney, formatPrice, priceFractionDigits } from '@/ui/format';
 import { Skeleton } from '@/ui/primitives/skeleton';
 import { ChartEmpty } from '@/ui/chart/chart-empty';
 import { ChartHeader, type ChartType, type FeedState } from '@/ui/chart/chart-header';
@@ -23,7 +23,6 @@ import {
   whitespaceEnd,
 } from '@/ui/chart/scale';
 import { readChartColors, withAlpha, type ChartColors } from '@/ui/chart/theme';
-import { useRemaining } from '@/ui/trading/clock';
 import { formatUtcDate } from '@/ui/trading/time-label';
 import { Clock } from 'lucide-react';
 import {
@@ -104,7 +103,6 @@ export function FxChart(props: FxChartProps) {
     onTypeChange,
     connection = 'live',
     notional,
-    quoteTone = 'target',
     targetPulse = false,
     maxCost,
     entryLabel = true,
@@ -123,9 +121,7 @@ export function FxChart(props: FxChartProps) {
   const [drag, setDrag] = useState<{ x: number; y: number; price: string } | null>(null);
   const dragPrice = drag?.price;
   const target = dragPrice ?? overlays.target;
-  const quoteUntil = overlays.quote ? unixIso(overlays.quote.to) : unixIso(overlays.now);
   const nowIso = unixIso(overlays.now);
-  const remaining = useRemaining(quoteUntil, nowIso);
   const latest = useRef({
     series,
     overlays,
@@ -220,6 +216,13 @@ export function FxChart(props: FxChartProps) {
       if (api.reference) api.chart.removeSeries(api.reference);
       if (api.simulated) api.chart.removeSeries(api.simulated);
       if (api.tail) api.chart.removeSeries(api.tail);
+      // The price scale takes its grid step from the oldest series. Drop the
+      // whitespace axis so the new price series is that series, then rebuild it.
+      if (api.axis) {
+        api.chart.removeSeries(api.axis);
+        api.axis = null;
+        axisKey.current = '';
+      }
       const main = addMain(api.chart, type, colors, digits);
       const overlay = new OverlayPrimitive(blankModel(colors));
       main.attachPrimitive(overlay);
@@ -253,7 +256,7 @@ export function FxChart(props: FxChartProps) {
     const nextAxis = pad.join(',');
     if (axisKey.current !== nextAxis) {
       axisKey.current = nextAxis;
-      syncAxis(api, pad);
+      syncAxis(api, pad, digits);
     }
     if (change === 'update' && type !== 'candles') {
       const last = series[series.length - 1];
@@ -285,9 +288,6 @@ export function FxChart(props: FxChartProps) {
         inverted,
         overlays,
         target,
-        quoteTone,
-        remaining,
-        pair,
       }),
     );
     const view = visibleWindow(range, overlays.now, first, overlays.dueDate);
@@ -357,9 +357,7 @@ export function FxChart(props: FxChartProps) {
     onTargetDrag,
     overlays,
     pair,
-    quoteTone,
     range,
-    remaining,
     series,
     reference,
     state,
@@ -409,6 +407,7 @@ export function FxChart(props: FxChartProps) {
   }
 
   const last = series[series.length - 1]?.value;
+  const fill = height === 'fill';
   const cost = (price: string) =>
     notional
       ? formatMoney(
@@ -418,7 +417,7 @@ export function FxChart(props: FxChartProps) {
       : undefined;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={cx('flex min-h-0 flex-col gap-3', fill && 'h-full')}>
       {showHeader ? (
         <ChartHeader
           pair={pair}
@@ -436,22 +435,22 @@ export function FxChart(props: FxChartProps) {
         />
       ) : null}
       {state === 'loading' ? (
-        <Skeleton variant="chart" className="w-full" />
+        <Skeleton variant="chart" className={fill ? 'h-full min-h-0 flex-1' : 'w-full'} />
       ) : state === 'empty' ? (
-        <div style={{ height: height === 'fill' ? '100%' : height }}>
+        <div className={fill ? 'min-h-0 flex-1' : undefined} style={fill ? undefined : { height }}>
           <ChartEmpty />
         </div>
       ) : (
         <div
-          className={cx('relative', state === 'stale' && 'opacity-60')}
-          style={{ height: height === 'fill' ? '100%' : height }}
+          className={cx('relative min-h-0', fill ? 'flex-1' : undefined, state === 'stale' && 'opacity-60')}
+          style={fill ? undefined : { height }}
           onPointerDownCapture={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
         >
           <div
             ref={host}
-            className="h-full w-full"
+            className="absolute inset-0"
             role="img"
             aria-label={`${pair.base}/${pair.quote} chart`}
           />
@@ -534,7 +533,7 @@ function addMain(
   });
 }
 
-function syncAxis(api: Handle, times: readonly number[]): void {
+function syncAxis(api: Handle, times: readonly number[], digits: number): void {
   const data = times.map((time) => ({ time: time as UTCTimestamp }));
   if (!api.axis) {
     api.axis = api.chart.addSeries(LineSeries, {
@@ -543,6 +542,11 @@ function syncAxis(api: Handle, times: readonly number[]): void {
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
+      priceFormat: {
+        type: 'price',
+        precision: digits,
+        minMove: 10 ** -digits,
+      },
     });
   }
   api.axis.setData(data);
@@ -719,17 +723,8 @@ function overlayModel(input: {
   inverted: boolean;
   overlays: ChartOverlays;
   target?: string;
-  quoteTone: 'target' | 'deadline';
-  remaining: number;
-  pair: Pair;
 }): OverlayModel {
   const { colors, overlays, inverted } = input;
-  const expired = Boolean(overlays.quote) && input.remaining <= 0;
-  const urgent = input.remaining > 0 && input.remaining < 60;
-  const quoteColor =
-    input.quoteTone === 'deadline'
-      ? withAlpha(colors.warn, urgent ? 0.35 : 0.15)
-      : withAlpha(colors.up, urgent ? 0.35 : 0.15);
   const spans = (overlays.simulatedRanges ?? []).map((span) => ({
     from: span.from,
     to: span.to ?? overlays.now,
@@ -738,17 +733,7 @@ function overlayModel(input: {
     inverted,
     target: input.target ? chartPrice(input.target, inverted) : undefined,
     entry: overlays.entry ? chartPrice(overlays.entry, inverted) : undefined,
-    quote: overlays.quote ? chartPrice(overlays.quote.price, inverted) : undefined,
     zone: Boolean(input.target),
-    quoteBand: overlays.quote
-      ? {
-          from: overlays.quote.from,
-          to: overlays.quote.to,
-          color: quoteColor,
-          expired,
-          label: expired ? 'Expired' : formatCountdown(input.remaining),
-        }
-      : undefined,
     deadline: overlays.executionDeadline,
     due: overlays.dueDate,
     now: overlays.now,

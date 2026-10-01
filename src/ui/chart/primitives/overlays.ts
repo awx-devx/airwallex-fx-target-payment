@@ -21,9 +21,7 @@ export interface OverlayModel {
   inverted: boolean;
   target?: number;
   entry?: number;
-  quote?: number;
   zone: boolean;
-  quoteBand?: TimeSpan & { color: string; label: string; expired: boolean };
   deadline: number;
   due: number;
   now: number;
@@ -72,7 +70,7 @@ export class OverlayPrimitive implements ISeriesPrimitive {
   }
 
   autoscaleInfo(): AutoscaleInfo | null {
-    const prices = [this.model.target, this.model.entry, this.model.quote].filter(
+    const prices = [this.model.target, this.model.entry].filter(
       (price): price is number => price !== undefined,
     );
     if (prices.length === 0) return null;
@@ -106,7 +104,7 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
       this.zone(ctx, model, width, height);
       this.hatchSpans(ctx, model, height);
       this.deadlineHatch(ctx, model, width, height);
-      this.quoteBand(ctx, model, height);
+      this.dueShade(ctx, model, width, height);
       this.verticals(ctx, model, height);
       this.targetGlow(ctx, model, width);
     });
@@ -158,24 +156,17 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
     hatch(ctx, x, 0, Math.max(0, width - x), height, withAlpha(model.colors.fg1, 0.04), 8);
   }
 
-  private quoteBand(
+  /** Past the due date. Same weight as the orange wash under the target. */
+  private dueShade(
     ctx: CanvasRenderingContext2D,
     model: OverlayModel,
+    width: number,
     height: number,
   ): void {
-    const band = model.quoteBand;
-    if (!band || model.quote === undefined) return;
-    const y = this.primitive.y(model.quote);
-    const from = this.primitive.x(band.from);
-    const to = this.primitive.x(band.to);
-    if (y === null || from === null || to === null) return;
-    const left = Math.min(from, to);
-    const right = Math.max(from, to);
-    ctx.fillStyle = band.expired ? withAlpha(model.colors.fg3, 0.25) : band.color;
-    ctx.fillRect(left, y - 4, Math.max(2, right - left), 8);
-    ctx.fillStyle = model.colors.fg1;
-    ctx.font = '11px sans-serif';
-    ctx.fillText(band.label, left + 6, Math.min(height - 8, y - 8));
+    const x = this.primitive.x(model.due);
+    if (x === null) return;
+    ctx.fillStyle = withAlpha(model.colors.down, 0.08);
+    ctx.fillRect(x, 0, Math.max(0, width - x), height);
   }
 
   private verticals(
@@ -205,6 +196,16 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
     }
     const due = this.primitive.x(model.due);
     if (due !== null) {
+      ctx.save();
+      ctx.shadowColor = withAlpha(model.colors.down, 0.3);
+      ctx.shadowBlur = 6;
+      ctx.strokeStyle = withAlpha(model.colors.down, 0.3);
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(due, 0);
+      ctx.lineTo(due, height);
+      ctx.stroke();
+      ctx.restore();
       strokeVertical(ctx, due, height, withAlpha(model.colors.down, 0.7), true, model.dueToday ? 2 : 1);
       label(ctx, model.dueLabel, due, model.colors.down);
     }

@@ -23,21 +23,23 @@ export function DistanceToTarget({
   price,
   target,
   inverted = false,
+  compact = false,
 }: {
   pair: Pair;
   price: string;
   target: string;
   inverted?: boolean;
+  compact?: boolean;
 }) {
   const { band, ratio } = distanceToTarget(price, target);
+  const label = band === 'through' ? 'Through target' : `${formatDelta(ratio, { mode: 'pct' })} from target`;
+  if (compact) return <p className="truncate text-fg-3">{label}</p>;
   const scaled = D(ratio).abs().mul('800');
   const width = band === 'through' ? 100 : Math.min(100, scaled.toNumber());
   return (
     <div className="w-full max-w-xs">
       <div className="flex items-baseline justify-between gap-3">
-        <p className={TEXT[band]}>
-          {band === 'through' ? 'Through target' : `${formatDelta(ratio, { mode: 'pct' })} from target`}
-        </p>
+        <p className={TEXT[band]}>{label}</p>
         <p className="num text-fg-3">
           {formatPrice(pair, price, { inverted })}
         </p>

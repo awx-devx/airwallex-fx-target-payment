@@ -1,5 +1,6 @@
 'use client';
 
+import { Command } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/ui/primitives/button';
 import { Dialog } from '@/ui/primitives/dialog';
@@ -66,11 +67,13 @@ export function CommandPalette({
   open,
   onOpenChange,
   onPick,
+  size = 'md',
 }: {
   items: readonly CommandItem[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick?: (item: CommandItem) => void;
+  size?: 'sm' | 'md';
 }) {
   const [query, setQuery] = useState('');
   return (
@@ -80,8 +83,18 @@ export function CommandPalette({
       title="Command palette"
       description="Jump, upload, or approve"
       trigger={
-        <Button variant="secondary" iconRight={<Kbd>⌘K</Kbd>}>
-          Commands
+        <Button
+          variant="secondary"
+          size={size}
+          aria-label="Commands"
+          icon={<Command strokeWidth={1.5} className="size-3.5 xl:hidden" />}
+          iconRight={
+            <span className="hidden xl:contents">
+              <Kbd>⌘K</Kbd>
+            </span>
+          }
+        >
+          <span className="hidden xl:inline">Commands</span>
         </Button>
       }
     >

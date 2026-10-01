@@ -11,6 +11,8 @@ export function Tabs({
   tabs,
   variant = 'underline',
   size = 'md',
+  listClassName,
+  fill = false,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -23,15 +25,23 @@ export function Tabs({
   }>;
   variant?: 'underline' | 'pill';
   size?: 'sm' | 'md';
+  listClassName?: string;
+  /** Stretch the active pane to the parent height so switching tabs does not resize the chart. */
+  fill?: boolean;
 }) {
   return (
-    <TabsPrimitive.Root value={value} onValueChange={onValueChange}>
+    <TabsPrimitive.Root
+      value={value}
+      onValueChange={onValueChange}
+      className={fill ? 'flex h-full min-h-0 flex-1 flex-col' : undefined}
+    >
       <TabsPrimitive.List
         className={cx(
-          'flex',
+          'flex shrink-0',
           variant === 'pill'
             ? 'gap-1 rounded-sm border border-line-2 bg-bg-1 p-0.5'
             : 'gap-4 border-b border-line-1',
+          listClassName,
         )}
       >
         {tabs.map((tab) => (
@@ -58,7 +68,11 @@ export function Tabs({
         ))}
       </TabsPrimitive.List>
       {tabs.map((tab) => (
-        <TabsPrimitive.Content key={tab.value} value={tab.value} className="pt-3 outline-none">
+        <TabsPrimitive.Content
+          key={tab.value}
+          value={tab.value}
+          className={fill ? 'min-h-0 flex-1 overflow-auto outline-none' : 'pt-3 outline-none'}
+        >
           {tab.content}
         </TabsPrimitive.Content>
       ))}

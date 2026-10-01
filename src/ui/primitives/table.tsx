@@ -8,14 +8,23 @@ export function Table({
   children,
   label,
   className,
+  scroll = true,
 }: {
   children: ReactNode;
   label: string;
   className?: string;
+  /**
+   * When false the parent is the scrollport, so a sticky header can pin to it.
+   * `border-collapse: separate` is required for that pin to work in Chromium.
+   */
+  scroll?: boolean;
 }) {
   return (
-    <div className={cx('overflow-auto', className)}>
-      <table className="w-full border-collapse text-left" aria-label={label}>
+    <div className={cx(scroll && 'overflow-auto', className)}>
+      <table
+        className={cx('w-full text-left', scroll ? 'border-collapse' : 'border-separate border-spacing-0')}
+        aria-label={label}
+      >
         {children}
       </table>
     </div>
@@ -45,7 +54,7 @@ export function Th({
     <th
       className={cx(
         'border-b border-line-1 bg-bg-2 px-3 text-left font-medium text-fg-3',
-        sticky && 'sticky top-0',
+        sticky && 'sticky top-0 z-10',
       )}
       style={{ height: 'var(--row-h)' }}
       aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}

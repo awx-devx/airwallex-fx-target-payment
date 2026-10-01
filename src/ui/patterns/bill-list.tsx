@@ -8,6 +8,7 @@ import { Button } from '@/ui/primitives/button';
 import { Chip } from '@/ui/primitives/chip';
 import { cx } from '@/ui/primitives/cx';
 import { EmptyState } from '@/ui/primitives/empty-state';
+import { Flag } from '@/ui/primitives/flag';
 import { Input } from '@/ui/primitives/input';
 import { SegmentedControl } from '@/ui/primitives/segmented';
 import { Skeleton } from '@/ui/primitives/skeleton';
@@ -15,6 +16,7 @@ import { CountdownChip } from '@/ui/trading/countdown-chip';
 import { DistanceToTarget } from '@/ui/trading/distance-to-target';
 import { MoneyDisplay } from '@/ui/trading/money-display';
 import { PairLabel } from '@/ui/trading/pair-label';
+import { PriceDisplay } from '@/ui/trading/price-display';
 import { PriceTicker } from '@/ui/trading/price-ticker';
 import { Sparkline } from '@/ui/trading/sparkline';
 import { StateBadge } from '@/ui/trading/state-badge';
@@ -46,6 +48,7 @@ export function BillListItem({
   now,
   selected = false,
   density = 'comfortable',
+  layout = 'row',
   onSelect,
 }: {
   bill: BillSummary;
@@ -53,17 +56,70 @@ export function BillListItem({
   now: string;
   selected?: boolean;
   density?: 'compact' | 'comfortable';
+  layout?: 'row' | 'rail';
   onSelect?: (id: string) => void;
 }) {
   const compact = density === 'compact';
+  if (layout === 'rail') {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect?.(bill.id)}
+        className={cx(
+          'flex w-full flex-col gap-1 overflow-hidden border-b border-line-1 px-3 py-2.5 text-left outline-none',
+          'focus-visible:shadow-[inset_0_0_0_1px_var(--line-3)]',
+          selected
+            ? 'bg-orange-wash shadow-[inset_2px_0_0_var(--orange-500)] hover:bg-orange-500/15'
+            : 'hover:bg-white/6',
+        )}
+      >
+        <span className="flex items-center gap-2">
+          <span className="inline-flex shrink-0">
+            <Flag currency={bill.pair.base} size={16} />
+            <Flag currency={bill.pair.quote} size={16} />
+          </span>
+          <span className="min-w-0 flex-1 truncate font-medium text-fg-1">{bill.vendorName}</span>
+          <StateBadge state={bill.state} />
+        </span>
+        <span className="flex items-baseline justify-between gap-3">
+          <MoneyDisplay
+            currency={bill.pair.base}
+            value={bill.amount}
+            size="sm"
+            className="text-fg-3"
+          />
+          {bill.lastPrice ? (
+            <PriceDisplay pair={bill.pair} value={bill.lastPrice} flash stale={bill.flags.stale} />
+          ) : null}
+        </span>
+        <span className="flex items-center justify-between gap-3">
+          {bill.lastPrice && bill.targetPrice ? (
+            <span className="min-w-0 flex-1">
+              <DistanceToTarget
+                pair={bill.pair}
+                price={bill.lastPrice}
+                target={bill.targetPrice}
+                compact
+              />
+            </span>
+          ) : (
+            <span />
+          )}
+          <CountdownChip until={`${bill.executionDeadline}T21:00:00.000Z`} now={now} kind="deadline" />
+        </span>
+      </button>
+    );
+  }
   return (
     <button
       type="button"
       onClick={() => onSelect?.(bill.id)}
       className={cx(
-        'flex w-full items-center gap-3 border-b border-line-1 px-3 text-left outline-none hover:bg-bg-2',
+        'flex w-full items-center gap-3 border-b border-line-1 px-3 text-left outline-none',
         'focus-visible:shadow-[inset_0_0_0_1px_var(--line-3)]',
-        selected && 'bg-orange-wash shadow-[inset_2px_0_0_var(--orange-500)]',
+        selected
+          ? 'bg-orange-wash shadow-[inset_2px_0_0_var(--orange-500)] hover:bg-orange-500/15'
+          : 'hover:bg-white/6',
       )}
       style={{ minHeight: compact ? 44 : 64 }}
     >
@@ -135,6 +191,7 @@ export function BillList({
   onQueryChange,
   loading = false,
   density = 'comfortable',
+  layout = 'row',
   onUpload,
   virtualized = false,
 }: {
@@ -152,6 +209,7 @@ export function BillList({
   onQueryChange?: (query: string) => void;
   loading?: boolean;
   density?: 'compact' | 'comfortable';
+  layout?: 'row' | 'rail';
   onUpload?: () => void;
   virtualized?: boolean;
 }) {
@@ -174,7 +232,7 @@ export function BillList({
     .filter((row): row is BillRow => Boolean(row));
 
   return (
-    <section className="flex h-full min-h-80 flex-col bg-bg-0">
+    <section className="flex h-full min-h-80 flex-col">
       <div className="space-y-2 border-b border-line-1 p-3">
         <Input
           size="sm"
@@ -223,11 +281,25 @@ export function BillList({
       ) : visible.length === 0 ? (
         <EmptyState title="No bills" body="Nothing matches this filter." />
       ) : grouped ? (
-        <Grouped rows={visible} now={now} selectedId={selectedId} density={density} onSelect={onSelect} />
+        <Grouped
+          rows={visible}
+          now={now}
+          selectedId={selectedId}
+          density={density}
+          layout={layout}
+          onSelect={onSelect}
+        />
       ) : virtualized ? (
-        <VirtualRows rows={visible} now={now} selectedId={selectedId} density={density} onSelect={onSelect} />
+        <VirtualRows
+          rows={visible}
+          now={now}
+          selectedId={selectedId}
+          density={density}
+          layout={layout}
+          onSelect={onSelect}
+        />
       ) : (
-        <div className="overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           {visible.map((row) => (
             <BillListItem
               key={row.bill.id}
@@ -236,6 +308,7 @@ export function BillList({
               now={now}
               selected={row.bill.id === selectedId}
               density={density}
+              layout={layout}
               onSelect={onSelect}
             />
           ))}
@@ -250,12 +323,14 @@ function Grouped({
   now,
   selectedId,
   density,
+  layout,
   onSelect,
 }: {
   rows: readonly BillRow[];
   now: string;
   selectedId?: string;
   density: 'compact' | 'comfortable';
+  layout: 'row' | 'rail';
   onSelect?: (id: string) => void;
 }) {
   const groups = new Map<string, BillRow[]>();
@@ -266,7 +341,7 @@ function Grouped({
     groups.set(key, list);
   }
   return (
-    <div className="overflow-auto">
+    <div className="min-h-0 flex-1 overflow-auto">
       {[...groups.entries()].map(([key, list]) => (
         <div key={key}>
           <PairGroupHeader pair={list[0]!.bill.pair} bills={list.map((row) => row.bill)} />
@@ -278,6 +353,7 @@ function Grouped({
               now={now}
               selected={row.bill.id === selectedId}
               density={density}
+              layout={layout}
               onSelect={onSelect}
             />
           ))}
@@ -292,12 +368,14 @@ function VirtualRows({
   now,
   selectedId,
   density,
+  layout,
   onSelect,
 }: {
   rows: readonly BillRow[];
   now: string;
   selectedId?: string;
   density: 'compact' | 'comfortable';
+  layout: 'row' | 'rail';
   onSelect?: (id: string) => void;
 }) {
   const rowHeight = density === 'compact' ? 44 : 64;
@@ -324,6 +402,7 @@ function VirtualRows({
               now={now}
               selected={row.bill.id === selectedId}
               density={density}
+              layout={layout}
               onSelect={onSelect}
             />
           </div>

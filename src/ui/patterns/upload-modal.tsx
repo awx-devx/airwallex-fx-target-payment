@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/ui/primitives/button';
 import { Dialog, DialogPreview } from '@/ui/primitives/dialog';
 import { FileDropzone, type DropFile } from '@/ui/primitives/file-dropzone';
@@ -77,6 +77,7 @@ export function UploadModal({
   onFiles,
   onSamples,
   onReview,
+  trigger = <Button>Upload bills</Button>,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -85,6 +86,7 @@ export function UploadModal({
   onFiles?: (files: File[]) => void;
   onSamples?: (count: number) => void;
   onReview?: () => void;
+  trigger?: ReactNode | null;
 }) {
   return (
     <Dialog
@@ -92,7 +94,7 @@ export function UploadModal({
       onOpenChange={onOpenChange}
       title="Upload bills"
       description="PDF, image, or XML"
-      trigger={<Button>Upload bills</Button>}
+      trigger={trigger ?? undefined}
     >
       <UploadBody phase={phase} files={files} onFiles={onFiles} onSamples={onSamples} onReview={onReview} />
     </Dialog>

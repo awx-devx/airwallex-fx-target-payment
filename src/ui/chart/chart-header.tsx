@@ -44,7 +44,7 @@ export function ChartHeader({
   const delta =
     price && entry ? decimalString(D(price).minus(D(entry))) : undefined;
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3 px-4 pt-3">
       <PairLabel pair={pair} inverted={inverted} size="lg" />
       {price ? (
         <PriceDisplay pair={pair} value={price} inverted={inverted} size="hero" stale={stale} flash />
