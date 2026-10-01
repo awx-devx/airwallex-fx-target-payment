@@ -86,7 +86,7 @@ Unlike a real perp, there is **no leverage and no liquidation risk**. The "expir
 - Accounting / ERP sync (Airwallex Spend Bills sync is a stretch goal, see B-track)
 - FX forwards / hedging products beyond a spot conversion paired with a transfer
 - Payout-rail holiday calendars (the deadline math skips weekends and Airwallex's FX non-conversion days, but not local clearing holidays; lead days absorb them)
-- Mobile-first layout (desktop terminal first; tablet is best effort)
+- A dedicated mobile design (the desktop terminal is the target; smaller widths reflow the same layout into drawers, [07 §1](./07-pages-spec.md#responsive-behaviour))
 
 ## Success criteria for the demo
 

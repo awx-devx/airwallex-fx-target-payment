@@ -48,6 +48,19 @@ The main screen, modelled on a perps trading terminal.
 | `PAID` | Receipt: rate, cost, savings vs entry, vs target, transfer IDs | Download receipt (stretch) |
 | `FAILED` | Error + reason + fix path | Edit & re-arm |
 
+### Responsive behaviour
+
+Desktop is the design target (the pitch runs at 1440+), but every page must stay usable down to a phone width. The rule is reflow, not a second design: the same components move into drawers.
+
+| Width | Terminal |
+| --- | --- |
+| ≥ 1440 px (`2xl`) | Full three-column grid |
+| 1280–1439 px (`xl`) | Right rail (ticket) collapses to a right drawer, opened from a ticket button in the top bar |
+| 1024–1279 px (`lg`) | Both rails collapse: a **menu button** in the top bar opens the bill list as a left drawer, the ticket stays a right drawer. The centre (chart + bottom panel) fills the width |
+| < 1024 px | As above, and the chart stacks above the bottom panel instead of beside it. The top bar keeps the wordmark, the menu button, the ticket button and the notification bell; balances and the connection indicator move into the menu drawer |
+
+Other pages follow the same split: the upload review's document preview stacks above the fields below `lg`, and settings uses a single column. Dialogs that are wider than the viewport shrink to full width. Touch targets stay at least 32 px, which the comfortable density already gives.
+
 ### Keyboard shortcuts
 
 | Key | Action |

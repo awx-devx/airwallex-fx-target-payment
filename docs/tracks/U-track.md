@@ -122,7 +122,7 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 | ID | Task |
 | --- | --- |
 | U6.1 | Data hooks against `DataSource` (`useBills`, `useBill`, `useChart`, `useStream`, `useApprovals`, `useBalances`) with TanStack Query; Zustand UI store (selection, layout, density) |
-| U6.2 | Terminal layout grid (3 columns + bottom panel, resizable splitters, collapse right rail < 1440) with Motion `layout` transitions on selection and rail collapse |
+| U6.2 | Terminal layout grid (3 columns + bottom panel, resizable splitters, collapse right rail < 1440) with Motion `layout` transitions on selection and rail collapse. Responsive reflow per [07 §1](../07-pages-spec.md#responsive-behaviour): below 1280 the ticket is a drawer, below 1024 a top-bar menu button opens the bill list as a drawer and the chart stacks over the bottom panel |
 | U6.3 | Selection + deep links `/bills/:id`; chart instance cache; `J`/`K` navigation |
 | U6.4 | Ticket state machine rendering per [07 §1](../07-pages-spec.md#behaviour) |
 | U6.5 | Upload → review → strategy → arm flow (mock extraction with delays and low-confidence fields); demo-only **Add sample invoices** button in `UploadModal` |

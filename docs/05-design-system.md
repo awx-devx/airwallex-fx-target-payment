@@ -114,6 +114,7 @@ Rules:
 - Radius: `--r-xs 4`, `--r-sm 6`, `--r-md 10`, `--r-lg 14`, `--r-xl 20`, `--r-pill 999`.
 - Density: the default is **compact** (row height 36, input height 32). A **comfortable** variant (row 44, input 40) is used for modals and forms.
 - Terminal grid (≥ 1440 px): left rail 280 px (bills), centre flexible (chart + bottom panel), right rail 360 px (ticket). Minimum supported width is 1280 px; below that the right rail collapses to a drawer.
+- **Breakpoints** (plain Tailwind, no container queries): `lg` 1024, `xl` 1280, `2xl` 1440. Below `xl` the terminal rails move into drawers opened from the top bar (a bills button on the left, a ticket button on the right) and the top bar drops to icon buttons with labels in tooltips. Below `lg` the chart and the bottom panel stack vertically. Nothing overflows or overlaps at any width down to 360 px; horizontal scrolling is limited to wide tables. Layouts reflow, they don't get a separate mobile design. Spec: [07 §1](./07-pages-spec.md#responsive-behaviour).
 
 ---
 
