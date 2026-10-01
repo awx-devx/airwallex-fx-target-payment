@@ -135,10 +135,11 @@ Rules:
 | `--dur-2` | 200 ms | Popovers, tabs |
 | `--dur-3` | 320 ms | Drawers, modals |
 | `--dur-tick` | 600 ms | Price flash decay |
+| `--dur-tween` | 300 ms | Savings and cost tween |
 
 Patterns:
 - **Tick flash:** on a price change, flash the background with `--up-wash` or `--down-wash` according to `favorable()`, decaying over `--dur-tick`. The digits roll with a vertical odometer only on the hero price.
-- **Number tween:** savings and cost tween over 300 ms.
+- **Number tween:** savings and cost tween over `--dur-tween` (300 ms).
 - **State change:** badges crossfade. On a transition to `TARGET_HIT`, the card border animates into `--glow-lg` and the target line on the chart brightens briefly (one pulse).
 - **Countdown:** in the final 60 s the chip turns `--warn` and ticks with a subtle scale of 1 → 1.03.
 - **Enter/exit:** lists, toasts, popovers, drawers and modals use `AnimatePresence` (fade + 8 px rise, `--dur-2`/`--dur-3`).

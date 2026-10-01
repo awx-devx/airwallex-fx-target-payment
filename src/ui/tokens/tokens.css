@@ -1,6 +1,7 @@
 /*
  * Design tokens from docs/05. Components read these variables; they do not
- * hard-code hex values. U1 adds the showcase and the motion hooks on top.
+ * hard-code hex values. Durations and easings in src/ui/tokens/motion.ts must
+ * stay in sync with the motion tokens below.
  */
 
 :root {
@@ -94,6 +95,7 @@
   --dur-2: 200ms;
   --dur-3: 320ms;
   --dur-tick: 600ms;
+  --dur-tween: 300ms;
 
   color-scheme: dark;
 }
@@ -120,10 +122,14 @@
   --color-orange-500: var(--orange-500);
   --color-orange-600: var(--orange-600);
   --color-up: var(--up);
+  --color-up-wash: var(--up-wash);
   --color-down: var(--down);
+  --color-down-wash: var(--down-wash);
   --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
   --color-info: var(--info);
   --color-muted: var(--muted);
+  --color-orange-wash: var(--orange-wash);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --radius-xs: var(--r-xs);
@@ -150,4 +156,106 @@
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+}
+
+/* 2% noise on the app background so dark fills don't band. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+}
+
+.label {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.display {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 32px;
+  line-height: 36px;
+}
+
+.display-lg {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 44px;
+  line-height: 48px;
+}
+
+.num {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.num-head {
+  color: var(--fg-2);
+}
+
+.num-pip {
+  color: var(--fg-1);
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+.glow-sm {
+  box-shadow: var(--glow-sm);
+}
+.glow-md {
+  box-shadow: var(--glow-md);
+}
+.glow-lg {
+  box-shadow: var(--glow-lg);
+}
+.glow-up {
+  box-shadow: var(--glow-up);
+}
+.glow-warn {
+  box-shadow: var(--glow-warn);
+}
+.shadow-panel {
+  box-shadow: var(--shadow-panel);
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* WATCHING is the subtle pulse; TARGET_HIT uses the strong glow. */
+.glow-pulse,
+.glow-pulse-strong {
+  position: relative;
+}
+
+.glow-pulse::after,
+.glow-pulse-strong::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: var(--glow-sm);
+  animation: glow-pulse 2.4s var(--ease-in-out) infinite;
+}
+
+.glow-pulse-strong::after {
+  box-shadow: var(--glow-lg);
 }

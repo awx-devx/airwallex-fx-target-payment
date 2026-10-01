@@ -1,5 +1,6 @@
 'use client';
 
+import { dur2, easeOut } from '@/ui/tokens/motion';
 import { MotionConfig } from 'motion/react';
 import type { ReactNode } from 'react';
 
@@ -16,5 +17,12 @@ export function MotionProvider({
   children: ReactNode;
   reducedMotion?: ReducedMotion;
 }) {
-  return <MotionConfig reducedMotion={reducedMotion}>{children}</MotionConfig>;
+  return (
+    <MotionConfig
+      reducedMotion={reducedMotion}
+      transition={{ duration: dur2, ease: easeOut }}
+    >
+      {children}
+    </MotionConfig>
+  );
 }
