@@ -8,6 +8,8 @@ import { overlayShowcases } from '@/ui/primitives/showcase/overlays';
 import { pickerShowcases } from '@/ui/primitives/showcase/pickers';
 import { statusShowcases } from '@/ui/primitives/showcase/status';
 import { tokensShowcase } from '@/ui/tokens/showcase';
+import { chartPartShowcases } from '@/ui/chart/showcase/parts';
+import { chartScenarioShowcases } from '@/ui/chart/showcase/scenarios';
 import { bookShowcases } from '@/ui/trading/showcase/books';
 import { marketShowcases } from '@/ui/trading/showcase/market';
 import { statusShowcases as tradingStatusShowcases } from '@/ui/trading/showcase/status';
@@ -26,4 +28,6 @@ export const showcases: Showcase[] = [
   ...marketShowcases,
   ...bookShowcases,
   ...tradingStatusShowcases,
+  ...chartPartShowcases,
+  ...chartScenarioShowcases,
 ];

@@ -115,4 +115,5 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Simulated trigger skips the "real quote ≤ target" check | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, strategy engine (simulated ticks only) | Always require `p_quote ≤ p_target` |
 | Simulated trigger is auto-approved by `system:demo-sim` | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `worker/demoSim.ts` → approve service | Human approval only (or the standing instruction at the cutoff) |
 | Activity feed includes simulation started and ended | `DEMO-ONLY` | `ActivityItem` | Production activity has no simulation events |
+| Chart shows simulation markers and a kit Simulate replay | `DEMO-ONLY` | `EventMarkers`, `scenario-simulate` | Production charts have no simulation markers or replay |
 | Sim reads transfer status immediately instead of waiting for webhooks | `SANDBOX` | `worker/demoSim.ts` | Webhooks + reconciler |
