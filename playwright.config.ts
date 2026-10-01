@@ -14,7 +14,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     ...devices['Desktop Chrome'],
-    viewport: { width: 1600, height: 900 },
+    viewport: { width: 1920, height: 900 },
   },
   webServer: {
     command: 'pnpm dev',
