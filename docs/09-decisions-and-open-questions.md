@@ -49,7 +49,7 @@ Status values: **Proposed** (default, open for objection), **Accepted**, **Super
 | Gate | Date | Reviewers | Notes |
 | --- | --- | --- | --- |
 | Contracts frozen (v1) | | | |
-| UI kit review (U5 exit) | | | |
+| UI kit review (U5 exit) | | | Patterns U5.1–U5.7 are on `/dev/ui-kit` and the visual baseline includes them. Reviewer sign-off is still open. |
 | Pages on mocks (U6 exit) | | | |
 | Sandbox verification (B2 exit) | | | |
 | Integrated demo rehearsal | | | |
