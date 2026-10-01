@@ -1,6 +1,6 @@
 import type { Pair } from '@/contracts/bill';
 import { roundToPayout } from '@/contracts/currencies';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { formatMoney, formatPrice, PipNumber } from '@/ui/format';
 import { DeltaText } from '@/ui/trading/delta-text';
 
@@ -24,7 +24,7 @@ export function CrosshairTooltip({
   const cost = notional
     ? formatMoney(
         notional.currency,
-        roundToPayout(notional.currency, D(notional.amount).mul(D(price)).toString()),
+        roundToPayout(notional.currency, decimalString(D(notional.amount).mul(D(price)))),
       )
     : undefined;
   return (
@@ -36,13 +36,13 @@ export function CrosshairTooltip({
       {entry ? (
         <p className="mt-1 flex justify-between gap-4">
           <span className="text-fg-3">Δ entry</span>
-          <DeltaText value={D(price).minus(D(entry)).toString()} pair={pair} />
+          <DeltaText value={decimalString(D(price).minus(D(entry)))} pair={pair} />
         </p>
       ) : null}
       {target ? (
         <p className="flex justify-between gap-4">
           <span className="text-fg-3">Δ target</span>
-          <DeltaText value={D(price).minus(D(target)).toString()} pair={pair} />
+          <DeltaText value={decimalString(D(price).minus(D(target)))} pair={pair} />
         </p>
       ) : null}
       {cost ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { favorable, formatDelta, formatMoney } from '@/ui/format';
 import { useTween } from '@/ui/motion/hooks';
 import { DIRECTION_TEXT } from '@/ui/trading/direction';
@@ -15,7 +15,7 @@ export function SavingsCell({
   savingsPct?: string;
 }) {
   const tweened = useTween(savings);
-  const direction = favorable(D(tweened).negated().toString());
+  const direction = favorable(decimalString(D(tweened).negated()));
   return (
     <span className={`inline-flex items-baseline gap-2 ${DIRECTION_TEXT[direction]}`}>
       <span className="num">{formatMoney(currency, tweened, { signed: true })}</span>

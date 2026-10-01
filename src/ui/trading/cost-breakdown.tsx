@@ -1,6 +1,6 @@
 import type { Pair } from '@/contracts/bill';
 import { roundToPayout } from '@/contracts/currencies';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { formatMoney, formatPrice, PipNumber } from '@/ui/format';
 import { DeltaText } from '@/ui/trading/delta-text';
 import { KeyValueList } from '@/ui/trading/key-value-list';
@@ -36,7 +36,7 @@ export function CostBreakdown({
   mode?: 'estimated' | 'tentative' | 'locked';
   feeUnknown?: boolean;
 }) {
-  const notional = roundToPayout(homeCurrency, D(billAmount).mul(D(price)).toString());
+  const notional = roundToPayout(homeCurrency, decimalString(D(billAmount).mul(D(price))));
   const youPay = total ?? notional;
   const short =
     vendorReceives &&
@@ -88,7 +88,7 @@ export function CostBreakdown({
                 {
                   label: 'Vs entry',
                   value: (
-                    <DeltaText value={D(price).minus(D(entryPrice)).toString()} pair={pair} />
+                    <DeltaText value={decimalString(D(price).minus(D(entryPrice)))} pair={pair} />
                   ),
                 },
               ]
@@ -98,7 +98,7 @@ export function CostBreakdown({
                 {
                   label: 'Vs target',
                   value: (
-                    <DeltaText value={D(price).minus(D(targetPrice)).toString()} pair={pair} />
+                    <DeltaText value={decimalString(D(price).minus(D(targetPrice)))} pair={pair} />
                   ),
                 },
               ]

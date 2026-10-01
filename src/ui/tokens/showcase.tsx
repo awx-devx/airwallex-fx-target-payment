@@ -9,7 +9,7 @@ import {
   formatPrice,
   PipNumber,
 } from '@/ui/format';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { useKitReducedMotion, useTimeFrozen } from '@/ui/motion/freeze';
 import { useTickFlash, useTween } from '@/ui/motion/hooks';
 import {
@@ -438,9 +438,9 @@ function DemoButton({
 }
 
 function Favourable() {
-  const fell = D('1.08000').minus(D('1.08412')).toString();
-  const rose = D('1.09000').minus(D('1.08412')).toString();
-  const jpyFell = D('0.00650').minus(D('0.00670')).toString();
+  const fell = decimalString(D('1.08000').minus(D('1.08412')));
+  const rose = decimalString(D('1.09000').minus(D('1.08412')));
+  const jpyFell = decimalString(D('0.00650').minus(D('0.00670')));
   return (
     <div className="space-y-3">
       <p className="max-w-xl text-fg-2">

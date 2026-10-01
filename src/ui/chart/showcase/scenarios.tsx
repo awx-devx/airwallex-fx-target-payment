@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react';
 import type { ChartOverlays, ChartRange, ChartSeriesPoint } from '@/contracts/chart';
-import { D, significantPrice } from '@/contracts/money';
+import { D, decimalString, significantPrice } from '@/contracts/money';
 import type { Showcase } from '@/ui/showcase/types';
 import { FxChart } from '@/ui/chart/fx-chart';
 import {
@@ -125,9 +125,9 @@ function LiveScenario() {
 
 function easeInOut(ratio: number): string {
   const x = D(Math.min(1, Math.max(0, ratio)).toFixed(6));
-  if (x.lte('0.5')) return x.pow(3).mul('4').toString();
+  if (x.lte('0.5')) return decimalString(x.pow(3).mul('4'));
   const u = x.mul('-2').plus('2');
-  return D('1').minus(u.pow(3).div('2')).toString();
+  return decimalString(D('1').minus(u.pow(3).div('2')));
 }
 
 // DEMO-ONLY: the kit replays the Simulate timeline in the browser.

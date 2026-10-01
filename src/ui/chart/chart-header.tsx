@@ -2,7 +2,7 @@
 
 import type { ChartRange } from '@/contracts/chart';
 import type { Pair } from '@/contracts/bill';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { ConnectionIndicator } from '@/ui/trading/connection-indicator';
 import { CountdownChip } from '@/ui/trading/countdown-chip';
 import { DeltaText } from '@/ui/trading/delta-text';
@@ -42,7 +42,7 @@ export function ChartHeader({
   now?: string;
 }) {
   const delta =
-    price && entry ? D(price).minus(D(entry)).toString() : undefined;
+    price && entry ? decimalString(D(price).minus(D(entry))) : undefined;
   return (
     <div className="flex flex-wrap items-center gap-3">
       <PairLabel pair={pair} inverted={inverted} size="lg" />

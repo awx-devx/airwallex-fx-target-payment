@@ -2,7 +2,7 @@
 
 import type { ChartOverlays, ChartRange, ChartSeriesPoint } from '@/contracts/chart';
 import type { Pair, StrategyMode } from '@/contracts/bill';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { formatMoney } from '@/ui/format';
 import { useState } from 'react';
 import { FxChart } from '@/ui/chart/fx-chart';
@@ -36,7 +36,7 @@ export function StrategyWizardStep({
   overlays: ChartOverlays;
 }) {
   const [range, setRange] = useState<ChartRange>('TO_DUE');
-  const cost = formatMoney(homeCurrency, D(amount).mul(D(target)).toString());
+  const cost = formatMoney(homeCurrency, decimalString(D(amount).mul(D(target))));
   return (
     <div className="space-y-3">
       <SegmentedControl

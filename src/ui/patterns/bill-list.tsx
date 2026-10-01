@@ -1,7 +1,7 @@
 'use client';
 
 import type { BillSummary } from '@/contracts/bill';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { formatMoney } from '@/ui/format';
 import { useState } from 'react';
 import { Button } from '@/ui/primitives/button';
@@ -113,8 +113,8 @@ export function PairGroupHeader({
     <div className="flex items-center justify-between gap-3 border-b border-line-1 bg-bg-1 px-3 py-2">
       <PairLabel pair={pair} size="sm" />
       <p className="num text-xs text-fg-2">
-        {formatMoney(pair.base, foreign.toString())}
-        {home.greaterThan('0') ? ` · ${formatMoney(pair.quote, home.toString())}` : ''} · {bills.length}
+        {formatMoney(pair.base, decimalString(foreign))}
+        {home.greaterThan('0') ? ` · ${formatMoney(pair.quote, decimalString(home))}` : ''} · {bills.length}
       </p>
     </div>
   );

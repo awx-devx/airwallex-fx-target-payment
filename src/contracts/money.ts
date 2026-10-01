@@ -17,6 +17,14 @@ export function D(value: string | Decimal): Decimal {
   return new Decimal(value);
 }
 
+/**
+ * A decimal string `D()` accepts. `Decimal#toString()` switches to an exponent
+ * at about 1e-7, which this regex rejects.
+ */
+export function decimalString(value: Decimal): string {
+  return value.toFixed();
+}
+
 /** Round half up and keep exactly `fractionDigits` digits after the point. */
 export function formatDecimal(value: Decimal, fractionDigits: number): string {
   return value

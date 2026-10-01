@@ -1,6 +1,6 @@
 'use client';
 
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { favorable } from '@/ui/format';
 import { useTimeFrozen } from '@/ui/motion/freeze';
 import { interpolateDecimal } from '@/ui/motion/interpolate';
@@ -59,7 +59,7 @@ function washFor(
 ): string {
   if (!pending || suppressed) return 'transparent';
   try {
-    const delta = D(pending.to).minus(D(pending.from)).toString();
+    const delta = decimalString(D(pending.to).minus(D(pending.from)));
     const direction = favorable(delta);
     if (direction === 'neutral') return 'transparent';
     return `var(${WASH[direction]})`;

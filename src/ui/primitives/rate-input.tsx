@@ -1,6 +1,6 @@
 'use client';
 
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import {
   favorable,
   formatPair,
@@ -38,7 +38,7 @@ export function RateInput({
     const next = raw.trim();
     setDraft(null);
     if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(next)) return;
-    onValueChange(inverted ? D('1').div(D(next)).toString() : next);
+    onValueChange(inverted ? decimalString(D('1').div(D(next))) : next);
   }
 
   function step(pips: number) {
@@ -94,7 +94,7 @@ export function RateInput({
 }
 
 function hintFor(value: string, entry: string): { text: string; className: string } | null {
-  const direction = favorable(D(value).minus(D(entry)).toString());
+  const direction = favorable(decimalString(D(value).minus(D(entry))));
   if (direction === 'neutral') return { text: 'At entry', className: 'text-fg-3' };
   if (direction === 'favorable') {
     return { text: 'Below entry', className: 'text-up' };

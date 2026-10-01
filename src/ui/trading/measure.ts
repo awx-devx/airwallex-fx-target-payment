@@ -1,5 +1,5 @@
 import type { FailureCategory, TransferStatus } from '@/contracts/airwallex';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { FAILURE_NEXT_STEP } from '@/contracts/airwallex-errors';
 
 export type DistanceBand = 'far' | 'mid' | 'near' | 'through';
@@ -11,11 +11,12 @@ export function distanceToTarget(
 ): { band: DistanceBand; ratio: string } {
   const delta = D(price).minus(D(target));
   const ratio = delta.div(D(target));
-  if (!delta.greaterThan(0)) return { band: 'through', ratio: ratio.toString() };
+  const text = decimalString(ratio);
+  if (!delta.greaterThan(0)) return { band: 'through', ratio: text };
   const abs = ratio.abs();
-  if (abs.greaterThan('0.01')) return { band: 'far', ratio: ratio.toString() };
-  if (abs.lessThan('0.0025')) return { band: 'near', ratio: ratio.toString() };
-  return { band: 'mid', ratio: ratio.toString() };
+  if (abs.greaterThan('0.01')) return { band: 'far', ratio: text };
+  if (abs.lessThan('0.0025')) return { band: 'near', ratio: text };
+  return { band: 'mid', ratio: text };
 }
 
 export type CountdownUrgency = 'normal' | 'warn' | 'urgent' | 'expired';

@@ -1,7 +1,7 @@
 'use client';
 
 import type { Pair } from '@/contracts/bill';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { favorable } from '@/ui/format';
 import { TrendingDown, TrendingUp, WifiOff } from 'lucide-react';
 import { cx } from '@/ui/primitives/cx';
@@ -27,7 +27,7 @@ export function PriceTicker({
   stale?: boolean;
   disconnected?: boolean;
 }) {
-  const delta = entry ? D(price).minus(D(entry)).toString() : undefined;
+  const delta = entry ? decimalString(D(price).minus(D(entry))) : undefined;
   const direction = delta ? favorable(delta) : 'neutral';
   const Icon = delta && D(delta).isNegative() ? TrendingDown : TrendingUp;
   return (

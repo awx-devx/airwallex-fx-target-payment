@@ -3,7 +3,7 @@
 import type { ChartOverlays, ChartRange, ChartSeriesPoint } from '@/contracts/chart';
 import type { Pair, StrategyMode } from '@/contracts/bill';
 import { roundToPayout } from '@/contracts/currencies';
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { favorable, formatCountdown, formatMoney, formatPrice, priceFractionDigits } from '@/ui/format';
 import { Skeleton } from '@/ui/primitives/skeleton';
 import { ChartEmpty } from '@/ui/chart/chart-empty';
@@ -336,9 +336,9 @@ export function FxChart(props: FxChartProps) {
     const prior = series[series.length - 2];
     if (last) {
       const delta = overlays.entry
-        ? D(last.value).minus(D(overlays.entry)).toString()
+        ? decimalString(D(last.value).minus(D(overlays.entry)))
         : prior
-          ? D(last.value).minus(D(prior.value)).toString()
+          ? decimalString(D(last.value).minus(D(prior.value)))
           : '0';
       const direction = favorable(delta);
       api.main.applyOptions({
@@ -413,7 +413,7 @@ export function FxChart(props: FxChartProps) {
     notional
       ? formatMoney(
           notional.currency,
-          roundToPayout(notional.currency, D(notional.amount).mul(D(price)).toString()),
+          roundToPayout(notional.currency, decimalString(D(notional.amount).mul(D(price)))),
         )
       : undefined;
 

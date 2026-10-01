@@ -1,4 +1,4 @@
-import { D } from '@/contracts/money';
+import { D, decimalString } from '@/contracts/money';
 import { favorable } from '@/ui/format';
 import { Skeleton } from '@/ui/primitives/skeleton';
 import { DIRECTION_TEXT } from '@/ui/trading/direction';
@@ -16,7 +16,7 @@ export function Sparkline({
   if (points.length < 2) return <span className="text-fg-3">No ticks</span>;
   const first = points[0] ?? '0';
   const last = points[points.length - 1] ?? first;
-  const direction = favorable(D(last).minus(D(first)).toString());
+  const direction = favorable(decimalString(D(last).minus(D(first))));
   const nums = points.map((point) => D(point));
   const min = nums.reduce((low, point) => (point.lessThan(low) ? point : low), nums[0] ?? D(first));
   const max = nums.reduce((high, point) => (point.greaterThan(high) ? point : high), nums[0] ?? D(first));
