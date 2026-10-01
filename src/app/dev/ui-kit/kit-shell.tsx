@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useSyncExternalStore } from 'react';
+import { MotionProvider } from '@/ui/motion/provider';
 import { KIT_GROUPS, kitAnchor, showcases } from '@/ui/showcase';
 
 const STORAGE_KEY = 'ui-kit-toolbar';
@@ -112,172 +113,177 @@ export function KitShell() {
   }
 
   return (
-    <div
-      className="flex h-screen flex-col bg-bg-0 text-fg-1"
-      data-density={toolbar.density}
-      data-reduced-motion={toolbar.reducedMotion ? 'true' : 'false'}
-      data-freeze-time={toolbar.freezeTime ? 'true' : 'false'}
-      data-kit-bg={toolbar.background}
-      data-market-speed={toolbar.marketSpeed}
-    >
-      <header className="flex flex-wrap items-center gap-3 border-b border-line-1 px-4 py-3">
-        <div className="mr-2">
-          <p className="text-[11px] font-medium tracking-[0.06em] text-fg-3 uppercase">
-            Dev
-          </p>
-          <h1 className="text-sm font-medium">UI kit</h1>
-        </div>
-        <Segment
-          label="Density"
-          value={toolbar.density}
-          options={[
-            ['compact', 'Compact'],
-            ['comfortable', 'Comfortable'],
-          ]}
-          onChange={(density) => patch({ density })}
-        />
-        <Toggle
-          label="Reduced motion"
-          pressed={toolbar.reducedMotion}
-          onClick={() => patch({ reducedMotion: !toolbar.reducedMotion })}
-        />
-        <Toggle
-          label="Freeze time"
-          pressed={toolbar.freezeTime}
-          onClick={() => patch({ freezeTime: !toolbar.freezeTime })}
-        />
-        <Segment
-          label="Background"
-          value={toolbar.background}
-          options={[
-            ['0', 'bg-0'],
-            ['1', 'bg-1'],
-          ]}
-          onChange={(background) => patch({ background })}
-        />
-        <Segment
-          label="Market speed"
-          value={toolbar.marketSpeed}
-          options={[
-            ['1', '1×'],
-            ['10', '10×'],
-            ['60', '60×'],
-          ]}
-          onChange={(marketSpeed) => patch({ marketSpeed })}
-        />
-        <Segment
-          label="Width"
-          value={String(toolbar.width)}
-          options={WIDTHS.map((width) => [String(width), String(width)])}
-          onChange={(width) => patch({ width: Number(width) as Width })}
-        />
-      </header>
-      <div className="flex min-h-0 flex-1">
-        <nav
-          aria-label="Sections"
-          className="w-60 shrink-0 overflow-auto border-r border-line-1 p-3"
-        >
-          <label className="block">
-            <span className="sr-only">Search sections</span>
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search sections"
-              className="mb-3 w-full rounded-sm border border-line-2 bg-bg-2 px-2 text-fg-1 outline-none placeholder:text-fg-4 focus:shadow-[var(--glow-sm)]"
-              style={{ height: 'var(--input-h)' }}
-            />
-          </label>
-          <ul className="space-y-3">
-            {visible.map(({ group, items }) => (
-              <li key={group.id}>
-                <a
-                  href={`#${kitAnchor(group.id)}`}
-                  className="text-sm font-medium text-fg-1 hover:text-orange-300"
-                >
-                  {group.title}
-                </a>
-                {items.length > 0 ? (
-                  <ul className="mt-1 space-y-1 pl-3">
-                    {items.map((showcase) => (
-                      <li key={showcase.id}>
-                        <a
-                          href={`#${kitAnchor(group.id, showcase.id)}`}
-                          className="text-fg-2 hover:text-fg-1"
-                        >
-                          {showcase.title}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <main className="min-w-0 flex-1 overflow-auto p-6">
-          <div
-            className="border border-line-1"
-            data-kit-stage
-            style={{
-              width: toolbar.width,
-              background:
-                toolbar.background === '1' ? 'var(--bg-1)' : 'var(--bg-0)',
-              boxShadow: 'var(--shadow-panel)',
-            }}
-          >
-            {visible.map(({ group, items }) => (
-              <section
-                key={group.id}
-                id={kitAnchor(group.id)}
-                data-kit-anchor={kitAnchor(group.id)}
-                className="border-b border-line-1 px-6 py-8"
-              >
-                <h2 className="text-lg font-medium">{group.title}</h2>
-                <p className="mt-1 text-fg-2">{group.description}</p>
-                {items.length === 0 ? (
-                  <p className="mt-6 text-fg-3">
-                    No components in this section yet.
-                  </p>
-                ) : (
-                  <div className="mt-6 space-y-8">
-                    {items.map((showcase) => (
-                      <article
-                        key={showcase.id}
-                        id={kitAnchor(showcase.group, showcase.id)}
-                        data-kit-anchor={kitAnchor(showcase.group, showcase.id)}
-                      >
-                        <h3 className="font-medium">{showcase.title}</h3>
-                        {showcase.importPath ? (
-                          <p className="font-mono text-fg-3">
-                            {showcase.importPath}
-                          </p>
-                        ) : null}
-                        {showcase.description ? (
-                          <p className="mt-1 text-fg-2">
-                            {showcase.description}
-                          </p>
-                        ) : null}
-                        <div className="mt-4 space-y-4">
-                          {showcase.sections.map((section) => (
-                            <div
-                              key={section.id}
-                              id={kitAnchor(showcase.group, section.id)}
-                            >
-                              <h4 className="text-fg-2">{section.title}</h4>
-                              <div className="mt-2">{section.render()}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ))}
+    <MotionProvider reducedMotion={toolbar.reducedMotion ? 'always' : 'user'}>
+      <div
+        className="flex h-screen flex-col bg-bg-0 text-fg-1"
+        data-density={toolbar.density}
+        data-reduced-motion={toolbar.reducedMotion ? 'true' : 'false'}
+        data-freeze-time={toolbar.freezeTime ? 'true' : 'false'}
+        data-kit-bg={toolbar.background}
+        data-market-speed={toolbar.marketSpeed}
+      >
+        <header className="flex flex-wrap items-center gap-3 border-b border-line-1 px-4 py-3">
+          <div className="mr-2">
+            <p className="text-[11px] font-medium tracking-[0.06em] text-fg-3 uppercase">
+              Dev
+            </p>
+            <h1 className="text-sm font-medium">UI kit</h1>
           </div>
-        </main>
+          <Segment
+            label="Density"
+            value={toolbar.density}
+            options={[
+              ['compact', 'Compact'],
+              ['comfortable', 'Comfortable'],
+            ]}
+            onChange={(density) => patch({ density })}
+          />
+          <Toggle
+            label="Reduced motion"
+            pressed={toolbar.reducedMotion}
+            onClick={() => patch({ reducedMotion: !toolbar.reducedMotion })}
+          />
+          <Toggle
+            label="Freeze time"
+            pressed={toolbar.freezeTime}
+            onClick={() => patch({ freezeTime: !toolbar.freezeTime })}
+          />
+          <Segment
+            label="Background"
+            value={toolbar.background}
+            options={[
+              ['0', 'bg-0'],
+              ['1', 'bg-1'],
+            ]}
+            onChange={(background) => patch({ background })}
+          />
+          <Segment
+            label="Market speed"
+            value={toolbar.marketSpeed}
+            options={[
+              ['1', '1×'],
+              ['10', '10×'],
+              ['60', '60×'],
+            ]}
+            onChange={(marketSpeed) => patch({ marketSpeed })}
+          />
+          <Segment
+            label="Width"
+            value={String(toolbar.width)}
+            options={WIDTHS.map((width) => [String(width), String(width)])}
+            onChange={(width) => patch({ width: Number(width) as Width })}
+          />
+        </header>
+        <div className="flex min-h-0 flex-1">
+          <nav
+            aria-label="Sections"
+            className="w-60 shrink-0 overflow-auto border-r border-line-1 p-3"
+          >
+            <label className="block">
+              <span className="sr-only">Search sections</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search sections"
+                className="mb-3 w-full rounded-sm border border-line-2 bg-bg-2 px-2 text-fg-1 outline-none placeholder:text-fg-4 focus:shadow-[var(--glow-sm)]"
+                style={{ height: 'var(--input-h)' }}
+              />
+            </label>
+            <ul className="space-y-3">
+              {visible.map(({ group, items }) => (
+                <li key={group.id}>
+                  <a
+                    href={`#${kitAnchor(group.id)}`}
+                    className="text-sm font-medium text-fg-1 hover:text-orange-300"
+                  >
+                    {group.title}
+                  </a>
+                  {items.length > 0 ? (
+                    <ul className="mt-1 space-y-1 pl-3">
+                      {items.map((showcase) => (
+                        <li key={showcase.id}>
+                          <a
+                            href={`#${kitAnchor(group.id, showcase.id)}`}
+                            className="text-fg-2 hover:text-fg-1"
+                          >
+                            {showcase.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <main className="min-w-0 flex-1 overflow-auto p-6">
+            <div
+              className="border border-line-1"
+              data-kit-stage
+              style={{
+                width: toolbar.width,
+                background:
+                  toolbar.background === '1' ? 'var(--bg-1)' : 'var(--bg-0)',
+                boxShadow: 'var(--shadow-panel)',
+              }}
+            >
+              {visible.map(({ group, items }) => (
+                <section
+                  key={group.id}
+                  id={kitAnchor(group.id)}
+                  data-kit-anchor={kitAnchor(group.id)}
+                  className="border-b border-line-1 px-6 py-8"
+                >
+                  <h2 className="text-lg font-medium">{group.title}</h2>
+                  <p className="mt-1 text-fg-2">{group.description}</p>
+                  {items.length === 0 ? (
+                    <p className="mt-6 text-fg-3">
+                      No components in this section yet.
+                    </p>
+                  ) : (
+                    <div className="mt-6 space-y-8">
+                      {items.map((showcase) => (
+                        <article
+                          key={showcase.id}
+                          id={kitAnchor(showcase.group, showcase.id)}
+                          data-kit-anchor={kitAnchor(
+                            showcase.group,
+                            showcase.id,
+                          )}
+                        >
+                          <h3 className="font-medium">{showcase.title}</h3>
+                          {showcase.importPath ? (
+                            <p className="font-mono text-fg-3">
+                              {showcase.importPath}
+                            </p>
+                          ) : null}
+                          {showcase.description ? (
+                            <p className="mt-1 text-fg-2">
+                              {showcase.description}
+                            </p>
+                          ) : null}
+                          <div className="mt-4 space-y-4">
+                            {showcase.sections.map((section) => (
+                              <div
+                                key={section.id}
+                                id={kitAnchor(showcase.group, section.id)}
+                              >
+                                <h4 className="text-fg-2">{section.title}</h4>
+                                <div className="mt-2">{section.render()}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </MotionProvider>
   );
 }
 
