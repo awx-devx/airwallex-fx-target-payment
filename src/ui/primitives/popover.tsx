@@ -11,7 +11,7 @@ export function PopoverPanel({
   arrow?: boolean;
 }) {
   return (
-    <div className="relative w-64 rounded-md border border-line-2 bg-bg-2 p-3 text-fg-1 shadow-[var(--shadow-panel)]">
+    <div className="relative w-64 rounded-lg border border-line-2 bg-bg-2 p-3 text-fg-1">
       {children}
       {arrow ? (
         <span
@@ -42,7 +42,7 @@ export function Popover({
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
           sideOffset={8}
-          className="z-50 w-64 rounded-md border border-line-2 bg-bg-2 p-3 text-fg-1 shadow-[var(--shadow-panel)] outline-none"
+          className="z-50 w-64 rounded-lg border border-line-2 bg-bg-2 p-3 text-fg-1 outline-none"
         >
           {children}
           {arrow ? <PopoverPrimitive.Arrow className="fill-bg-2" /> : null}

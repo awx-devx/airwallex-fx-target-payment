@@ -20,7 +20,7 @@ export function TooltipCard({
   title?: ReactNode;
 }) {
   return (
-    <div className="max-w-xs rounded-sm border border-line-2 bg-bg-2 px-2 py-1.5 text-fg-1 shadow-[var(--shadow-panel)]">
+    <div className="max-w-xs rounded-lg border border-line-2 bg-bg-2 px-2 py-1.5 text-fg-1">
       {title ? <p className="font-medium">{title}</p> : null}
       <p className={title ? 'text-fg-2' : undefined}>{content}</p>
     </div>
@@ -47,7 +47,7 @@ export function Tooltip({
         <TooltipPrimitive.Content
           sideOffset={6}
           className={cx(
-            'z-50 max-w-xs rounded-sm border border-line-2 bg-bg-2 px-2 py-1.5 text-fg-1 shadow-[var(--shadow-panel)]',
+            'z-50 max-w-xs rounded-lg border border-line-2 bg-bg-2 px-2 py-1.5 text-fg-1',
             'data-[state=delayed-open]:animate-none',
           )}
         >

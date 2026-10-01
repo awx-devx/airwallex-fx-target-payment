@@ -34,7 +34,7 @@ export function FileDropzone({
       className={cx(
         'rounded-md border border-dashed px-4 text-center',
         size === 'lg' ? 'py-10' : 'py-6',
-        dragging ? 'border-orange-500 shadow-[var(--glow-md)]' : 'border-line-2',
+        dragging ? 'border-orange-500' : 'border-line-2',
         error && 'border-down',
       )}
     >

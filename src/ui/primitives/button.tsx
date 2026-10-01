@@ -17,7 +17,7 @@ export type ForcedState = 'hover' | 'active' | 'focus';
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
-    'text-bg-0 hover:shadow-[var(--glow-md)] data-[force=hover]:shadow-[var(--glow-md)] active:brightness-95 data-[force=active]:brightness-95',
+    'bg-orange-500 text-bg-0 hover:bg-orange-600 data-[force=hover]:bg-orange-600 active:bg-orange-600 data-[force=active]:bg-orange-600',
   secondary:
     'border border-line-2 bg-bg-2 text-fg-1 hover:border-line-3 hover:bg-bg-3 data-[force=hover]:border-line-3 data-[force=hover]:bg-bg-3',
   ghost:
@@ -67,7 +67,6 @@ export function Button({
         'inline-flex items-center justify-center rounded-sm font-medium whitespace-nowrap',
         'outline-none focus-visible:shadow-[var(--glow-sm)] data-[force=focus]:shadow-[var(--glow-sm)]',
         'disabled:pointer-events-none disabled:opacity-40',
-        variant === 'primary' && 'bg-[image:var(--grad-accent)]',
         VARIANT[variant],
         variant === 'link' ? 'h-auto px-0' : SIZE[size],
         className,

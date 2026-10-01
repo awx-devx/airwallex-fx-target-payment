@@ -53,25 +53,24 @@
       transparent 50%
     );
 
-  --glow-sm:
-    0 0 0 1px rgba(255, 106, 26, 0.35), 0 0 12px -2px var(--orange-glow);
-  --glow-md:
-    0 0 0 1px rgba(255, 106, 26, 0.45), 0 0 24px -4px var(--orange-glow);
+  /* Focus and selection. A line, not a bloom. */
+  --glow-sm: 0 0 0 1px var(--orange-500);
+  --glow-md: 0 0 0 1px var(--orange-500);
+  /* Reserved for a target-hit quote. */
   --glow-lg:
     0 0 0 1px rgba(255, 106, 26, 0.55), 0 0 48px -6px var(--orange-glow);
   --glow-up:
     0 0 0 1px rgba(43, 217, 160, 0.45), 0 0 24px -4px rgba(43, 217, 160, 0.45);
-  --glow-warn:
-    0 0 0 1px rgba(255, 194, 75, 0.45), 0 0 24px -4px rgba(255, 194, 75, 0.45);
+  --glow-warn: 0 0 0 1px var(--warn);
   --shadow-panel:
     0 1px 0 rgba(255, 255, 255, 0.03) inset,
     0 20px 40px -20px rgba(0, 0, 0, 0.8);
 
-  --r-xs: 4px;
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --r-xl: 20px;
+  --r-xs: 0px;
+  --r-sm: 0px;
+  --r-md: 0px;
+  --r-lg: 4px;
+  --r-xl: 4px;
   --r-pill: 999px;
 
   --space-2: 2px;
@@ -283,24 +282,5 @@ body::before {
 }
 
 .glow-border {
-  position: relative;
-  background: var(--bg-1);
-}
-
-.glow-border::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: var(--grad-border);
-  pointer-events: none;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
+  border-color: var(--orange-500);
 }

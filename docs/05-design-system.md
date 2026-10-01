@@ -1,6 +1,6 @@
 # 05 — Design System
 
-**Direction:** a *glowing, dark, premium trading terminal*. Near-black surfaces, layered depth, and a **molten orange** accent that glows. Motion is used to show that data is live. Every number is tabular and precise. The screen should feel calm until something happens; then orange light draws the eye to the event.
+**Direction:** a *matte ruled sheet*. Near-black surfaces, hairline rules, square controls, and a **flat orange** accent. The page is one flush sheet: sections share a single border and scroll into each other, with no floating card and no drop shadow. Motion is used to show that data is live. Every number is tabular and precise. The screen stays quiet; glow is reserved for the chart target line and a locked quote.
 
 Tune the orange hue to Airwallex brand guidance before the demo, if it is available. All values below are tokens and can be changed in one place.
 
@@ -8,8 +8,8 @@ Tune the orange hue to Airwallex brand guidance before the demo, if it is availa
 
 ## 1. Principles
 
-1. **Data first, chrome second.** The chart and the numbers are the hero. Borders are hairlines and panels recede.
-2. **Glow means attention.** Glow is rationed. It is used only for the target line, the active selection, live and pending states, and primary actions. If everything glows, nothing does.
+1. **Data first, chrome second.** The chart and the numbers are the hero. Borders are hairlines. Panels sit flush on the sheet; they do not float.
+2. **A line means attention.** Focus, selection, and primary actions are a 1px orange rule. Glow is rarer than that: only the chart target line and a locked target-hit quote (the quote card and its approval dialog). If everything glows, nothing does.
 3. **Colour has meaning.** Orange marks the brand and the target/action, green means favourable, red means adverse, and amber means a deadline or warning. Colour is never decoration alone.
 4. **Always show "live".** Ticks flash, countdowns count, connection status is visible, and stale data is visibly stale.
 5. **Keyboard-first.** It is a terminal, so every primary action has a shortcut.
@@ -42,7 +42,7 @@ Defined as CSS variables in `src/ui/tokens/tokens.css` and exposed to Tailwind v
 | `--fg-3` | `#6B6B78` (tertiary / labels) |
 | `--fg-4` | `#45454F` (disabled) |
 
-### Accent: molten orange
+### Accent: flat orange
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -70,25 +70,29 @@ Defined as CSS variables in `src/ui/tokens/tokens.css` and exposed to Tailwind v
 
 ### Gradients
 
-- `--grad-accent`: `linear-gradient(135deg, #FF8A3D 0%, #FF6A1A 45%, #E0410B 100%)` for the primary button fill and hero numbers.
-- `--grad-border`: `linear-gradient(180deg, rgba(255,106,26,0.55), rgba(255,106,26,0) 60%)` for glowing card borders (masked border technique).
-- `--grad-ambient`: two radial orange blooms, very low alpha (≤ 0.06), fixed behind the chart area for depth.
+These variables stay in the token file so the kit can show them. They are not applied to buttons, cards, or page chrome.
+
+- `--grad-accent`: `linear-gradient(135deg, #FF8A3D 0%, #FF6A1A 45%, #E0410B 100%)`. Unused. Primary fill is flat `--orange-500`.
+- `--grad-border`: `linear-gradient(180deg, rgba(255,106,26,0.55), rgba(255,106,26,0) 60%)`. Unused. A marked card uses `border-color: var(--orange-500)`.
+- `--grad-ambient`: two radial orange blooms. Unused. No bloom behind the chart.
 - Noise: a 2% opacity SVG noise overlay on `--bg-0` to avoid banding.
 
 ---
 
-## 3. Glow & elevation
+## 3. Focus, rules, and the two glows
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--glow-sm` | `0 0 0 1px rgba(255,106,26,0.35), 0 0 12px -2px var(--orange-glow)` | Focus ring, selected chip |
-| `--glow-md` | `0 0 0 1px rgba(255,106,26,0.45), 0 0 24px -4px var(--orange-glow)` | Primary button hover, active bill card |
-| `--glow-lg` | `0 0 0 1px rgba(255,106,26,0.55), 0 0 48px -6px var(--orange-glow)` | Target-hit card, approval modal |
-| `--glow-up` | same shape with `--up` | Paid / favourable events |
-| `--glow-warn` | same shape with `--warn` | Final-day state |
-| `--shadow-panel` | `0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 40px -20px rgba(0,0,0,0.8)` | Panels |
+| `--glow-sm` | `0 0 0 1px var(--orange-500)` | Focus ring. A line, not a bloom. |
+| `--glow-md` | `0 0 0 1px var(--orange-500)` | Same 1px rule. Hover does not bloom. |
+| `--glow-lg` | `0 0 0 1px rgba(255,106,26,0.55), 0 0 48px -6px var(--orange-glow)` | Target-hit approval dialog |
+| `--glow-up` | `0 0 0 1px rgba(43,217,160,0.45), 0 0 24px -4px rgba(43,217,160,0.45)` | Locked target-hit quote card |
+| `--glow-warn` | `0 0 0 1px var(--warn)` | 1px warn rule. Not a bloom. |
+| `--shadow-panel` | `0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 40px -20px rgba(0,0,0,0.8)` | Defined, unused. Panels and overlays have no drop shadow. |
 
-**Pulse:** `@keyframes glow-pulse` animates the glow opacity between 0.55 and 1 over 2.4 s ease-in-out. It is used only for `WATCHING` (subtle) and `TARGET_HIT` (strong). It is disabled under `prefers-reduced-motion`.
+The chart target line is a separate glow, drawn on the canvas (a blurred stroke under the crisp line). It does not use these CSS tokens.
+
+**Pulse:** `@keyframes glow-pulse` animates opacity between 0.55 and 1 over 2.4 s ease-in-out. `WATCHING` uses `--glow-sm`, so the pulse is a 1px ring. `TARGET_HIT` uses `--glow-lg` (the strong pulse). Both are disabled under `prefers-reduced-motion`.
 
 ---
 
@@ -111,7 +115,8 @@ Rules:
 ## 5. Spacing, radius, layout
 
 - Spacing scale (px): 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56.
-- Radius: `--r-xs 4`, `--r-sm 6`, `--r-md 10`, `--r-lg 14`, `--r-xl 20`, `--r-pill 999`.
+- Radius: `--r-xs` through `--r-md` are `0` (the sheet: buttons, inputs, badges, chips, cards, stepper marks). `--r-lg` and `--r-xl` are `4` (the only soft layer: dialogs, menus, popovers, toasts, tooltips, select menus, the date popup, and the crosshair card). `--r-pill 999` is only for dots, flags, avatars, and tracks (progress, slider, switch, radio).
+- The kit stage is the scroll pane. No outer padding, no panel shadow. Sections share one `border-b` in `--line-1` and sit flush. The nav edge is that same 1px line.
 - Density: the default is **compact** (row height 36, input height 32). A **comfortable** variant (row 44, input 40) is used for modals and forms.
 - Terminal grid (≥ 1440 px): left rail 280 px (bills), centre flexible (chart + bottom panel), right rail 360 px (ticket). Minimum supported width is 1280 px; below that the right rail collapses to a drawer.
 - **Breakpoints** (plain Tailwind, no container queries): `lg` 1024, `xl` 1280, `2xl` 1440. Below `xl` the terminal rails move into drawers opened from the top bar (a bills button on the left, a ticket button on the right) and the top bar drops to icon buttons with labels in tooltips. Below `lg` the chart and the bottom panel stack vertically. Nothing overflows or overlaps at any width down to 360 px; horizontal scrolling is limited to wide tables. Layouts reflow, they don't get a separate mobile design. Spec: [07 §1](./07-pages-spec.md#responsive-behaviour).
@@ -124,7 +129,7 @@ All animation runs through **Motion** (`motion` on npm, formerly Framer Motion; 
 
 Rules:
 - Durations and easings come from the tokens below; components never hardcode timings.
-- Only animate `transform` and `opacity`. Width, height and colour animations are reserved for the tokenised patterns below (tick flash, glow border).
+- Only animate `transform` and `opacity`. Width, height and colour animations are reserved for the tokenised patterns below (tick flash, the target-hit quote).
 - `MotionConfig reducedMotion="user"` wraps the app: under `prefers-reduced-motion` (and the kit's reduced-motion toggle) there is no pulse, odometer, flash or layout animation; colour changes are instant.
 - `src/ui/**` imports `motion/react` directly. No fetching and no stores inside animated components.
 
@@ -141,7 +146,7 @@ Rules:
 Patterns:
 - **Tick flash:** on a price change, flash the background with `--up-wash` or `--down-wash` according to `favorable()`, decaying over `--dur-tick`. The digits roll with a vertical odometer only on the hero price.
 - **Number tween:** savings and cost tween over `--dur-tween` (300 ms).
-- **State change:** badges crossfade. On a transition to `TARGET_HIT`, the card border animates into `--glow-lg` and the target line on the chart brightens briefly (one pulse).
+- **State change:** badges crossfade. On a transition to `TARGET_HIT`, the quote card takes `--glow-up`, the approval dialog takes `--glow-lg`, and the target line on the chart brightens briefly (one pulse).
 - **Countdown:** in the final 60 s the chip turns `--warn` and ticks with a subtle scale of 1 → 1.03.
 - **Enter/exit:** lists, toasts, popovers, drawers and modals use `AnimatePresence` (fade + 8 px rise, `--dur-2`/`--dur-3`).
 - **Layout:** bill selection and rail collapse use `layout` transitions on `--ease-in-out` so panels glide instead of snapping.
@@ -153,7 +158,7 @@ Patterns:
 
 | Element | Style |
 | --- | --- |
-| Background | transparent over `--bg-1` with ambient bloom |
+| Background | transparent over `--bg-1`. No ambient bloom. |
 | Grid | `rgba(255,255,255,0.04)`, vertical grid off by default |
 | Price series (area) | line `--fg-1` at 1.5 px; area gradient from `rgba(255,255,255,0.10)` to `0` |
 | Reference history | line `--info` at 40% opacity, dashed 2/4, labelled "Reference (ECB)" |
@@ -177,7 +182,7 @@ Implementation notes: horizontal lines use the built-in price lines (`createPric
 
 - **Lucide** icons at a 1.5 px stroke, 16 px default and 14 px in dense tables.
 - Currency flags: circular 16/20 px SVG set (e.g. `circle-flags`), shown as a stacked pair for `F/H`.
-- Empty states: a minimal line-art chart with an orange glow dot, no mascots.
+- Empty states: a minimal line-art chart with one orange mark, no mascots.
 
 ---
 
@@ -185,5 +190,5 @@ Implementation notes: horizontal lines use the built-in price lines (`createPric
 
 - Text contrast is ≥ 4.5:1 for `--fg-1` and `--fg-2` on `--bg-1`. `--fg-3` is used for labels only.
 - Favourable and adverse colours are always paired with a sign or an arrow (▲/▼, +/−). Meaning never depends on colour alone.
-- Focus is always visible (`--glow-sm`). All dialogs are Radix with focus trapping.
+- Focus is always visible: a 1px orange outline (`--glow-sm`). All dialogs are Radix with focus trapping.
 - Live regions: approval requests and target hits are announced via `aria-live="assertive"`, and ticks are **not** announced.

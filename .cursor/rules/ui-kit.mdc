@@ -1,12 +1,12 @@
 ---
-description: UI kit conventions (props-only components, tokens, glow, number formatting, favourable colours, showcase, layout widths, a11y)
+description: UI kit conventions (props-only components, tokens, hairline sheet, number formatting, favourable colours, showcase, layout widths, a11y)
 globs: src/ui/**,src/app/dev/**
 alwaysApply: false
 ---
 
 # UI Kit
 
-Specs: `docs/05-design-system.md` (tokens, glow, typography, motion, chart styling), `docs/06-ui-kit-spec.md` (inventory, `/dev/ui-kit`, review gate).
+Specs: `docs/05-design-system.md` (tokens, rules, typography, motion, chart styling), `docs/06-ui-kit-spec.md` (inventory, `/dev/ui-kit`, review gate).
 
 ## Boundaries
 - `src/ui/**` is **props-only**: no `fetch`, no TanStack Query, no Zustand, no imports from `src/server/**`, `src/features/**` or `src/mocks/**` (fixtures come in through `*.fixtures.ts` files, which may import `src/mocks`). The ESLint `no-restricted-imports` rule enforces this.
@@ -21,7 +21,7 @@ Specs: `docs/05-design-system.md` (tokens, glow, typography, motion, chart styli
 
 ## Look
 - **Dark only.** There's a single dark theme; don't add light-mode branches. All colours come from tokens (`--bg-*`, `--fg-*`, `--orange-*`, `--up`, `--down`, `--warn`, `--info`). **No hex values in components.**
-- **Glow is rationed:** only for the target line, the active selection, live/pending states (`WATCHING`, `TARGET_HIT`) and primary actions. At most three glowing elements on any composite screen. Use the `--glow-*` tokens; don't hand-roll box-shadows.
+- **Glow is rationed:** a 1px orange rule for focus and selection. A real glow only for the chart target line, a locked target quote (`--glow-up`), and the target-hit approval dialog (`--glow-lg`). Not for primary buttons, chips, or panels. Use the `--glow-*` tokens; don't hand-roll box-shadows.
 - Direction colours always go through `favorable(delta)`. For a bill, a **lower price is green**. Never map "up = green" directly.
 - Bill state labels and colours come from one state-meta map used by `StateBadge`. Components don't switch on `BillState` for styling.
 

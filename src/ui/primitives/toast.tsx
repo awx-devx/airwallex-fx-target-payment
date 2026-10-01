@@ -19,7 +19,7 @@ const TONE: Record<ToastTone, string> = {
   success: 'border-up',
   warning: 'border-warn',
   error: 'border-down',
-  'target-hit': 'border-orange-500 glow-md',
+  'target-hit': 'border-orange-500',
 };
 
 export function ToastCard({
@@ -41,7 +41,7 @@ export function ToastCard({
     <div
       role="status"
       className={cx(
-        'w-80 rounded-md border bg-bg-2 p-3 shadow-[var(--shadow-panel)]',
+        'w-80 rounded-lg border bg-bg-2 p-3',
         TONE[tone],
       )}
     >
@@ -117,7 +117,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <ToastPrimitive.Root
               key={item.id}
               className={cx(
-                'w-80 rounded-md border bg-bg-2 p-3 shadow-[var(--shadow-panel)]',
+                'w-80 rounded-lg border bg-bg-2 p-3',
                 TONE[item.tone],
               )}
               onOpenChange={(open) => {

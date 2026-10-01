@@ -28,7 +28,7 @@ export function CrosshairTooltip({
       )
     : undefined;
   return (
-    <div className="pointer-events-none rounded-sm border border-line-2 bg-bg-2 px-2 py-1.5 text-[12px] shadow-[var(--shadow-panel)]">
+    <div className="pointer-events-none rounded-lg border border-line-2 bg-bg-2 px-2 py-1.5 text-[12px]">
       <p className="text-fg-3">{timeLabel}</p>
       <p className="mt-1">
         <PipNumber value={formatPrice(pair, price, { inverted })} />
@@ -67,7 +67,7 @@ export function DragPreview({
   cost?: string;
 }) {
   return (
-    <div className="pointer-events-none rounded-sm border border-orange-500 bg-bg-2 px-2 py-1 text-[12px] shadow-[var(--glow-sm)]">
+    <div className="pointer-events-none rounded-lg border border-orange-500 bg-bg-2 px-2 py-1 text-[12px]">
       <PipNumber value={formatPrice(pair, price, { inverted })} />
       {cost ? <p className="num text-fg-2">{cost}</p> : null}
     </div>

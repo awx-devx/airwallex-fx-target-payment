@@ -26,7 +26,7 @@ export function BalancePill({
       <button
         type="button"
         className={cx(
-          'num inline-flex h-6 items-center rounded-full border px-2 text-xs',
+          'num inline-flex h-6 items-center border px-2 text-xs',
           tone === 'insufficient' && 'border-down text-down',
           tone === 'low' && 'border-warn text-warn',
           tone === 'normal' && 'border-line-2 text-fg-1',

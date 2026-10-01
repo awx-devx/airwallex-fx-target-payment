@@ -216,15 +216,14 @@ export function KitShell() {
               ))}
             </ul>
           </nav>
-          <main className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain p-6">
+          <main className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain">
             <div
-              className="w-full border border-line-1"
+              className="w-full border-r border-line-1"
               data-kit-stage
               style={{
                 maxWidth: toolbar.width,
                 background:
                   toolbar.background === '1' ? 'var(--bg-1)' : 'var(--bg-0)',
-                boxShadow: 'var(--shadow-panel)',
               }}
             >
               {visible.map(({ group, items }) => (

@@ -42,7 +42,7 @@ export function TransferMethodPicker({
               'focus-visible:shadow-[var(--glow-sm)]',
               'disabled:cursor-not-allowed disabled:opacity-50',
               selected
-                ? 'border-orange-500 bg-orange-wash shadow-[var(--glow-sm)]'
+                ? 'border-orange-500 bg-orange-wash'
                 : 'border-line-2 bg-bg-2',
             )}
           >

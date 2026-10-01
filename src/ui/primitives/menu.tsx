@@ -20,7 +20,7 @@ export function Menu({
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           sideOffset={6}
-          className="z-50 min-w-48 rounded-md border border-line-2 bg-bg-2 p-1 shadow-[var(--shadow-panel)]"
+          className="z-50 min-w-48 rounded-lg border border-line-2 bg-bg-2 p-1"
         >
           {children}
         </DropdownMenu.Content>
@@ -75,7 +75,7 @@ export function MenuSub({
         <span className="ml-auto text-fg-3">›</span>
       </DropdownMenu.SubTrigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.SubContent className="z-50 min-w-40 rounded-md border border-line-2 bg-bg-2 p-1 shadow-[var(--shadow-panel)]">
+        <DropdownMenu.SubContent className="z-50 min-w-40 rounded-lg border border-line-2 bg-bg-2 p-1">
           {children}
         </DropdownMenu.SubContent>
       </DropdownMenu.Portal>
@@ -86,7 +86,7 @@ export function MenuSub({
 /** Static menu body for the kit matrix. The live menu uses the same classes. */
 export function MenuPreview({ children }: { children: ReactNode }) {
   return (
-    <div className="min-w-48 rounded-md border border-line-2 bg-bg-2 p-1 shadow-[var(--shadow-panel)]">
+    <div className="min-w-48 rounded-lg border border-line-2 bg-bg-2 p-1">
       {children}
     </div>
   );

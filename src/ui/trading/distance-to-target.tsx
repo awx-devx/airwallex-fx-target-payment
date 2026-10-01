@@ -8,7 +8,7 @@ const FILL = {
   far: 'bg-fg-3',
   mid: 'bg-fg-2',
   near: 'bg-warn',
-  through: 'bg-orange-500 shadow-[var(--glow-sm)]',
+  through: 'bg-orange-500',
 } as const;
 
 const TEXT = {

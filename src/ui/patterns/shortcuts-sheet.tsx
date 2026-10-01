@@ -11,7 +11,7 @@ const SHORTCUTS = [
 
 export function ShortcutsSheet() {
   return (
-    <div className="max-w-sm space-y-2 rounded-lg border border-line-1 bg-bg-1 p-4">
+    <div className="max-w-sm space-y-2 rounded-md border border-line-1 bg-bg-1 p-4">
       <p className="font-medium">Shortcuts</p>
       <ul className="space-y-1">
         {SHORTCUTS.map(([keys, label]) => (

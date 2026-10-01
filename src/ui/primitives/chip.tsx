@@ -17,9 +17,9 @@ export function Chip({
   return (
     <span
       className={cx(
-        'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs',
+        'inline-flex h-6 items-center gap-1 border px-2 text-xs',
         selected
-          ? 'border-orange-500 bg-orange-wash text-orange-300 shadow-[var(--glow-sm)]'
+          ? 'border-orange-500 bg-orange-wash text-orange-300'
           : 'border-line-2 bg-bg-2 text-fg-2',
       )}
     >

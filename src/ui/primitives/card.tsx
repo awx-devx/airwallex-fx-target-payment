@@ -19,10 +19,10 @@ export function Card({
       className={cx(
         'rounded-md border border-line-1 p-4',
         variant === 'flat' && 'bg-bg-1',
-        variant === 'raised' && 'bg-bg-2 shadow-[var(--shadow-panel)]',
+        variant === 'raised' && 'bg-bg-2',
         variant === 'glow-border' && 'glow-border',
-        interactive && 'transition-shadow hover:shadow-[var(--glow-sm)]',
-        selected && 'bg-orange-wash shadow-[var(--glow-sm)]',
+        interactive && 'hover:bg-bg-2',
+        selected && 'border-orange-500 bg-orange-wash',
         className,
       )}
     >

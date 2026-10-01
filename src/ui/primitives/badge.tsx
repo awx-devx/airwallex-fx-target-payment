@@ -61,7 +61,7 @@ export function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 font-medium whitespace-nowrap',
         appearance === 'outline' && 'border',
         size === 'xs' ? 'h-4 px-1.5 text-[10px]' : 'h-5 px-2 text-[11px]',
         palette[tone],

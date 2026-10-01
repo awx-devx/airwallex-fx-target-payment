@@ -25,7 +25,7 @@ export function CountdownChip({
   return (
     <span
       className={cx(
-        'num inline-flex h-5 items-center rounded-full border px-2 text-[11px]',
+        'num inline-flex h-5 items-center border px-2 text-[11px]',
         urgency === 'urgent' && 'border-down text-down glow-pulse',
         urgency === 'warn' && 'border-warn text-warn',
         urgency === 'expired' && 'border-line-2 text-fg-3',

@@ -63,7 +63,7 @@ export function Dialog({
               <DialogPrimitive.Content asChild forceMount>
                 <motion.div
                   className={cx(
-                    'relative z-10 w-full rounded-lg border border-line-1 bg-bg-1 p-5 shadow-[var(--shadow-panel)]',
+                    'relative z-10 w-full rounded-lg border border-line-1 bg-bg-1 p-5',
                     WIDTH[size],
                     tone === 'glow' && 'glow-lg',
                     tone === 'danger' && 'border-down',
@@ -139,7 +139,7 @@ export function Drawer({
               <DialogPrimitive.Content asChild forceMount>
                 <motion.div
                   className={cx(
-                    'absolute z-10 border-line-1 bg-bg-1 p-5 shadow-[var(--shadow-panel)]',
+                    'absolute z-10 border-line-1 bg-bg-1 p-5',
                     side === 'right' ? 'top-0 right-0 h-full border-l' : 'right-0 bottom-0 left-0 border-t',
                     side === 'right' &&
                       (size === 'lg' ? 'w-[420px] max-w-full' : 'w-80 max-w-full'),
@@ -186,7 +186,7 @@ export function DialogPreview({
   return (
     <div
       className={cx(
-        'w-full rounded-lg border border-line-1 bg-bg-1 p-5 shadow-[var(--shadow-panel)]',
+        'w-full rounded-lg border border-line-1 bg-bg-1 p-5',
         WIDTH[size],
         tone === 'glow' && 'glow-lg',
         tone === 'danger' && 'border-down',
@@ -215,7 +215,7 @@ export function DrawerPreview({
     <div className="relative h-48 overflow-hidden rounded-md border border-line-1 bg-bg-0">
       <div
         className={cx(
-          'absolute border-line-1 bg-bg-1 p-4 shadow-[var(--shadow-panel)]',
+          'absolute border-line-1 bg-bg-1 p-4',
           side === 'right' ? 'inset-y-0 right-0 border-l' : 'inset-x-0 bottom-0 border-t',
           side === 'right' && (size === 'lg' ? 'w-56' : 'w-40'),
         )}

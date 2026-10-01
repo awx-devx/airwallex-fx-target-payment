@@ -51,7 +51,7 @@ export function Select({
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
           position="popper"
-          className="z-50 max-h-64 w-[var(--radix-select-trigger-width)] overflow-auto rounded-sm border border-line-2 bg-bg-2 p-1 shadow-[var(--shadow-panel)]"
+          className="z-50 max-h-64 w-[var(--radix-select-trigger-width)] overflow-auto rounded-lg border border-line-2 bg-bg-2 p-1"
         >
           <SelectPrimitive.Viewport>
             {options.length === 0 ? (

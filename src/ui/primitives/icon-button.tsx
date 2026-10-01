@@ -18,7 +18,7 @@ const VARIANT: Record<IconButtonVariant, string> = {
   ghost: 'text-fg-1 hover:bg-bg-3 data-[force=hover]:bg-bg-3',
   secondary:
     'border border-line-2 bg-bg-2 text-fg-1 hover:border-line-3 data-[force=hover]:border-line-3',
-  primary: 'bg-[image:var(--grad-accent)] text-bg-0 hover:shadow-[var(--glow-md)]',
+  primary: 'bg-orange-500 text-bg-0 hover:bg-orange-600 data-[force=hover]:bg-orange-600',
 };
 
 export function IconButton({

@@ -126,7 +126,7 @@ export const layoutShowcases: Showcase[] = [
             </Card>
             <Card interactive selected>
               <p className="font-medium">Selected</p>
-              <p className="text-fg-2">Orange wash and glow.</p>
+              <p className="text-fg-2">Orange rule and wash.</p>
             </Card>
           </div>
         ),

@@ -102,7 +102,7 @@ export function Calendar({
   const closed = new Map(closedDays.map((day) => [day.date, day.reason]));
 
   return (
-    <div className="mt-2 w-64 rounded-md border border-line-2 bg-bg-1 p-3">
+    <div className="mt-2 w-64 rounded-lg border border-line-2 bg-bg-1 p-3">
       <div className="mb-2 flex items-center justify-between">
         <IconButton label="Previous month" size="sm" onClick={() => setMonth(addMonths(month, -1))}>
           <ChevronLeft strokeWidth={1.5} className="size-4" />
