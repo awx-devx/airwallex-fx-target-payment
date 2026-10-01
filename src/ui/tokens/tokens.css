@@ -137,6 +137,8 @@
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --radius-xl: var(--r-xl);
+  /* docs/05 §5. Tailwind's default 2xl is 1536. */
+  --breakpoint-2xl: 90rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

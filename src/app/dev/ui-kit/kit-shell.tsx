@@ -115,7 +115,7 @@ export function KitShell() {
   return (
     <MotionProvider reducedMotion={toolbar.reducedMotion ? 'always' : 'user'}>
       <div
-        className="flex h-screen flex-col bg-bg-0 text-fg-1"
+        className="flex h-dvh flex-col overflow-clip bg-bg-0 text-fg-1"
         data-density={toolbar.density}
         data-reduced-motion={toolbar.reducedMotion ? 'true' : 'false'}
         data-freeze-time={toolbar.freezeTime ? 'true' : 'false'}
@@ -177,7 +177,7 @@ export function KitShell() {
         <div className="flex min-h-0 flex-1">
           <nav
             aria-label="Sections"
-            className="w-60 shrink-0 overflow-auto border-r border-line-1 p-3"
+            className="min-h-0 w-60 shrink-0 overflow-auto overscroll-contain border-r border-line-1 p-3"
           >
             <label className="block">
               <span className="sr-only">Search sections</span>
@@ -216,12 +216,12 @@ export function KitShell() {
               ))}
             </ul>
           </nav>
-          <main className="min-w-0 flex-1 overflow-auto p-6">
+          <main className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain p-6">
             <div
-              className="border border-line-1"
+              className="w-full border border-line-1"
               data-kit-stage
               style={{
-                width: toolbar.width,
+                maxWidth: toolbar.width,
                 background:
                   toolbar.background === '1' ? 'var(--bg-1)' : 'var(--bg-0)',
                 boxShadow: 'var(--shadow-panel)',

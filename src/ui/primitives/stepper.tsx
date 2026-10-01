@@ -9,7 +9,7 @@ export function Stepper({
   }>;
 }) {
   return (
-    <ol className="flex items-center gap-3">
+    <ol className="flex min-w-0 flex-wrap items-center gap-3">
       {steps.map((step, index) => (
         <li key={step.label} className="flex items-center gap-3">
           <span

@@ -141,7 +141,8 @@ export function Drawer({
                   className={cx(
                     'absolute z-10 border-line-1 bg-bg-1 p-5 shadow-[var(--shadow-panel)]',
                     side === 'right' ? 'top-0 right-0 h-full border-l' : 'right-0 bottom-0 left-0 border-t',
-                    side === 'right' && (size === 'lg' ? 'w-[420px]' : 'w-80'),
+                    side === 'right' &&
+                      (size === 'lg' ? 'w-[420px] max-w-full' : 'w-80 max-w-full'),
                   )}
                   initial={{ opacity: 0, ...from }}
                   animate={{ opacity: 1, x: 0, y: 0 }}
