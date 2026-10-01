@@ -15,7 +15,7 @@ The product is presented like a **perps trading terminal**: every bill is a "pos
 | 02 | [Architecture](./02-architecture.md) | System components, stack, repo layout, runtime topology |
 | 03 | [Domain model](./03-domain-model.md) | Bill lifecycle state machine, rate math, trigger rules, DB schema |
 | 04 | [Airwallex integration spec](./04-airwallex-integration.md) | Endpoint-by-endpoint contract, webhooks, idempotency, sandbox setup |
-| 05 | [Design system](./05-design-system.md) | Visual language: matte ruled sheet, flat orange, tokens, motion, charts |
+| 05 | [Design system](./05-design-system.md) | Visual language: matte ruled sheet, flat orange, bottom grain aurora, tokens, motion, charts |
 | 06 | [UI kit spec](./06-ui-kit-spec.md) | Every component, its variants and states, and the `/dev/ui-kit` page |
 | 07 | [Pages spec](./07-pages-spec.md) | Terminal layout, flows, screens assembled from the kit |
 | 08 | [Demo plan](./08-demo-plan.md) | Demo mode, market simulator, scripted scenarios, run-of-show, demo-vs-production inventory |

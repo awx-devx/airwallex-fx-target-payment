@@ -1,6 +1,6 @@
 # 05 — Design System
 
-**Direction:** a *matte ruled sheet*. Near-black surfaces, hairline rules, square controls, and a **flat orange** accent. The page is one flush sheet: sections share a single border and scroll into each other, with no floating card and no drop shadow. Motion is used to show that data is live. Every number is tabular and precise. The screen stays quiet; glow is reserved for the chart target line and a locked quote.
+**Direction:** a *matte ruled sheet*. Near-black surfaces, hairline rules, square controls, and a **flat orange** accent. The page is one flush sheet: sections share a single border and scroll into each other, with no floating card and no drop shadow. A quiet grain pool sits along the bottom edge, behind the sheet. Motion is used to show that data is live. Every number is tabular and precise. The screen stays quiet; glow is reserved for the chart target line and a locked quote.
 
 Tune the orange hue to Airwallex brand guidance before the demo, if it is available. All values below are tokens and can be changed in one place.
 
@@ -10,7 +10,7 @@ Tune the orange hue to Airwallex brand guidance before the demo, if it is availa
 
 1. **Data first, chrome second.** The chart and the numbers are the hero. Borders are hairlines. Panels sit flush on the sheet; they do not float.
 2. **A line means attention.** Focus, selection, and primary actions are a 1px orange rule. Glow is rarer than that: only the chart target line and a locked target-hit quote (the quote card and its approval dialog). If everything glows, nothing does.
-3. **Colour has meaning.** Orange marks the brand and the target/action, green means favourable, red means adverse, and amber means a deadline or warning. Colour is never decoration alone.
+3. **Colour has meaning.** Orange marks the brand and the target/action, green means favourable, red means adverse, and amber means a deadline or warning. Status colour is never decoration. The one ground treatment is the grain aurora below, and it does not use green or red.
 4. **Always show "live".** Ticks flash, countdowns count, connection status is visible, and stale data is visibly stale.
 5. **Keyboard-first.** It is a terminal, so every primary action has a shortcut.
 
@@ -76,6 +76,23 @@ These variables stay in the token file so the kit can show them. They are not ap
 - `--grad-border`: `linear-gradient(180deg, rgba(255,106,26,0.55), rgba(255,106,26,0) 60%)`. Unused. A marked card uses `border-color: var(--orange-500)`.
 - `--grad-ambient`: two radial orange blooms. Unused. No bloom behind the chart.
 - Noise: a 2% opacity SVG noise overlay on `--bg-0` to avoid banding.
+
+### Grain aurora
+
+The page ground, behind the sheet (D-22). A Paper Shaders `GrainGradient` (`@paper-design/shaders-react`, pinned `0.0.81`) fills a fixed band on the bottom 40vh and fades out through a mask before mid-screen. Panels stay opaque and sit above it.
+
+| Prop | Value |
+| --- | --- |
+| `colorBack` | `#07070A` (`--bg-0`) |
+| `colors` | `#1C1240`, `#3A2214` (dimmed violet and orange) |
+| `shape` | `wave` |
+| `softness` | `0.95` |
+| `intensity` | `0.12` |
+| `noise` | `0.08` |
+| `scale` | `1.4` |
+| `speed` | `1`, or `0` when the user prefers reduced motion (and when the kit freezes time) |
+
+The shader scales its own clock by `0.1`, so speed `1` is a slow drift. Paper takes hex strings, so these stops live on the component rather than as CSS variables. Tune them in place; don't add another shader.
 
 ---
 

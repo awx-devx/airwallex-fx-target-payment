@@ -190,12 +190,13 @@ interface FxChartProps {
 
 **Layout**
 - Left: a sticky nav tree of sections (Tokens / Primitives / Trading / Chart / Patterns) with search. The nav edge is a 1px `--line-1` rule.
+- The sheet sits on the grain aurora from [05 §2](./05-design-system.md#grain-aurora): a fixed bottom band, behind the content. The stage background stays transparent so the pool shows through the gaps. Freeze time and reduced motion pause it.
 - Main: the stage is the scroll pane (no outer padding, no panel shadow). One **Showcase** block per component, bands separated by a shared `border-b`:
   - Title, import path, short description
   - A **variant matrix** (grid of variants × sizes × states), rendered from fixtures
   - A **playground**: a prop knob panel (select/boolean/text knobs generated from a small per-component `knobs` config)
   - A "Copy usage" snippet
-- Global toolbar: density toggle (compact/comfortable), reduced-motion toggle, "freeze time" toggle (stops ticking for screenshots), background toggle (`bg-0`/`bg-1`), **simulated market speed** (for live components), and a width presets switch (1280/1440/1920).
+- Global toolbar: density toggle (compact/comfortable), reduced-motion toggle, "freeze time" toggle (stops ticking for screenshots, and pauses the grain aurora), background toggle (`bg-0`/`bg-1`), **simulated market speed** (for live components), and a width presets switch (1280/1440/1920).
 
 **Implementation**
 - Each component folder exports `showcase.tsx` with `export const showcase: Showcase = { title, sections: [...] }`. The page auto-discovers these through an index file. There is no Storybook dependency. If the team prefers Storybook later, the same `showcase` configs can generate stories.

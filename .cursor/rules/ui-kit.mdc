@@ -20,7 +20,8 @@ Specs: `docs/05-design-system.md` (tokens, rules, typography, motion, chart styl
 - After the review gate, visual changes update the Playwright baseline in a separate, deliberate commit.
 
 ## Look
-- **Dark only.** There's a single dark theme; don't add light-mode branches. All colours come from tokens (`--bg-*`, `--fg-*`, `--orange-*`, `--up`, `--down`, `--warn`, `--info`). **No hex values in components.**
+- **Dark only.** There's a single dark theme; don't add light-mode branches. All colours come from tokens (`--bg-*`, `--fg-*`, `--orange-*`, `--up`, `--down`, `--warn`, `--info`). **No hex values in components.** The grain aurora is the exception: Paper shaders take hex strings, and those stops are the ones in `docs/05` §2.
+- **Page ground.** The sheet stays transparent over the grain aurora (`AuroraBand`). Don't paint an opaque background across the stage.
 - **Glow is rationed:** a 1px orange rule for focus and selection. A real glow only for the chart target line, a locked target quote (`--glow-up`), and the target-hit approval dialog (`--glow-lg`). Not for primary buttons, chips, or panels. Use the `--glow-*` tokens; don't hand-roll box-shadows.
 - Direction colours always go through `favorable(delta)`. For a bill, a **lower price is green**. Never map "up = green" directly.
 - Bill state labels and colours come from one state-meta map used by `StateBadge`. Components don't switch on `BillState` for styling.

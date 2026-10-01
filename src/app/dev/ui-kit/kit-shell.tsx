@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useSyncExternalStore } from 'react';
+import { AuroraBand } from '@/app/dev/ui-kit/aurora';
 import { MotionProvider } from '@/ui/motion/provider';
 import { KIT_GROUPS, kitAnchor, showcases } from '@/ui/showcase';
 
@@ -115,14 +116,19 @@ export function KitShell() {
   return (
     <MotionProvider reducedMotion={toolbar.reducedMotion ? 'always' : 'user'}>
       <div
-        className="flex h-dvh flex-col overflow-clip bg-bg-0 text-fg-1"
+        className="relative isolate flex h-dvh flex-col overflow-clip text-fg-1"
+        style={{
+          background:
+            toolbar.background === '1' ? 'var(--bg-1)' : 'var(--bg-0)',
+        }}
         data-density={toolbar.density}
         data-reduced-motion={toolbar.reducedMotion ? 'true' : 'false'}
         data-freeze-time={toolbar.freezeTime ? 'true' : 'false'}
         data-kit-bg={toolbar.background}
         data-market-speed={toolbar.marketSpeed}
       >
-        <header className="flex flex-wrap items-center gap-3 border-b border-line-1 px-4 py-3">
+        <AuroraBand freeze={toolbar.freezeTime} />
+        <header className="relative z-45 flex flex-wrap items-center gap-3 border-b border-line-1 bg-bg-0 px-4 py-3">
           <div className="mr-2">
             <p className="text-[11px] font-medium tracking-[0.06em] text-fg-3 uppercase">
               Dev
@@ -174,7 +180,7 @@ export function KitShell() {
             onChange={(width) => patch({ width: Number(width) as Width })}
           />
         </header>
-        <div className="flex min-h-0 flex-1">
+        <div className="relative z-10 flex min-h-0 flex-1">
           <nav
             aria-label="Sections"
             className="min-h-0 w-60 shrink-0 overflow-auto overscroll-contain border-r border-line-1 p-3"
@@ -220,11 +226,7 @@ export function KitShell() {
             <div
               className="w-full border-r border-line-1"
               data-kit-stage
-              style={{
-                maxWidth: toolbar.width,
-                background:
-                  toolbar.background === '1' ? 'var(--bg-1)' : 'var(--bg-0)',
-              }}
+              style={{ maxWidth: toolbar.width }}
             >
               {visible.map(({ group, items }) => (
                 <section

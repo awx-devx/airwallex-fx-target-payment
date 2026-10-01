@@ -28,6 +28,8 @@ The main screen, modelled on a perps trading terminal.
 └──────────────┴──────────────────────────────────────────────────────────┴─────────────────┘
 ```
 
+The sheet sits on `--bg-0` with the grain aurora from [05 §2](./05-design-system.md#grain-aurora) along the bottom edge, behind the panels. It pauses under reduced motion.
+
 ### Behaviour
 
 - **Selection:** clicking a bill in the list or a table row selects it. The URL updates to `/bills/:id` (shallow) and the chart and ticket switch instantly. The previous chart instance is kept warm for fast back-and-forth, like switching markets.

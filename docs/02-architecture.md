@@ -57,6 +57,7 @@ flowchart LR
 | Styling | Tailwind CSS v4 + CSS variables for tokens | Fast iteration, tokens map cleanly to the design system |
 | Primitives | Radix UI (headless) | Accessible dialogs, popovers, tabs, tooltips |
 | Motion | Motion (formerly Framer Motion) | Number transitions, layout animations |
+| Page ground | `@paper-design/shaders-react` `GrainGradient`, pinned `0.0.81` | Bottom grain aurora behind the sheet (D-22) |
 | Extraction progress | `thinking-orbs` (`ThinkingOrb`) | The extraction row, instead of a generic spinner (D-21) |
 | Charts | TradingView **Lightweight Charts** v5 | Trading-grade performance. Price lines built in; vertical lines and zones through series primitives (plugins) |
 | Client state | TanStack Query (server state) + Zustand (UI state: selected bill, layout) | Clear split |

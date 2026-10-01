@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",
+    "@paper-design/shaders-react": "0.0.81",
     "date-fns": "^4.4.0",
     "decimal.js": "^10.6.0",
     "lightweight-charts": "^5.2.1",
