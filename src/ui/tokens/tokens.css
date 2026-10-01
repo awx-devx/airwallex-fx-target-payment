@@ -1,0 +1,153 @@
+/*
+ * Design tokens from docs/05. Components read these variables; they do not
+ * hard-code hex values. U1 adds the showcase and the motion hooks on top.
+ */
+
+:root {
+  --bg-0: #07070a;
+  --bg-1: #0c0c11;
+  --bg-2: #121219;
+  --bg-3: #1a1a23;
+  --bg-overlay: rgba(7, 7, 10, 0.72);
+  --line-1: rgba(255, 255, 255, 0.06);
+  --line-2: rgba(255, 255, 255, 0.1);
+  --line-3: rgba(255, 255, 255, 0.16);
+
+  --fg-1: #f4f4f6;
+  --fg-2: #a6a6b3;
+  --fg-3: #6b6b78;
+  --fg-4: #45454f;
+
+  --orange-300: #ffb27a;
+  --orange-400: #ff914d;
+  --orange-500: #ff6a1a;
+  --orange-600: #e5520a;
+  --orange-glow: rgba(255, 106, 26, 0.45);
+  --orange-wash: rgba(255, 106, 26, 0.08);
+
+  --up: #2bd9a0;
+  --up-wash: rgba(43, 217, 160, 0.1);
+  --down: #ff4d6a;
+  --down-wash: rgba(255, 77, 106, 0.1);
+  --warn: #ffc24b;
+  --warn-wash: rgba(255, 194, 75, 0.1);
+  --info: #6ea8ff;
+  --muted: #6b6b78;
+
+  --grad-accent: linear-gradient(135deg, #ff8a3d 0%, #ff6a1a 45%, #e0410b 100%);
+  --grad-border: linear-gradient(
+    180deg,
+    rgba(255, 106, 26, 0.55),
+    rgba(255, 106, 26, 0) 60%
+  );
+  --grad-ambient:
+    radial-gradient(
+      ellipse at 20% 0%,
+      rgba(255, 106, 26, 0.06),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 80% 100%,
+      rgba(255, 106, 26, 0.04),
+      transparent 50%
+    );
+
+  --glow-sm:
+    0 0 0 1px rgba(255, 106, 26, 0.35), 0 0 12px -2px var(--orange-glow);
+  --glow-md:
+    0 0 0 1px rgba(255, 106, 26, 0.45), 0 0 24px -4px var(--orange-glow);
+  --glow-lg:
+    0 0 0 1px rgba(255, 106, 26, 0.55), 0 0 48px -6px var(--orange-glow);
+  --glow-up:
+    0 0 0 1px rgba(43, 217, 160, 0.45), 0 0 24px -4px rgba(43, 217, 160, 0.45);
+  --glow-warn:
+    0 0 0 1px rgba(255, 194, 75, 0.45), 0 0 24px -4px rgba(255, 194, 75, 0.45);
+  --shadow-panel:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 20px 40px -20px rgba(0, 0, 0, 0.8);
+
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-56: 56px;
+
+  --row-h: 36px;
+  --input-h: 32px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-tick: 600ms;
+
+  color-scheme: dark;
+}
+
+[data-density='comfortable'] {
+  --row-h: 44px;
+  --input-h: 40px;
+}
+
+@theme inline {
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+  --color-line-1: var(--line-1);
+  --color-line-2: var(--line-2);
+  --color-line-3: var(--line-3);
+  --color-orange-300: var(--orange-300);
+  --color-orange-400: var(--orange-400);
+  --color-orange-500: var(--orange-500);
+  --color-orange-600: var(--orange-600);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+[data-reduced-motion='true'],
+[data-reduced-motion='true'] *,
+[data-reduced-motion='true'] *::before,
+[data-reduced-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
