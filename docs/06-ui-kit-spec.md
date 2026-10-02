@@ -136,7 +136,7 @@ interface FxChartProps {
 | `SimulatedSegment` | series segment inside `simulatedRanges` drawn dashed in `--orange-300` at reduced opacity, with a faint hatched background; open-ended (running) and closed |
 | `CrosshairTooltip` | price, Δ entry, Δ target, cost at price, time |
 | `RangeSwitcher` | segmented control above the chart |
-| `ChartHeader` | pair label, hero price, Δ, connection indicator, range switcher, chart-type toggle |
+| `ChartHeader` | pair label, hero price, Δ, connection indicator, range switcher, chart-type toggle; when a bill is selected, its vendor and amount in `--fg-3` beside the market |
 
 ### Chart scenarios on the kit page (fixtures)
 

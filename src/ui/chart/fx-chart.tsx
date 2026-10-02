@@ -69,6 +69,8 @@ export interface FxChartProps {
   showHeader?: boolean;
   autosettleAt?: string;
   errorMessage?: string;
+  /** Selected bill, shown quietly in the header beside the market. */
+  subject?: { vendor: string; amount: string; currency: string };
 }
 
 interface Handle {
@@ -109,6 +111,7 @@ export function FxChart(props: FxChartProps) {
     showHeader = true,
     autosettleAt,
     errorMessage = "Couldn't load this chart.",
+    subject,
   } = props;
   const host = useRef<HTMLDivElement>(null);
   const handle = useRef<Handle | null>(null);
@@ -432,6 +435,7 @@ export function FxChart(props: FxChartProps) {
           onTypeChange={(next) => onTypeChange?.(next)}
           autosettleAt={autosettleAt}
           now={nowIso}
+          subject={subject}
         />
       ) : null}
       {state === 'loading' ? (

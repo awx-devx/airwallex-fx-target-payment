@@ -6,6 +6,7 @@ import { D, decimalString } from '@/contracts/money';
 import { ConnectionIndicator } from '@/ui/trading/connection-indicator';
 import { CountdownChip } from '@/ui/trading/countdown-chip';
 import { DeltaText } from '@/ui/trading/delta-text';
+import { MoneyDisplay } from '@/ui/trading/money-display';
 import { PairLabel } from '@/ui/trading/pair-label';
 import { PriceDisplay } from '@/ui/trading/price-display';
 import { RangeSwitcher } from '@/ui/chart/range-switcher';
@@ -27,6 +28,7 @@ export function ChartHeader({
   onTypeChange,
   autosettleAt,
   now,
+  subject,
 }: {
   pair: Pair;
   price?: string;
@@ -40,6 +42,8 @@ export function ChartHeader({
   onTypeChange: (type: ChartType) => void;
   autosettleAt?: string;
   now?: string;
+  /** Selected bill, shown quietly beside the market. */
+  subject?: { vendor: string; amount: string; currency: string };
 }) {
   const delta =
     price && entry ? decimalString(D(price).minus(D(entry))) : undefined;
@@ -51,6 +55,12 @@ export function ChartHeader({
       ) : null}
       {delta ? <DeltaText value={delta} pair={pair} /> : null}
       <ConnectionIndicator state={connection} />
+      {subject ? (
+        <span className="inline-flex min-w-0 items-baseline gap-2 text-xs text-fg-3">
+          <span className="max-w-48 truncate">{subject.vendor}</span>
+          <MoneyDisplay currency={subject.currency} value={subject.amount} size="sm" className="text-fg-3" />
+        </span>
+      ) : null}
       {autosettleAt && now ? (
         <CountdownChip until={autosettleAt} now={now} kind="autosettle" />
       ) : null}

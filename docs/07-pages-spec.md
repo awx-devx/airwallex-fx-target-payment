@@ -32,7 +32,7 @@ The sheet sits on `--bg-0` with the grain aurora from [05 §2](./05-design-syste
 
 ### Behaviour
 
-- **Selection:** clicking a bill in the list or a table row selects it. The URL updates to `/bills/:id` (shallow) and the chart and ticket switch instantly. The previous chart instance is kept warm for fast back-and-forth, like switching markets.
+- **Selection:** clicking a bill in the list or a table row selects it. The URL updates to `/bills/:id` (shallow) and the chart and ticket switch instantly. The chart header adds the vendor and amount in `--fg-3` beside the market. The previous chart instance is kept warm for fast back-and-forth, like switching markets.
 - **Row menu:** every table row has a three-dot menu, held on the left when the table scrolls sideways. The cell stays transparent, and the other columns clip at its edge. The first item is **Open ticket**, which selects the bill and opens the ticket drawer. Further items come from `allowedActions`, in sentence case (Arm, Pay now, Pause). Cancel is last and uses `--down`. Review, Edit, Edit strategy, and Resolve beneficiary (except on a failed bill, which re-arms) also open the ticket.
 - **Grouping:** "Group by pair" in the list shows `PairGroupHeader` with the total exposure. Bills in the same pair share the reference series but keep **their own** entry and target lines and their own deadline.
 - **Live updates:** SSE `tick` updates the list sparkline, the table row (flash), the chart and the ticket. `bill.updated` re-renders the state badges. `approval.requested` raises a **target-hit toast** with Approve/Review actions, and adds a badge to the Approvals tab.

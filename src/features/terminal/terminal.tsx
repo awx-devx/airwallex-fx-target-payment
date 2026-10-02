@@ -386,6 +386,7 @@ export function TerminalScreen({
                   }}
                   connection={connection === 'delayed' ? 'delayed' : 'simulated'}
                   notional={{ amount: selected.amount, currency: selected.pair.base }}
+                  subject={{ vendor: selected.vendorName, amount: selected.amount, currency: selected.pair.base }}
                   maxCost={selected.maxCost}
                 />
               ) : (
@@ -404,6 +405,11 @@ export function TerminalScreen({
                   onTypeChange={ui.setChartType}
                   state={bills.isLoading || chart.isLoading ? 'loading' : 'empty'}
                   height="fill"
+                  subject={
+                    selected
+                      ? { vendor: selected.vendorName, amount: selected.amount, currency: selected.pair.base }
+                      : undefined
+                  }
                 />
               )}
             </div>
