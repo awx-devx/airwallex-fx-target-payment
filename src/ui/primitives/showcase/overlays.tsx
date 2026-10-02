@@ -24,15 +24,15 @@ function LiveDialog() {
     <Dialog
       open={open}
       onOpenChange={setOpen}
-      title="Approve quote"
-      description="The locked quote is still valid."
+      title="Pay now"
+      description="Pays this bill at the current rate."
       trigger={<Button>Open dialog</Button>}
       footer={
         <>
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={() => setOpen(false)}>Approve</Button>
+          <Button onClick={() => setOpen(false)}>Pay now</Button>
         </>
       }
     >
@@ -216,14 +216,8 @@ export const overlayShowcases: Showcase[] = [
                   tone="glow"
                   title="Target hit"
                   description="EUR/USD is through 1.07500."
-                  footer={
-                    <>
-                      <Button variant="ghost">Later</Button>
-                      <Button>Approve</Button>
-                    </>
-                  }
                 >
-                  <p>Quote 1.07480 · valid 00:14.</p>
+                  <p>Paying at 1.07480.</p>
                 </DialogPreview>
               </Cell>
               <Cell label="danger lg">

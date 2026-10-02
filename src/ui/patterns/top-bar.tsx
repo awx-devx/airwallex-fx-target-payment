@@ -1,11 +1,9 @@
 'use client';
 
 import type { BalanceSummary } from '@/contracts/airwallex';
-import type { Role } from '@/contracts/bill';
 import { Bell } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/ui/primitives/button';
-import { SegmentedControl } from '@/ui/primitives/segmented';
 import { BalancePill } from '@/ui/trading/balance-pill';
 import { ConnectionIndicator } from '@/ui/trading/connection-indicator';
 import { formatUtcDate } from '@/ui/trading/time-label';
@@ -16,8 +14,6 @@ export function TopBar({
   balances,
   connection = 'live',
   unread = 0,
-  role,
-  onRoleChange,
   now,
   warp,
   onNotifications,
@@ -29,8 +25,6 @@ export function TopBar({
   balances: readonly BalanceSummary[];
   connection?: Connection;
   unread?: number;
-  role: Role;
-  onRoleChange?: (role: Role) => void;
   now: string;
   warp?: string;
   onNotifications?: () => void;
@@ -82,10 +76,6 @@ export function TopBar({
             <span className="hidden xl:inline">Alerts</span>
           )}
         </Button>
-        {/* DEMO-ONLY: anyone can switch role. PROD: the role comes from auth. */}
-        <div className="hidden xl:block">
-          <RoleSwitch role={role} onRoleChange={onRoleChange} />
-        </div>
         <p className="num hidden text-xs whitespace-nowrap text-fg-2 md:block">
           {formatUtcDate(now, 'day-time')}
           {warp ? <span className="text-orange-300"> · {warp}</span> : null}
@@ -96,18 +86,14 @@ export function TopBar({
   );
 }
 
-/** Balances, connection, and role when the top bar has collapsed them. */
+/** Balances and connection when the top bar has collapsed them. */
 export function AccountStrip({
   balances,
   connection = 'live',
-  role,
-  onRoleChange,
   now,
 }: {
   balances: readonly BalanceSummary[];
   connection?: Connection;
-  role: Role;
-  onRoleChange?: (role: Role) => void;
   now: string;
 }) {
   return (
@@ -123,32 +109,10 @@ export function AccountStrip({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <ConnectionIndicator state={connection} />
-        <RoleSwitch role={role} onRoleChange={onRoleChange} />
         <p className="num ml-auto text-xs whitespace-nowrap text-fg-3 lg:hidden">
           {formatUtcDate(now, 'day-time')}
         </p>
       </div>
     </div>
-  );
-}
-
-function RoleSwitch({
-  role,
-  onRoleChange,
-}: {
-  role: Role;
-  onRoleChange?: (role: Role) => void;
-}) {
-  return (
-    <SegmentedControl
-      label="Role"
-      size="sm"
-      value={role}
-      onValueChange={(next) => onRoleChange?.(next)}
-      options={[
-        { value: 'preparer', label: 'Preparer' },
-        { value: 'approver', label: 'Approver' },
-      ]}
-    />
   );
 }

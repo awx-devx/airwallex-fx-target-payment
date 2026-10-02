@@ -23,14 +23,12 @@ describe('bill list logic', () => {
   const bills = [
     bill({ id: 'a', state: 'WATCHING', amount: '10.00', executionDeadline: '2026-10-20', distanceToTargetBps: 40 }),
     bill({ id: 'b', state: 'PAID', amount: '50.00', executionDeadline: '2026-10-12', distanceToTargetBps: 5 }),
-    bill({ id: 'c', state: 'DEADLINE_WINDOW', amount: '30.00', executionDeadline: '2026-10-09', distanceToTargetBps: 12 }),
-    bill({ id: 'd', state: 'TARGET_HIT', amount: '80.00', executionDeadline: '2026-10-18', distanceToTargetBps: 0 }),
+    bill({ id: 'c', state: 'PAUSED', amount: '30.00', executionDeadline: '2026-10-09', distanceToTargetBps: 12 }),
+    bill({ id: 'd', state: 'EXECUTING', amount: '80.00', executionDeadline: '2026-10-18', distanceToTargetBps: 0 }),
   ];
 
-  it('filters watching, approval, final day, and paid', () => {
-    expect(filterBills(bills, 'watching').map((item) => item.id)).toEqual(['a']);
-    expect(filterBills(bills, 'approval').map((item) => item.id)).toEqual(['d']);
-    expect(filterBills(bills, 'final-day').map((item) => item.id)).toEqual(['c']);
+  it('filters watching and paid', () => {
+    expect(filterBills(bills, 'watching').map((item) => item.id)).toEqual(['a', 'c']);
     expect(filterBills(bills, 'paid').map((item) => item.id)).toEqual(['b']);
   });
 

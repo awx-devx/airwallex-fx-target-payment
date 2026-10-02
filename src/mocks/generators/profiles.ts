@@ -49,7 +49,7 @@ export function profileSlots(profile: ProfileName, asOf: string): BillSlot[] {
       'WATCHING',
       'WATCHING',
       'PAUSED',
-      'DEADLINE_WINDOW',
+      'EXECUTING',
       'PAID',
     ];
     return states.map((state, index) => ({
@@ -93,7 +93,7 @@ export function profileSlots(profile: ProfileName, asOf: string): BillSlot[] {
         transferMethod: 'SWIFT' as const,
       },
       {
-        state: 'DEADLINE_WINDOW' as const,
+        state: 'WATCHING' as const,
         currency: 'INR',
         dueDate: addDays(asOf, 4),
         transferMethod: 'LOCAL' as const,
@@ -139,8 +139,8 @@ export function profileSlots(profile: ProfileName, asOf: string): BillSlot[] {
       'DRAFT',
       'READY',
       'WATCHING',
-      'TARGET_HIT',
-      'DEADLINE_WINDOW',
+      'PAUSED',
+      'EXECUTING',
       'PAID',
     ];
     return states.map((state, index) => ({

@@ -79,12 +79,6 @@ export const armBodySchema = z.object({
 });
 export type ArmBody = z.infer<typeof armBodySchema>;
 
-export const rejectBodySchema = z.object({
-  action: z.enum(['HOLD', 'CANCEL']),
-  note: z.string().optional(),
-});
-export type RejectBody = z.infer<typeof rejectBodySchema>;
-
 export const chartQuerySchema = z.object({
   range: chartRangeSchema,
 });

@@ -1,14 +1,11 @@
 'use client';
 
-import type { Role } from '@/contracts/bill';
 import type { ChartRange } from '@/contracts/chart';
 import type { ChartType } from '@/ui/chart/chart-header';
 import type { BillFilter, BillSort } from '@/ui/patterns/bill-list-logic';
 import { create } from 'zustand';
 
 interface UiState {
-  role: Role;
-  setRole: (role: Role) => void;
   filter: BillFilter;
   setFilter: (filter: BillFilter) => void;
   sort: BillSort;
@@ -42,8 +39,6 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  role: 'approver',
-  setRole: (role) => set({ role }),
   filter: 'all',
   setFilter: (filter) => set({ filter }),
   sort: 'deadline',

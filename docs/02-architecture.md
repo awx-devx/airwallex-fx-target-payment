@@ -41,11 +41,11 @@ flowchart LR
 
 - **Web (Next.js)** serves the UI and the REST API and holds the SSE connections. It is stateless.
 - **Worker** is a long-running Node process started from the same repo. It runs the rate poller, the strategy engine, the deadline scheduler, the executor and the reconciler. It must not run on serverless.
-- **MongoDB** (via Mongoose) is the single source of truth for bills, strategies, approvals, executions, events and rate ticks. Run it as a **replica set** (a single node is fine locally). Multi-document transactions require a replica set; the design mostly avoids needing them (see §9).
+- **MongoDB** (via Mongoose) is the single source of truth for bills, strategies, executions, events and rate ticks. Run it as a **replica set** (a single node is fine locally). Multi-document transactions require a replica set; the design mostly avoids needing them (see §9).
 - **Redis** does two jobs:
   - **BullMQ** queues handle all background and retryable work: extraction, quote locking, execution, webhook processing, deadline actions, notifications.
   - **Redis pub/sub** (channel `app_events`) fans events from the worker and webhook handler out to every SSE connection.
-- **Time-based triggers live in MongoDB, not in delayed jobs.** Deadline open, auto-settle cutoff and quote expiry are stored as timestamps on the bill or approval document. A 1-second **sweeper** in the worker queries for due items using the injected `Clock` and enqueues BullMQ jobs with deterministic `jobId`s. This works identically under the demo's warp clock, survives restarts (catch-up is automatic), and keeps the timers visible in the database. See §9.
+- **Time-based triggers live in MongoDB, not in delayed jobs.** The deadline cutoff is stored as a timestamp on the bill. A 1-second **sweeper** in the worker queries for due items using the injected `Clock` and enqueues BullMQ jobs with deterministic `jobId`s. This works identically under the demo's warp clock, survives restarts (catch-up is automatic), and keeps the timers visible in the database. See §9.
 - **Adapters** isolate every external dependency behind an interface. Each one has a `mock` implementation so the UI track and tests never need credentials.
 
 ## 2. Stack (defaults; see [09](./09-decisions-and-open-questions.md))
@@ -91,7 +91,6 @@ flowchart LR
 │  │  │  └─ market/page.tsx       # demo control room (simulator + time controls)
 │  │  └─ api/
 │  │     ├─ bills/...             # REST
-│  │     ├─ approvals/...
 │  │     ├─ uploads/...
 │  │     ├─ stream/route.ts       # SSE
 │  │     ├─ webhooks/airwallex/route.ts
@@ -101,7 +100,7 @@ flowchart LR
 │  │  ├─ primitives/              # Button, Input, Badge, ...
 │  │  ├─ trading/                 # PriceTicker, PnLCell, CountdownChip, ...
 │  │  ├─ chart/                   # FxChart + primitives (lines, zones, markers)
-│  │  └─ patterns/                # BillTicket, ApprovalCard, PositionsTable, ...
+│  │  └─ patterns/                # BillTicket, PositionsTable, ...
 │  ├─ features/                   # page-level composition + data hooks (U6/U7)
 │  ├─ contracts/                  # zod schemas + TS types shared FE/BE (source of truth)
 │  ├─ mocks/                      # fixtures + mock adapters + simulated market (FE-usable)
@@ -114,7 +113,7 @@ flowchart LR
 │  │  │  ├─ history/              # HistorySource: frankfurter | none
 │  │  │  ├─ extraction/           # BillExtractor: anthropic | ollama | mock (pipeline in 12 §6)
 │  │  │  └─ notify/               # Notifier: inapp (the only implementation; Q-05)
-│  │  ├─ services/                # use-cases: armBill, approve, execute, ...
+│  │  ├─ services/                # use-cases: armBill, execute, ...
 │  │  ├─ queue/                   # BullMQ queues, job names, typed payloads, Redis connection
 │  │  └─ events/                  # event bus (Redis pub/sub) + SSE serializer
 │  └─ worker/
@@ -124,7 +123,7 @@ flowchart LR
 │     ├─ processors/              # one file per BullMQ queue
 │     ├─ executor.ts
 │     ├─ reconciler.ts
-│     └─ demoSim.ts               # demo only: Simulate runs (scripted ticks, auto-approve, transfer advance)
+│     └─ demoSim.ts               # demo only: Simulate runs (scripted ticks, transfer advance)
 ├─ scripts/                       # seeds, smoke tests, index sync, migrations (migrate-mongo)
 ├─ docker-compose.yml
 └─ .env.example
@@ -168,7 +167,7 @@ Adapters are selected by environment:
 | `CLOCK` | `system` \| `warp` | `system` |
 | `DEADLINE_SAFETY_NET` | `none` \| `airwallex` | `none` |
 
-**Hybrid demo mode** (recommended for the live demo): `RATE_SOURCE=simulated`, `PAYMENTS_GATEWAY=airwallex`. The simulated market drives the chart and triggers, while quotes and transfers are real sandbox calls. The approval card shows both the simulated trigger rate and the real Airwallex quote rate, and we are transparent that the market feed is simulated. Because a real quote won't follow a simulated price, the quote check compares the simulated price for simulated ticks ([03 §3](./03-domain-model.md#3-trigger-rules)). See [08](./08-demo-plan.md).
+**Hybrid demo mode** (recommended for the live demo): `RATE_SOURCE=simulated`, `PAYMENTS_GATEWAY=airwallex`. The simulated market drives the chart and triggers, while quotes and transfers are real sandbox calls. The receipt and the `QUOTE_LOCKED` event show both the simulated trigger rate and the real Airwallex quote rate, and we are transparent that the market feed is simulated. Because a real quote won't follow a simulated price, the quote check compares the simulated price for simulated ticks ([03 §3](./03-domain-model.md#3-trigger-rules)). See [08](./08-demo-plan.md).
 
 **Per-bill simulation (Simulate button):** the poller reads rates through a `RoutingRateSource`. A bill with an active `demo:sim:{billId}` key in Redis gets scripted simulated ticks from the worker's `demoSim` loop, and every other bill gets the configured source. This lets the demo run on the live feed and still produce an on-demand target hit for one bill. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
 
@@ -194,46 +193,42 @@ sequenceDiagram
   R-->>UI: SSE "tick"
   P->>SE: evaluate(bill, tick)
   alt price <= target (confirmed)
-    SE->>QP: lock(F, H, A, MIN_30)
+    SE->>QP: lock(F, H, A, MIN_1)
     QP-->>SE: quote (client price, valid_to_at)
-    alt quote price <= target
-      SE->>DB: bill → TARGET_HIT, approval(PENDING, quote)
-      SE->>R: publish bill.updated, approval.requested
-      R-->>UI: SSE
-      SE->>N: alert approver (deep link)
-    else near miss
-      SE->>DB: event NEAR_MISS (stay WATCHING)
+    alt quote price <= target and balance covers it
+      SE->>DB: bill → EXECUTING, event QUOTE_LOCKED
+      SE->>R: publish bill.updated, notification
+      R-->>UI: SSE toast "Target hit · paying"
+    else near miss or short balance
+      SE->>DB: event NEAR_MISS or flag insufficientBalance (stay WATCHING)
     end
   end
 ```
 
-### 5.2 Approve → execute → settle
+### 5.2 Execute → settle
+
+The strategy job (or the cutoff job) has already moved the bill to `EXECUTING` and holds a quote that is still valid.
 
 ```mermaid
 sequenceDiagram
-  participant UI
-  participant API as /api/approvals/:id/approve
-  participant DB as MongoDB
   participant Q as BullMQ (Redis)
   participant EX as Executor (worker)
+  participant DB as MongoDB
   participant AWX as Airwallex
   participant WH as /api/webhooks/airwallex
 
-  UI->>API: approve (approval_id)
-  API->>DB: conditional update: bill {state: TARGET_HIT, version: v} → APPROVED (quote not expired)
-  API->>Q: add execute job (jobId = execute:{billId}:{attempt})
-  Q->>EX: execute
+  Q->>EX: execute (jobId = execute:{billId}:{attempt})
   EX->>AWX: GET balances/current (check H >= est. cost)
   EX->>AWX: POST transfers/create {quote_id, request_id=tr:bill:attempt}
   AWX-->>EX: transfer (SCHEDULED/PROCESSING)
-  EX->>DB: execution doc, bill → EXECUTING → IN_FLIGHT
+  EX->>DB: execution doc, bill → IN_FLIGHT
   AWX-->>WH: payout.transfer.processing / sent / paid
   WH->>DB: verify HMAC, insert webhook_event (_id = event id; duplicate → skip)
   WH->>Q: add webhook.process job
   Q->>EX: apply status (monotonic) → publish bill.updated → SSE
 ```
 
-### 5.3 Deadline day
+### 5.3 Deadline cutoff
 
 ```mermaid
 sequenceDiagram
@@ -242,15 +237,11 @@ sequenceDiagram
   participant SE as Strategy engine
   participant AWX as Airwallex
   participant N as Notifier
-  S->>Q: bill.timers.deadlineOpenAt <= clock.now() → add deadline.open (jobId = deadline.open:{billId})
-  Q->>SE: deadline.open(bill) @ 09:00 account tz on execution deadline
-  SE->>AWX: quote HR_1 at market
-  SE->>N: "Final day — approve payment at market"
-  S->>Q: bill.timers.autosettleAt <= clock.now() → add deadline.autosettle
+  S->>Q: bill.timers.autosettleAt <= clock.now() → add deadline.autosettle (jobId = deadline.autosettle:{billId})
   Q->>SE: deadline.autosettle(bill) @ cutoff (default 14:00)
-  alt still not approved
-    SE->>AWX: transfers/create (fresh MIN_1 quote or market)
-    SE->>N: "Auto-settled under standing instruction"
+  alt still WATCHING or PAUSED
+    SE->>AWX: lock MIN_1 quote, transfers/create
+    SE->>N: "Paying at the deadline"
   end
 ```
 
@@ -262,18 +253,16 @@ A single stream at `/api/stream` carries all events. Clients filter by `billId`.
 | --- | --- | --- |
 | `tick` | `{ pair, billId?, ts, price, source }` | A new rate tick is stored |
 | `bill.updated` | `BillSummary` | Any bill field or state change |
-| `approval.requested` | `Approval` | A target hit or the deadline window opens |
-| `approval.resolved` | `{ approvalId, outcome }` | Approved, rejected or expired |
 | `execution.updated` | `Execution` | Transfer status changed |
 | `notification` | `Notification` | Something should be toasted |
 | `clock` | `{ now, warp }` | Demo mode only |
-| `demo.sim` | `{ billId, simId, phase: 'RAMPING'\|'TRIGGERED'\|'AUTO_APPROVED'\|'EXECUTING'\|'SETTLING'\|'DONE'\|'ABORTED', etaSec? }` | Demo mode only: Simulate run progress |
+| `demo.sim` | `{ billId, simId, phase: 'RAMPING'\|'TRIGGERED'\|'EXECUTING'\|'SETTLING'\|'DONE'\|'ABORTED', etaSec? }` | Demo mode only: Simulate run progress |
 
 ## 7. Security (demo-appropriate)
 
 - Airwallex credentials stay server-side only (`AIRWALLEX_CLIENT_ID`, `AIRWALLEX_API_KEY`). Use a **scoped** key with only these scopes: FX rates/quotes/conversions, transfers, beneficiaries, balances, and files (plus spend if the stretch goal is taken).
 - Webhook receiver: verify the HMAC over the **raw** body before parsing, and reject timestamps older than 5 minutes.
-- Approve/reject endpoints require an authenticated session with the `approver` role (the demo uses a simple session with a role switcher).
+- Mutations run as the single demo user. There is no second role.
 - The `/dev/*` and `/api/demo/*` routes are disabled unless `DEMO_MODE=true`.
 - Store vendor bank details encrypted at rest, or keep them only in Airwallex (we store just `beneficiary_id` plus masked display fields).
 
@@ -309,10 +298,9 @@ DEADLINE_SAFETY_NET=none
 POLL_INTERVAL_MS=10000
 TRIGGER_CONFIRM_TICKS=2
 TRIGGER_BUFFER_BPS=0
-QUOTE_VALIDITY_TARGET=MIN_30
-QUOTE_VALIDITY_DEADLINE=HR_1
-DEADLINE_WINDOW_OPEN=09:00               # account tz (Q-07)
-DEADLINE_AUTOSETTLE_CUTOFF=14:00
+QUOTE_VALIDITY_TARGET=MIN_1              # long enough for the job that creates the transfer
+QUOTE_VALIDITY_DEADLINE=MIN_1
+DEADLINE_AUTOSETTLE_CUTOFF=14:00         # account tz (Q-07)
 RATE_TICKS_TTL_DAYS=30                   # 7 on Atlas M0 (10 §5.2)
 
 # Integrations
@@ -344,9 +332,9 @@ MongoDB has no built-in job queue or cross-process push. Without Redis we would 
 | --- | --- | --- | --- | --- |
 | `extraction` | `POST /api/uploads` | 4 | `extract:{documentId}` | 3, exp 5 s |
 | `strategy` | poller (on trigger) | 4 | `trigger:{billId}:{tickId}` | 2 |
-| `deadline` | sweeper | 2 | `deadline.open:{billId}`, `deadline.autosettle:{billId}` | 5, exp 10 s |
-| `quote-expiry` | sweeper | 4 | `quote-expiry:{approvalId}` | 3 |
-| `execution` | approve API, autosettle | 2 | `execute:{billId}:{attempt}` | 5, exp 2 s (same `request_id`) |
+| `deadline` | sweeper | 2 | `deadline.autosettle:{billId}` | 5, exp 10 s |
+| `quote-retry` | sweeper | 4 | `quote-retry:{billId}` | 3 |
+| `execution` | strategy, cutoff, pay-now | 2 | `execute:{billId}:{attempt}` | 5, exp 2 s (same `request_id`) |
 | `webhook` | webhook route | 4 | `webhook:{eventId}` | 10, exp 5 s |
 | `notify` | services | 4 | `notify:{notificationId}` | 5 |
 | `reconcile` | repeatable job, every 60 s | 1 | repeatable | — |
@@ -368,9 +356,7 @@ Bill.findOneAndUpdate(
 
 - A `version` field provides optimistic concurrency. Mongoose's `optimisticConcurrency: true` is enabled on the `Bill` schema for `save()` paths as well.
 - The full audit event is also inserted into `bill_events`. If that insert fails, the transition still stands and the event is retried from a BullMQ job; the activity log is eventually consistent.
-- **Multi-document transactions** (a replica set is required) are used in exactly two places where two documents must change together:
-  - approve: the approval `PENDING → APPROVED` + the bill `TARGET_HIT|DEADLINE_WINDOW → APPROVED`
-  - execution create: the execution doc + the bill `APPROVED|AUTO_SETTLING → EXECUTING`
+- **Multi-document transactions** (a replica set is required) are used in one place, where two documents must change together: execution create, the execution document together with the bill moving to `EXECUTING` from `WATCHING` or `PAUSED`.
 - Duplicate-execution guard: a **partial unique index** on `executions { billId: 1 }` where `{ active: true }`. Executions set `active: false` when they reach `FAILED`/`CANCELLED`.
 
 ### 9.4 Money in MongoDB

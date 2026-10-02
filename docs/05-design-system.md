@@ -9,7 +9,7 @@ Tune the orange hue to Airwallex brand guidance before the demo, if it is availa
 ## 1. Principles
 
 1. **Data first, chrome second.** The chart and the numbers are the hero. Borders are hairlines. Panels sit flush on the sheet; they do not float.
-2. **A line means attention.** Focus, selection, and primary actions are a 1px orange rule. Glow is rarer than that: only the chart target line and a locked target-hit quote (the quote card and its approval dialog). If everything glows, nothing does.
+2. **A line means attention.** Focus, selection, and primary actions are a 1px orange rule. Glow is rarer than that: only the chart target line, a locked quote, and the brief target-hit toast. If everything glows, nothing does.
 3. **Colour has meaning.** Orange marks the brand and the target/action, green means favourable, red means adverse, and amber means a deadline or warning. Status colour is never decoration. The one ground treatment is the grain aurora below, and it does not use green or red.
 4. **Always show "live".** Ticks flash, countdowns count, connection status is visible, and stale data is visibly stale.
 5. **Keyboard-first.** It is a terminal, so every primary action has a shortcut.
@@ -102,14 +102,14 @@ The shader scales its own clock by `0.1`, so speed `1` is a slow drift. Paper ta
 | --- | --- | --- |
 | `--glow-sm` | `0 0 0 1px var(--orange-500)` | Focus ring. A line, not a bloom. |
 | `--glow-md` | `0 0 0 1px var(--orange-500)` | Same 1px rule. Hover does not bloom. |
-| `--glow-lg` | `0 0 0 1px rgba(255,106,26,0.55), 0 0 48px -6px var(--orange-glow)` | Target-hit approval dialog |
+| `--glow-lg` | `0 0 0 1px rgba(255,106,26,0.55), 0 0 48px -6px var(--orange-glow)` | Target-hit toast |
 | `--glow-up` | `0 0 0 1px rgba(43,217,160,0.45), 0 0 24px -4px rgba(43,217,160,0.45)` | Locked target-hit quote card |
 | `--glow-warn` | `0 0 0 1px var(--warn)` | 1px warn rule. Not a bloom. |
 | `--shadow-panel` | `0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 40px -20px rgba(0,0,0,0.8)` | Defined, unused. Panels and overlays have no drop shadow. |
 
 The chart target line is a separate glow, drawn on the canvas (a blurred stroke under the crisp line). It does not use these CSS tokens.
 
-**Pulse:** `@keyframes glow-pulse` animates opacity between 0.55 and 1 over 2.4 s ease-in-out. `WATCHING` uses `--glow-sm`, so the pulse is a 1px ring. `TARGET_HIT` uses `--glow-lg` (the strong pulse). Both are disabled under `prefers-reduced-motion`.
+**Pulse:** `@keyframes glow-pulse` animates opacity between 0.55 and 1 over 2.4 s ease-in-out. `WATCHING` uses `--glow-sm`, so the pulse is a 1px ring. A target hit uses `--glow-lg` once, on the toast and the chart marker. The pulse is disabled under `prefers-reduced-motion`.
 
 ---
 
@@ -138,7 +138,7 @@ Rules:
 - Density: the default is **compact** (row height 36, input height 32). A **comfortable** variant (row 44, input 40) is used for modals and forms.
 - Terminal grid (≥ 1024 px): left rail 320 px (bills), centre flexible (chart + bottom panel). The ticket is a right drawer at every width, opened from a row's **Open ticket** item or the top-bar Ticket button. Below 1024 px the bill list is a drawer too.
 - The sheet is at most **1600px**, centered. From `md` up, 16px of the ground shows outside it (24px from `xl`), and a `--line-1` rule on each side runs from the top bar through the body. The top bar's own rule runs the full viewport and the side rules meet it. Below `md` the sheet is flush with the window. The grain stays full-bleed behind the sheet. The bill list has no fill, so the ground shows through it. Hover on a bill row or a positions row is a 6% white veil; a selected row's hover is orange at 15%. Neither is a solid surface, so the grain keeps moving underneath.
-- **Breakpoints** (plain Tailwind, no container queries): `lg` 1024, `xl` 1280, `2xl` 1440. The ticket is always a drawer. Below `lg` the bill list is a drawer opened from the top bar, and the chart stacks above the bottom panel. Below `xl` the top bar drops balances, the role switch, and the connection label into the bill list. Nothing overflows or overlaps at any width down to 360 px; horizontal scrolling is limited to wide tables. Layouts reflow, they don't get a separate mobile design. Spec: [07 §1](./07-pages-spec.md#responsive-behaviour).
+- **Breakpoints** (plain Tailwind, no container queries): `lg` 1024, `xl` 1280, `2xl` 1440. The ticket is always a drawer. Below `lg` the bill list is a drawer opened from the top bar, and the chart stacks above the bottom panel. Below `xl` the top bar drops balances and the connection label into the bill list. Nothing overflows or overlaps at any width down to 360 px; horizontal scrolling is limited to wide tables. Layouts reflow, they don't get a separate mobile design. Spec: [07 §1](./07-pages-spec.md#responsive-behaviour).
 
 ---
 
@@ -165,7 +165,7 @@ Rules:
 Patterns:
 - **Tick flash:** on a price change, flash the background with `--up-wash` or `--down-wash` according to `favorable()`, decaying over `--dur-tick`. The digits roll with a vertical odometer only on the hero price.
 - **Number tween:** savings and cost tween over `--dur-tween` (300 ms).
-- **State change:** badges crossfade. On a transition to `TARGET_HIT`, the quote card takes `--glow-up`, the approval dialog takes `--glow-lg`, and the target line on the chart brightens briefly (one pulse).
+- **State change:** badges crossfade. On a target hit the chart marker brightens once, the toast takes `--glow-lg`, and the bill moves to `EXECUTING`.
 - **Countdown:** in the final 60 s the chip turns `--warn` and ticks with a subtle scale of 1 → 1.03.
 - **Enter/exit:** lists, toasts, popovers, drawers and modals use `AnimatePresence` (fade + 8 px rise, `--dur-2`/`--dur-3`).
 - **Layout:** bill selection and rail collapse use `layout` transitions on `--ease-in-out` so panels glide instead of snapping.
@@ -188,7 +188,7 @@ Patterns:
 | **Execution deadline** | vertical line, `--warn`, solid 1 px; label "EXECUTE BY · Oct 14"; the area after it is hatched at 4% |
 | **Due date** | vertical line, `--down` at 70%, dashed, with the same glow as the target line (6 px blurred at 30%); label "DUE · Oct 16". Everything after the line is a `--down` wash at 8%, the same hint as `--orange-wash` under the target |
 | **Now line** | vertical, `--fg-3`, dotted |
-| Markers | circles at the price: armed (info), near miss (hollow warn), target hit (orange filled + glow), approved (up), rejected (muted ×), executed (up ✓), auto-settle (warn ⚡) |
+| Markers | circles at the price: armed (info), near miss (hollow warn), target hit (orange filled + glow), executed (up ✓), deadline payment (warn ⚡) |
 | Crosshair | `--line-3`; tooltip card shows the price, the Δ vs entry, the Δ vs target and the cost at that price |
 | Last-price label | pill on the right axis in `favorable()` colour |
 
@@ -209,4 +209,4 @@ Implementation notes: horizontal lines use the built-in price lines (`createPric
 - Text contrast is ≥ 4.5:1 for `--fg-1` and `--fg-2` on `--bg-1`. `--fg-3` is used for labels only.
 - Favourable and adverse colours are always paired with a sign or an arrow (▲/▼, +/−). Meaning never depends on colour alone.
 - Focus is always visible: a 1px orange outline (`--glow-sm`). All dialogs are Radix with focus trapping.
-- Live regions: approval requests and target hits are announced via `aria-live="assertive"`, and ticks are **not** announced.
+- Live regions: target hits and deadline payments are announced via `aria-live="assertive"`, and ticks are **not** announced.

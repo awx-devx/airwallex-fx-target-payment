@@ -5,23 +5,15 @@ import type {
   ListBillsQuery,
   PatchBillBody,
   PutStrategyBody,
-  RejectBody,
 } from '@/contracts/api';
 import type { BillDetail, StrategyDetail } from '@/contracts/api';
 import type {
   ApiErrorCode,
   BalanceSummary,
   ExecutionSummary,
-  QuoteSummary,
   TransferStatus,
 } from '@/contracts/airwallex';
-import type { ApprovalSummary } from '@/contracts/approval';
-import type {
-  BillAction,
-  BillState,
-  BillSummary,
-  Role,
-} from '@/contracts/bill';
+import type { BillAction, BillState, BillSummary } from '@/contracts/bill';
 import type {
   ChartMarkerKind,
   ChartRange,
@@ -39,14 +31,8 @@ import { D, formatDecimal, significantPrice } from '@/contracts/money';
 import Decimal from 'decimal.js';
 import { allowedActions } from '@/contracts/permissions';
 import type { AppEvent, SimPhase } from '@/contracts/sse';
-import { addDays } from '@/mocks/generators/dates';
 import { createRng } from '@/mocks/generators/rng';
-import {
-  approvalCatalog,
-  balances,
-  bills,
-  events,
-} from '@/mocks/fixtures/catalog';
+import { balances, bills, events } from '@/mocks/fixtures/catalog';
 import { execution, FIXTURE_NOW } from '@/mocks/fixtures/build';
 import { formSchemaFor } from '@/mocks/fixtures/forms';
 import type { Clock } from '@/mocks/market/clock';
@@ -54,20 +40,12 @@ import { ManualClock, WarpClock } from '@/mocks/market/clock';
 import type { MarketPair } from '@/mocks/market/gbm';
 import { SimulatedMarket } from '@/mocks/market/gbm';
 
-const LIVE_STATES = new Set<BillState>([
-  'DRAFT',
-  'READY',
-  'WATCHING',
-  'PAUSED',
-  'TARGET_HIT',
-  'DEADLINE_WINDOW',
-]);
+const LIVE_STATES = new Set<BillState>(['DRAFT', 'READY', 'WATCHING', 'PAUSED']);
 
 const MARKERS: Partial<Record<BillEventType, ChartMarkerKind>> = {
   ARMED: 'ARMED',
   NEAR_MISS: 'NEAR_MISS',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED',
+  QUOTE_LOCKED: 'TARGET_HIT',
   PAID: 'EXECUTED',
   AUTOSETTLE: 'AUTOSETTLE',
   SIM_STARTED: 'SIM_START',
@@ -82,9 +60,7 @@ interface SimRun {
   from: string;
   to: string;
   phase: SimPhase;
-  approvalId?: string;
   triggered: boolean;
-  approved: boolean;
   executing: boolean;
   processing: boolean;
   sent: boolean;
@@ -121,24 +97,22 @@ function strategyFor(bill: BillSummary): StrategyDetail | undefined {
     feeEstimate: '0.00',
     bufferBps: 2,
     confirmTicks: 2,
-    quoteValidityTarget: 'MIN_30',
+    quoteValidityTarget: 'MIN_1',
     quoteValidityDeadline: 'MIN_1',
     autosettleCutoff: '21:00',
   };
 }
 
 /**
- * DEMO-ONLY: in-memory stand-in for the API. Simulate locks a quote at the
- * simulated price and auto-approves as `system:demo-sim`.
- * PROD: quotes come from Airwallex, a human approves them, and transfer
- * status comes from webhooks plus the reconciler.
+ * DEMO-ONLY: in-memory stand-in for the API. A target hit pays immediately.
+ * PROD: quotes and transfers come from Airwallex, and transfer status comes
+ * from webhooks plus the reconciler.
  */
 export class MockDataSource implements DataSource {
   readonly market: SimulatedMarket;
   readonly clock: Clock;
   private readonly readRealMs: () => number;
   private readonly store = new Map<string, BillDetail>();
-  private readonly approvals: ApprovalSummary[];
   private readonly balanceBook: BalanceSummary[];
   private readonly listeners = new Set<(event: AppEvent) => void>();
   private readonly sims = new Map<string, SimRun>();
@@ -156,7 +130,6 @@ export class MockDataSource implements DataSource {
       options?.marketSeed ?? 1,
       pairsFrom(seeded),
     );
-    this.approvals = structuredClone(approvalCatalog);
     this.balanceBook = structuredClone(balances);
     const history = structuredClone(events);
     for (const bill of seeded) {
@@ -197,7 +170,6 @@ export class MockDataSource implements DataSource {
   async getChart(id: string, query: ChartQuery): Promise<ChartResponse> {
     const bill = this.requireBill(id);
     const now = Math.floor(this.clock.now().getTime() / 1000);
-    const quote = bill.activeApproval?.quote;
     return {
       series: this.series(bill, now, query.range),
       overlays: {
@@ -213,25 +185,12 @@ export class MockDataSource implements DataSource {
           if (!kind) return [];
           return [{ time: Math.floor(Date.parse(event.ts) / 1000), kind }];
         }),
-        ...(quote
-          ? {
-              quote: {
-                price: quote.price,
-                from: Math.floor(Date.parse(quote.validFromAt) / 1000),
-                to: Math.floor(Date.parse(quote.validToAt) / 1000),
-              },
-            }
-          : {}),
       },
     };
   }
 
   async listEvents(billId: string): Promise<BillEvent[]> {
     return structuredClone(this.requireBill(billId).events);
-  }
-
-  async listApprovals(): Promise<ApprovalSummary[]> {
-    return structuredClone(this.approvals);
   }
 
   async getBalances(): Promise<BalanceSummary[]> {
@@ -249,13 +208,9 @@ export class MockDataSource implements DataSource {
     return () => this.listeners.delete(listener);
   }
 
-  async patchBill(
-    id: string,
-    body: PatchBillBody,
-    role: Role,
-  ): Promise<BillSummary> {
+  async patchBill(id: string, body: PatchBillBody): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'EDIT', role);
+    this.guard(bill, 'EDIT');
     if (body.vendorName) bill.vendorName = body.vendorName;
     if (body.invoiceNumber) bill.invoiceNumber = body.invoiceNumber;
     if (body.amount) bill.amount = body.amount;
@@ -263,16 +218,12 @@ export class MockDataSource implements DataSource {
     if (body.reference) bill.reference = body.reference;
     if (body.transferReason) bill.transferReason = body.transferReason;
     if (body.transferMethod) bill.transferMethod = body.transferMethod;
-    return this.publish(bill, undefined, `user:${role}`);
+    return this.publish(bill, undefined, 'user');
   }
 
-  async putStrategy(
-    id: string,
-    body: PutStrategyBody,
-    role: Role,
-  ): Promise<BillSummary> {
+  async putStrategy(id: string, body: PutStrategyBody): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'EDIT_STRATEGY', role);
+    this.guard(bill, 'EDIT_STRATEGY');
     bill.strategyMode = body.mode;
     if (body.targetPrice) bill.targetPrice = body.targetPrice;
     if (body.maxCost) bill.maxCost = body.maxCost;
@@ -289,12 +240,12 @@ export class MockDataSource implements DataSource {
         autosettleCutoff: body.autosettleCutoff ?? strategy.autosettleCutoff,
       };
     }
-    return this.publish(bill, 'STRATEGY_UPDATED', `user:${role}`);
+    return this.publish(bill, 'STRATEGY_UPDATED', 'user');
   }
 
-  async arm(id: string, body: ArmBody, role: Role): Promise<BillSummary> {
+  async arm(id: string, body: ArmBody): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'ARM', role);
+    this.guard(bill, 'ARM');
     if (!bill.lastPrice)
       fail(409, 'INVALID_STATE', 'Bill has no price to arm against');
     bill.state = 'WATCHING';
@@ -302,90 +253,47 @@ export class MockDataSource implements DataSource {
     bill.transferMethod = body.transferMethod;
     bill.transferReason = body.transferReason;
     bill.reference = body.reference;
-    return this.publish(bill, 'ARMED', `user:${role}`);
+    return this.publish(bill, 'ARMED', 'user');
   }
 
-  async pause(id: string, role: Role): Promise<BillSummary> {
+  async pause(id: string): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'PAUSE', role);
+    this.guard(bill, 'PAUSE');
     bill.state = 'PAUSED';
-    return this.publish(bill, 'PAUSED', `user:${role}`);
+    return this.publish(bill, 'PAUSED', 'user');
   }
 
-  async resume(id: string, role: Role): Promise<BillSummary> {
+  async resume(id: string): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'RESUME', role);
+    this.guard(bill, 'RESUME');
     bill.state = 'WATCHING';
-    return this.publish(bill, 'RESUMED', `user:${role}`);
+    return this.publish(bill, 'RESUMED', 'user');
   }
 
-  async payNow(id: string, role: Role): Promise<BillSummary> {
+  async payNow(id: string): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'PAY_NOW', role);
+    this.guard(bill, 'PAY_NOW');
     if (!bill.lastPrice) fail(409, 'INVALID_STATE', 'Bill has no price');
-    const approval = this.pendingApproval(bill, bill.lastPrice, false, 'TARGET_HIT');
-    bill.state = 'TARGET_HIT';
-    bill.activeApproval = approval;
-    this.remember(approval);
-    this.emit({ type: 'approval.requested', approval, billId: bill.id });
-    return this.publish(bill, 'APPROVAL_REQUESTED', `user:${role}`);
+    return this.startPayment(bill, 'MANUAL', 'QUOTE_LOCKED', 'user', 'Paying now');
   }
 
-  async cancel(id: string, role: Role): Promise<BillSummary> {
+  async cancel(id: string): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'CANCEL', role);
-    return this.cancelBill(bill, role);
+    this.guard(bill, 'CANCEL');
+    return this.cancelBill(bill);
   }
 
-  async rearm(id: string, role: Role): Promise<BillSummary> {
+  async rearm(id: string): Promise<BillSummary> {
     const bill = this.requireBill(id);
-    this.guard(bill, 'REARM', role);
+    this.guard(bill, 'REARM');
     bill.state = 'READY';
     bill.execution = undefined;
-    bill.activeApproval = undefined;
-    return this.publish(bill, 'STRATEGY_UPDATED', `user:${role}`);
+    return this.publish(bill, 'STRATEGY_UPDATED', 'user');
   }
 
-  async approve(approvalId: string, role: Role): Promise<BillSummary> {
-    const bill = this.billForApproval(approvalId);
-    this.guard(bill, 'APPROVE', role);
-    this.assertQuoteLive(bill);
-    return this.approveBill(bill, `user:${role}`, false);
-  }
-
-  async reject(
-    approvalId: string,
-    body: RejectBody,
-    role: Role,
-  ): Promise<BillSummary> {
-    const bill = this.billForApproval(approvalId);
-    this.guard(bill, body.action, role);
-    if (!bill.activeApproval)
-      fail(409, 'INVALID_STATE', 'Bill has no approval');
-    bill.activeApproval = { ...bill.activeApproval, status: 'REJECTED' };
-    this.remember(bill.activeApproval);
-    this.emit({
-      type: 'approval.resolved',
-      approvalId,
-      billId: bill.id,
-      outcome: 'REJECTED',
-    });
-    if (body.action === 'CANCEL') return this.cancelBill(bill, role);
-    bill.state = 'WATCHING';
-    bill.activeApproval = undefined;
-    return this.publish(bill, 'REJECTED', `user:${role}`, {
-      action: body.action,
-      note: body.note,
-    });
-  }
-
-  async simulate(
-    billId: string,
-    role: Role,
-    options?: SimulateOptions,
-  ): Promise<BillSummary> {
+  async simulate(billId: string, options?: SimulateOptions): Promise<BillSummary> {
     const bill = this.requireBill(billId);
-    this.guard(bill, 'SIMULATE', role);
+    this.guard(bill, 'SIMULATE');
     if (!bill.lastPrice || !bill.targetPrice)
       fail(409, 'INVALID_STATE', 'Bill has no target');
     const durationSec = options?.durationSec ?? 12;
@@ -403,7 +311,6 @@ export class MockDataSource implements DataSource {
       ),
       phase: 'RAMPING',
       triggered: false,
-      approved: false,
       executing: false,
       processing: false,
       sent: false,
@@ -423,9 +330,9 @@ export class MockDataSource implements DataSource {
     });
   }
 
-  async stopSimulation(billId: string, role: Role): Promise<BillSummary> {
+  async stopSimulation(billId: string): Promise<BillSummary> {
     const bill = this.requireBill(billId);
-    this.guard(bill, 'STOP_SIMULATION', role);
+    this.guard(bill, 'STOP_SIMULATION');
     const run = this.sims.get(billId);
     if (!run) fail(409, 'INVALID_STATE', 'No simulation is running');
     run.phase = 'ABORTED';
@@ -444,13 +351,13 @@ export class MockDataSource implements DataSource {
    * DEMO-ONLY: steps a mock transfer PROCESSING → SENT → PAID.
    * PROD: webhooks and the reconciler own transfer status.
    */
-  async advanceTransfer(billId: string, role: Role): Promise<BillSummary> {
+  async advanceTransfer(billId: string): Promise<BillSummary> {
     const bill = this.requireBill(billId);
-    this.guard(bill, 'ADVANCE_TRANSFER', role);
+    this.guard(bill, 'ADVANCE_TRANSFER');
     if (!bill.execution) fail(409, 'INVALID_STATE', 'Bill has no transfer');
     const next = nextTransferStatus(bill.execution.status);
     if (!next) fail(409, 'INVALID_STATE', 'Transfer cannot be advanced');
-    this.applyTransfer(bill, next, 'user:' + role);
+    this.applyTransfer(bill, next, 'user');
     return this.summary(bill);
   }
 
@@ -487,7 +394,7 @@ export class MockDataSource implements DataSource {
 
   /**
    * Drive Simulate timelines from `readRealMs`, including under a warp.
-   * The default marks are 12/13/15/16/19/22/25/26 seconds, scaled when
+   * The default marks are 12/13/16/19/22/25/26 seconds, scaled when
    * `durationSec` is not 12.
    */
   pump(billId?: string): AppEvent[] {
@@ -516,9 +423,6 @@ export class MockDataSource implements DataSource {
       this.emit(tick);
       this.at(run, elapsed, 13 * scale, 'triggered', () =>
         this.triggerSim(bill, run),
-      );
-      this.at(run, elapsed, 15 * scale, 'approved', () =>
-        this.autoApproveSim(bill, run),
       );
       this.at(run, elapsed, 16 * scale, 'executing', () =>
         this.executeSim(bill, run, 'SCHEDULED'),
@@ -550,7 +454,7 @@ export class MockDataSource implements DataSource {
     this.emit({ type: 'clock', now: this.iso(), warp: { speed } });
   }
 
-  /** DEMO-ONLY: rehearsal jump onto the bill's deadline day. PROD: the sweeper opens the window from the stored deadline. */
+  /** DEMO-ONLY: rehearsal jump onto the bill's deadline. PROD: the sweeper pays from the stored cutoff. */
   jumpToDeadline(billId: string): void {
     const bill = this.requireBill(billId);
     const at = new Date(`${bill.executionDeadline}T16:00:00.000Z`);
@@ -568,33 +472,19 @@ export class MockDataSource implements DataSource {
       (bill.state === 'WATCHING' || bill.state === 'PAUSED') &&
       bill.lastPrice
     ) {
-      const approval = this.pendingApproval(
-        bill,
-        bill.lastPrice,
-        false,
-        'DEADLINE',
-      );
-      bill.state = 'DEADLINE_WINDOW';
-      bill.activeApproval = approval;
-      this.remember(approval);
-      this.emit({ type: 'approval.requested', approval, billId: bill.id });
-      this.publish(bill, 'APPROVAL_REQUESTED', 'system');
+      this.startPayment(bill, 'DEADLINE', 'AUTOSETTLE', 'system', 'Paying at the deadline');
     }
   }
 
   private triggerSim(bill: BillDetail, run: SimRun): void {
     const price = bill.lastPrice ?? run.to;
-    const approval = this.pendingApproval(bill, price, true, 'TARGET_HIT');
-    run.approvalId = approval.id;
     run.phase = 'TRIGGERED';
-    bill.state = 'TARGET_HIT';
-    bill.activeApproval = approval;
-    this.remember(approval);
+    bill.state = 'EXECUTING';
     this.addEvent(bill, 'QUOTE_LOCKED', 'system:demo-sim', {
       simId: run.simId,
       price,
     });
-    this.emit({ type: 'approval.requested', approval, billId: bill.id });
+    this.notify(bill, 'Target hit', 'Paying at the locked quote.', 'success');
     this.emit({
       type: 'demo.sim',
       billId: bill.id,
@@ -603,36 +493,13 @@ export class MockDataSource implements DataSource {
     });
   }
 
-  /**
-   * DEMO-ONLY: auto-approval actor is `system:demo-sim`, and the quote is the
-   * simulated price rather than an Airwallex quote.
-   * PROD: a human approves a live quote, or the standing instruction settles
-   * at the cutoff.
-   */
-  private autoApproveSim(bill: BillDetail, run: SimRun): void {
-    if (
-      bill.state !== 'TARGET_HIT' ||
-      bill.activeApproval?.id !== run.approvalId
-    )
-      return;
-    this.approveBill(bill, 'system:demo-sim', true, run.simId);
-    run.phase = 'AUTO_APPROVED';
-    this.emit({
-      type: 'demo.sim',
-      billId: bill.id,
-      simId: run.simId,
-      phase: 'AUTO_APPROVED',
-    });
-  }
-
   private executeSim(
     bill: BillDetail,
     run: SimRun,
     status: TransferStatus,
   ): void {
-    if (bill.state !== 'APPROVED' && bill.state !== 'EXECUTING') return;
-    bill.state = 'EXECUTING';
-    bill.execution = this.transfer(bill, status, 1);
+    if (bill.state !== 'EXECUTING') return;
+    bill.execution = this.transfer(bill, status, 1, 'TARGET');
     run.phase = 'EXECUTING';
     this.addEvent(bill, 'TRANSFER_CREATED', 'system:demo-sim', {
       simId: run.simId,
@@ -693,40 +560,47 @@ export class MockDataSource implements DataSource {
     apply();
   }
 
-  private approveBill(
+  private startPayment(
     bill: BillDetail,
+    mode: ExecutionSummary['mode'],
+    event: BillEventType,
     actor: string,
-    auto: boolean,
-    simId?: string,
+    title: string,
   ): BillSummary {
-    const approval = bill.activeApproval;
-    if (!approval || approval.status !== 'PENDING')
-      fail(409, 'INVALID_STATE', 'No pending approval');
-    const resolved: ApprovalSummary = {
-      ...approval,
-      status: 'APPROVED',
-      autoApproved: auto,
-    };
-    bill.activeApproval = resolved;
-    bill.state = 'APPROVED';
-    this.remember(resolved);
+    bill.state = 'EXECUTING';
+    bill.execution = this.transfer(bill, 'SCHEDULED', 1, mode);
     this.emit({
-      type: 'approval.resolved',
-      approvalId: resolved.id,
+      type: 'execution.updated',
+      execution: bill.execution,
       billId: bill.id,
-      outcome: 'APPROVED',
     });
-    return this.publish(
-      bill,
-      'APPROVED',
-      actor,
-      auto ? { auto: true, simId } : undefined,
-    );
+    this.notify(bill, title, 'The transfer is being created.', 'success');
+    return this.publish(bill, event, actor);
   }
 
-  private cancelBill(bill: BillDetail, role: Role): BillSummary {
+  private notify(
+    bill: BillDetail,
+    title: string,
+    body: string,
+    level: 'info' | 'success' | 'warn' | 'danger',
+  ): void {
+    this.emit({
+      type: 'notification',
+      notification: {
+        id: `nt-${this.nextId()}`,
+        billId: bill.id,
+        title,
+        body,
+        level,
+        createdAt: this.iso(),
+        href: `/bills/${bill.id}`,
+      },
+    });
+  }
+
+  private cancelBill(bill: BillDetail): BillSummary {
     bill.state = 'CANCELLED';
-    return this.publish(bill, 'REJECTED', `user:${role}`, { action: 'CANCEL' });
+    return this.publish(bill, 'CANCELLED', 'user');
   }
 
   private applyTransfer(
@@ -757,35 +631,11 @@ export class MockDataSource implements DataSource {
     this.refresh(bill);
   }
 
-  private pendingApproval(
-    bill: BillDetail,
-    price: string,
-    simulated: boolean,
-    kind: ApprovalSummary['kind'],
-  ): ApprovalSummary {
-    const now = this.clock.now();
-    const quote = mockQuote({
-      id: `quote_${bill.id}_${this.nextId()}`,
-      price,
-      buyAmount: bill.amount,
-      sellCurrency: bill.pair.quote,
-      now,
-    });
-    return {
-      id: `ap-${bill.id}-${this.seq}`,
-      kind,
-      status: 'PENDING',
-      quote,
-      expiresAt: quote.validToAt,
-      trigger: { price, simulated },
-      autoApproved: false,
-    };
-  }
-
   private transfer(
     bill: BillDetail,
     status: TransferStatus,
     attempt: number,
+    mode: ExecutionSummary['mode'],
   ): ExecutionSummary {
     const id = this.nextId();
     return {
@@ -798,29 +648,19 @@ export class MockDataSource implements DataSource {
         rate: bill.lastPrice ?? '1',
         method: bill.transferMethod,
         attempt,
+        mode,
       }),
       updatedAt: this.iso(),
     };
   }
 
-  private assertQuoteLive(bill: BillDetail): void {
-    const validTo = bill.activeApproval?.quote.validToAt;
-    if (!validTo) fail(409, 'QUOTE_INVALID', 'Approval has no quote');
-    if (this.clock.now().getTime() > Date.parse(validTo)) {
-      fail(409, 'QUOTE_EXPIRED', 'Quote expired');
-    }
-  }
-
-  private guard(bill: BillDetail, action: BillAction, role: Role): void {
+  private guard(bill: BillDetail, action: BillAction): void {
     const options = {
       demoMode: true,
       simulationRunning: this.sims.has(bill.id),
     };
-    if (!allowedActions(bill, 'approver', options).includes(action)) {
+    if (!allowedActions(bill, options).includes(action)) {
       fail(409, 'INVALID_STATE', `${action} is not available in ${bill.state}`);
-    }
-    if (!allowedActions(bill, role, options).includes(action)) {
-      fail(403, 'FORBIDDEN', `${role} cannot ${action}`);
     }
   }
 
@@ -875,7 +715,7 @@ export class MockDataSource implements DataSource {
         .toDecimalPlaces(0)
         .toNumber();
     }
-    bill.allowedActions = allowedActions(bill, 'approver', {
+    bill.allowedActions = allowedActions(bill, {
       demoMode: true,
       simulationRunning: this.sims.has(bill.id),
     });
@@ -939,30 +779,16 @@ export class MockDataSource implements DataSource {
       transferReason: bill.transferReason,
       reference: bill.reference,
       beneficiary: bill.beneficiary,
-      activeApproval: bill.activeApproval,
       execution: bill.execution,
       flags: bill.flags,
       allowedActions: bill.allowedActions,
     };
   }
 
-  private remember(approval: ApprovalSummary): void {
-    const index = this.approvals.findIndex((item) => item.id === approval.id);
-    if (index === -1) this.approvals.push(approval);
-    else this.approvals[index] = approval;
-  }
-
   private requireBill(id: string): BillDetail {
     const bill = this.store.get(id);
     if (!bill) fail(404, 'NOT_FOUND', `Bill ${id} not found`);
     return bill;
-  }
-
-  private billForApproval(approvalId: string): BillDetail {
-    for (const bill of this.store.values()) {
-      if (bill.activeApproval?.id === approvalId) return bill;
-    }
-    fail(404, 'NOT_FOUND', `Approval ${approvalId} not found`);
   }
 
   private emit(event: AppEvent): void {
@@ -979,10 +805,7 @@ export class MockDataSource implements DataSource {
   }
 }
 
-type Flag =
-  | 'triggered'
-  | 'approved'
-  | 'executing'
+type Flag = 'triggered' | 'executing'
   | 'processing'
   | 'sent'
   | 'paid'
@@ -1002,34 +825,6 @@ function nextTransferStatus(
   if (status === 'SCHEDULED' || status === 'PROCESSING') return 'SENT';
   if (status === 'SENT') return 'PAID';
   return undefined;
-}
-
-function mockQuote(input: {
-  id: string;
-  price: string;
-  buyAmount: string;
-  sellCurrency: string;
-  now: Date;
-}): QuoteSummary {
-  const precision = requireCurrency(input.sellCurrency).payoutPrecision;
-  const mid = D(input.price).mul('0.9995');
-  const spread = D(input.price).minus(mid).div(mid).mul(10000);
-  const validFromAt = input.now.toISOString();
-  return {
-    airwallexQuoteId: input.id,
-    price: input.price,
-    buyAmount: input.buyAmount,
-    sellAmount: formatDecimal(D(input.buyAmount).mul(input.price), precision),
-    clientRate: input.price,
-    clientRateOriented: input.price,
-    midPrice: formatDecimal(mid, 6),
-    spreadBps: spread.toDecimalPlaces(1).toNumber(),
-    validity: 'MIN_30',
-    validFromAt,
-    validToAt: new Date(input.now.getTime() + 30 * 60 * 1000).toISOString(),
-    usage: 'SINGLE_USE',
-    conversionDate: addDays(validFromAt.slice(0, 10), 1),
-  };
 }
 
 function seededSeries(

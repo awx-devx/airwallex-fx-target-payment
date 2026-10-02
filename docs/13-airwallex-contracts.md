@@ -69,12 +69,12 @@ Error names **differ by endpoint** for the same condition (for example, `transfe
 | Airwallex code(s) | Endpoint(s) | Our `ApiError.code` | Server action | UI |
 | --- | --- | --- | --- | --- |
 | `validation_failed` | transfers create/validate, beneficiaries create/validate/update | `VALIDATION_FAILED` + `fieldErrors` | No retry. Bill stays in (or returns to) review. | Inline errors on the matching form fields (§2.2); `Banner` summary on the ticket |
-| `quote_expired` · `expired_quote` | transfers/create · conversions/create | `QUOTE_EXPIRED` | Target flow → `WATCHING`; deadline/auto-settle → re-quote `MIN_1`, retry once (04 §2.3) | Toast "Quote expired · re-quoting" / approval card `expired` variant |
+| `quote_expired` · `expired_quote` | transfers/create · conversions/create | `QUOTE_EXPIRED` | Stay `WATCHING` and retry (04 §2.3) | Toast "Quote expired · still watching" |
 | `quote_id_invalid` · `invalid_quote_id` · `conflict_original_ccy` | transfers/create · conversions/create | `QUOTE_INVALID` | Re-quote once; if it fails again, `FAILED` | Same as expired, with "re-quoted" note |
 | `quote_id_required` | transfers/create | `AIRWALLEX_CONFIG` | Account requires quotes: never omit `quote_id` (affects the auto-settle path) | Error banner "Airwallex account configuration" |
 | `duplicate_request_id` · `request_id_duplicate` (legacy) | transfers/create | *(not an error)* | `details.id` is the existing transfer: `GET /transfers/{id}` and continue as success | none |
 | HTTP 409 `request_pending` | transfers/create | *(not an error)* | The same `request_id` is still in flight: back off and retry with the same `request_id`; the reconciler covers exhaustion | Ticket stays `EXECUTING` |
-| `balance_insufficient` · `insufficient_funds` · `open_position_limit_exceeded` · `credit_limit_exceeded` | transfers · conversions | `INSUFFICIENT_BALANCE` | Bill stays approved-but-blocked | `BalancePill` red; approval card `insufficient balance` variant with top-up CTA |
+| `balance_insufficient` · `insufficient_funds` · `open_position_limit_exceeded` · `credit_limit_exceeded` | transfers · conversions | `INSUFFICIENT_BALANCE` | Stay `WATCHING`, set `insufficientBalance`, retry until the cutoff | `BalancePill` red; banner with a top-up CTA in demo |
 | `amount_above_limit` · `amount_below_limit` | rates, quotes, conversions (default **$1 – $5,000,000 USD** equivalent) | `AMOUNT_LIMIT` | Flag the bill; block arming | Review warning "Outside Airwallex FX limits ($1–$5M)" |
 | `*_above_account_limit` · `*_below_account_limit` · `amount_*_transfer_method_limit` · `amount_beneficiary_receives_below_limit` · `amount_beneficiary_receives_above_cumulative_limit` | transfers create/validate | `AMOUNT_LIMIT` (+ `params.amount_min/amount_max/_currency`) | No retry | Shows the limit from `params`; suggests the other transfer method when the schema's limits allow it (§5.3) |
 | `unsupported_currency` · `transfer_currency_unsupported` · `source_currency_unsupported` · `currency_pair_invalid` | rates, quotes, transfers | `ROUTE_UNSUPPORTED` | Block arming | Review error on the currency field |
@@ -128,7 +128,7 @@ Error names **differ by endpoint** for the same condition (for example, `transfe
 | `currency_pair`, `rate` | `raw` only | Market-convention rate; never used for `p` |
 | `dealt_currency` | assert `= F` | Mismatch = request bug |
 
-### 3.2 Quote → `quotes` → `QuoteSummary` → `QuoteCard` / `ApprovalCard`
+### 3.2 Quote → `quotes` → `QuoteSummary` → `QuoteCard`
 
 `POST /api/v1/fx/quotes/create` with `validity ∈ MIN_1 | MIN_15 | MIN_30 | HR_1 | HR_4 | HR_8 | HR_24`.
 
@@ -159,7 +159,7 @@ Error names **differ by endpoint** for the same condition (for example, `transfe
 | `beneficiary_id` | the resolved beneficiary | `BeneficiaryCard` |
 | `transfer_currency`, `transfer_amount` | F, A (payout precision) | the bill |
 | `source_currency` | H | settings |
-| `quote_id` | the approved quote | `ApprovalCard` |
+| `quote_id` | the quote locked for this payment | `QuoteCard` |
 | `transfer_method` | `LOCAL` \| `SWIFT` | Review → method picker (§5.3) |
 | `reason` | **required** enum; default `bill_payment` | Review: `Select` with the enum below; the bill stores `transferReason` |
 | `reference` | **required**; default = invoice number | Review: `Input`; length/charset errors come back as `018`/`002` from `transfers/validate` at arming (§4.4) |
@@ -199,7 +199,7 @@ Error names **differ by endpoint** for the same condition (for example, `transfe
 
 | Airwallex | Our bill state | `TransferStatusPill` | Notes |
 | --- | --- | --- | --- |
-| `IN_APPROVAL`, `APPROVAL_RECALLED`, `APPROVAL_REJECTED`, `APPROVAL_BLOCKED` | `IN_FLIGHT` + `flags.awxApproval` | "Awaiting Airwallex approval" (amber) | Only if an Airwallex transfer-approval workflow is on. **The sandbox runbook disables it** (our approval happens in-app). Seeing these is a config alert. |
+| `IN_APPROVAL`, `APPROVAL_RECALLED`, `APPROVAL_REJECTED`, `APPROVAL_BLOCKED` | `IN_FLIGHT` + `flags.awxApproval` | "Awaiting Airwallex approval" (amber) | Only if an Airwallex transfer-approval workflow is on. **The sandbox runbook disables it** (D-23: those transfers cannot use quotes). Seeing these is a config alert. |
 | `SCHEDULED` | `IN_FLIGHT` | Scheduled | The rate and fee are now confirmed (`amountsTentative = false`) |
 | `OVERDUE` | `IN_FLIGHT` + `flags.overdue` | Overdue (red) + funding status | Not funded by the transfer date. Airwallex **auto-cancels** unfunded pre-funded transfers at the end of the day. |
 | `PROCESSING` | `IN_FLIGHT` | Processing | RFI may be requested (out of scope) |
@@ -349,7 +349,7 @@ interface ExecutionSummary {
   failure?: { code?: string; message?: string; reasonCodes?: string[]; category: FailureCategory };
   lateFailureWatchUntil?: string;
   updatedAt: string;
-  mode: 'APPROVED'|'STANDING_INSTRUCTION';
+  mode: 'TARGET'|'DEADLINE'|'MANUAL';
 }
 
 interface BalanceSummary { currency: Ccy; available: string; pending: string; reserved: string; total: string; asOf: string }
@@ -403,7 +403,7 @@ interface ApiError {
 }
 ```
 
-`BillSummary` gains `transferMethod`, `transferReason`, `reference` and `beneficiary?: BeneficiarySummary`. Its `flags` gain `awxApproval`, `overdue`, `amountLimit`, `routeUnsupported` and `nameMismatch`. `ApprovalSummary.quote` becomes `QuoteSummary`.
+`BillSummary` gains `transferMethod`, `transferReason`, `reference` and `beneficiary?: BeneficiarySummary`. Its `flags` gain `awxApproval`, `overdue`, `amountLimit`, `routeUnsupported` and `nameMismatch`. A locked quote on the ticket is a `QuoteSummary`.
 
 **New internal REST endpoints** (server proxies; the browser never holds an Airwallex token):
 

@@ -37,8 +37,6 @@ export interface BillRow {
 const FILTERS: { value: BillFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'watching', label: 'Watching' },
-  { value: 'approval', label: 'Needs approval' },
-  { value: 'final-day', label: 'Final day' },
   { value: 'paid', label: 'Paid' },
 ];
 

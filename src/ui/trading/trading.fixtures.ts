@@ -57,5 +57,5 @@ export const EVENTS: BillEvent[] = BILL_EVENT_TYPES.map((type, index) => ({
   billId: 'bill_1',
   ts: `2026-10-01T12:${String(index).padStart(2, '0')}:00.000Z`,
   type,
-  actor: type === 'APPROVED' ? 'system:demo-sim' : 'user:ada',
+  actor: type === 'QUOTE_LOCKED' || type === 'AUTOSETTLE' ? 'system' : 'user:ada',
 }));

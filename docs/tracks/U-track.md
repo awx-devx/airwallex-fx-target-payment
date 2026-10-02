@@ -20,10 +20,10 @@ Owned jointly. It blocks U2 onwards, so do it first.
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| C0.1 | `src/contracts/*`: zod schemas + types for `BillSummary`, `ApprovalSummary`, `ChartSeriesPoint`, `ChartOverlays`, SSE event union, REST request/response bodies and `permissions.ts` (`allowedActions(bill, role)`, [03 §5](../03-domain-model.md#5-contracts-shared-febe)). Plus the Airwallex-derived types in [13 §8](../13-airwallex-contracts.md#8-contract-additions-srccontracts): `airwallex.ts` enums (verbatim values), `QuoteSummary`, `ExecutionSummary`, `BalanceSummary`, `BeneficiarySummary` + `AccountVerification`, `BeneficiaryFormSchema`, `FieldError`, `ApiError` | Types compile; `pnpm test contracts` validates the fixtures and covers `allowedActions` for every state × role |
+| C0.1 | `src/contracts/*`: zod schemas + types for `BillSummary`, `ChartSeriesPoint`, `ChartOverlays`, SSE event union, REST request/response bodies and `permissions.ts` (`allowedActions(bill)`, [03 §5](../03-domain-model.md#5-contracts-shared-febe)). Plus the Airwallex-derived types in [13 §8](../13-airwallex-contracts.md#8-contract-additions-srccontracts): `airwallex.ts` enums (verbatim values), `QuoteSummary`, `ExecutionSummary`, `BalanceSummary`, `BeneficiarySummary` + `AccountVerification`, `BeneficiaryFormSchema`, `FieldError`, `ApiError` | Types compile; `pnpm test contracts` validates the fixtures and covers `allowedActions` for every state |
 | C0.1b | `src/contracts/airwallex-errors.ts`: `fieldErrorMessage(code, params)` for codes `001`–`102` ([13 §2.2](../13-airwallex-contracts.md#22-field-validation-codes-001102--form-copy)), and `failureCategory()` ([13 §4.5](../13-airwallex-contracts.md#45-failure-categories)) | Unit tests per code group; unknown codes fall back to the Airwallex message |
 | C0.2 | `src/contracts/currencies.ts`: currency list with `payoutPrecision` (Airwallex Payouts table: **KES/SAR 0 dp**) and `isoPrecision`, plus FX capability flags `buy`/`sell`/`pureConversion`/`convertAndPayout` with conditional notes (IDR, MYR, AED), per [13 §1.1–1.2](../13-airwallex-contracts.md#11-currency-precision) | Used by the formatters, `AmountInput` and `CurrencySelect` |
-| C0.3 | `src/mocks/fixtures/*`: 8–10 bills covering **every `BillState`**, approvals (target, deadline, expired), and events. Airwallex-shaped fixtures: executions in **every `TransferStatus`** (incl. `IN_APPROVAL`, late failure after `PAID`, `FAILED`→auto-`CANCELLED`), every `FundingStatus`, one failure per `FailureCategory`, tentative vs confirmed amounts, every `AccountVerification` result, and 4 form schemas (EUR/IBAN DE, GBP/sort code, INR/IFSC, USD/ACH) with `FieldError` sets. Replace them with recorded sandbox responses after B2.1 | The fixture set is referenced by the kit scenarios |
+| C0.3 | `src/mocks/fixtures/*`: 8–10 bills covering **every `BillState`** and events. Airwallex-shaped fixtures: executions in **every `TransferStatus`** (incl. `IN_APPROVAL`, late failure after `PAID`, `FAILED`→auto-`CANCELLED`), every `FundingStatus`, one failure per `FailureCategory`, tentative vs confirmed amounts, every `AccountVerification` result, and 4 form schemas (EUR/IBAN DE, GBP/sort code, INR/IFSC, USD/ACH) with `FieldError` sets. Replace them with recorded sandbox responses after B2.1 | The fixture set is referenced by the kit scenarios |
 | C0.6 | `src/mocks/generators/*` ([11 §8](../11-test-data-and-seeding.md#8-code-layout)): seeded PRNG, corridors, vendors, bank details (with checksums), invoices, profiles. Pure and browser-safe, so the mock `DataSource` can build `mixed`/`stress` sets from a seed | Same seed → identical snapshot; totals exact at currency precision |
 | C0.4 | `src/mocks/market/*`: seeded GBM simulator with `nudge`/`rampTo`/`spike`, and a browser-side warp clock | Deterministic under a seed; used by the kit's live scenarios |
 | C0.5 | `DataSource` interface + `mock` implementation (in-memory store driven by fixtures + simulator, with emitted events matching the SSE contract) | Hooks can be written against it in U6 |
@@ -108,7 +108,7 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 | --- | --- |
 | U5.1 | TopBar, BillListItem, BillList (virtualised), PairGroupHeader |
 | U5.2 | BillTicket (all state variants), ArmConfirm, StrategyWizardStep |
-| U5.3 | ApprovalCard (all variants), ApprovalModal, TransferTracker (funding sub-row, failure category + next step, short reference) |
+| U5.3 | TransferTracker (funding sub-row, failure category + next step, short reference) and `QuoteCard` on an executing bill |
 | U5.4 | PositionsPanel + PositionsTable (tick flash rows) |
 | U5.5 | UploadModal (extraction rows show a `ThinkingOrb` whose `state` follows the extraction stage, paused under reduced motion; [07 §2](../07-pages-spec.md#2-upload--review-flow-upload-also-a-modal-over-the-terminal)), ExtractionReview (reason select, reference, inline `FieldError`s), **SchemaForm** (renders `BeneficiaryFormSchema`: all five field types, `refresh`, async bank search, error mapping by `path`; [13 §5.2](../13-airwallex-contracts.md#52-dynamic-form--beneficiaryformschema--schemaform)) |
 | U5.6 | NotificationCenter, CommandPalette, ShortcutsSheet |
@@ -121,15 +121,15 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 
 | ID | Task |
 | --- | --- |
-| U6.1 | Data hooks against `DataSource` (`useBills`, `useBill`, `useChart`, `useStream`, `useApprovals`, `useBalances`) with TanStack Query; Zustand UI store (selection, layout, density) |
+| U6.1 | Data hooks against `DataSource` (`useBills`, `useBill`, `useChart`, `useStream`, `useBalances`) with TanStack Query; Zustand UI store (selection, layout, density) |
 | U6.2 | Terminal layout grid (3 columns + bottom panel, resizable splitters, collapse right rail < 1440) with Motion `layout` transitions on selection and rail collapse. Responsive reflow per [07 §1](../07-pages-spec.md#responsive-behaviour): below 1280 the ticket is a drawer, below 1024 a top-bar menu button opens the bill list as a drawer and the chart stacks over the bottom panel |
 | U6.3 | Selection + deep links `/bills/:id`; chart instance cache; `J`/`K` navigation |
 | U6.4 | Ticket state machine rendering per [07 §1](../07-pages-spec.md#behaviour) |
 | U6.5 | Upload → review → strategy → arm flow (mock extraction with delays and low-confidence fields); demo-only **Add sample invoices** button in `UploadModal` |
-| U6.6 | Approval flows: toast → modal → approve/hold; deep link `/approvals/:id` |
+| U6.6 | Target hit pays and toasts ("Target hit · paying"); deep link `/bills/:id` |
 | U6.7 | Keyboard shortcuts + command palette actions |
 | U6.8 | Settings page; `/dev/market` control room (mock mode drives the browser simulator); the mock `DataSource` runs the Simulate timeline ([08 §1.1](../08-demo-plan.md#11-simulate-button)) end to end in the browser |
-| U6.9 | Edge states from [07 §6](../07-pages-spec.md#6-states--edge-cases-all-pages) |
+| U6.9 | Edge states from [07 §5](../07-pages-spec.md#5-states--edge-cases-all-pages) |
 | U6.10 | Playwright e2e on mocks: the three demo scenarios from [08 §2](../08-demo-plan.md#2-demo-bills), plus the generator's `e2e` profile (seed 1) and a `stress` smoke (200 bills: list scroll, `J`/`K` switching) |
 
 **Exit:** the complete demo can be performed end to end on `NEXT_PUBLIC_DATA_SOURCE=mock` with no backend running.
@@ -139,7 +139,7 @@ All components in [06 §3](../06-ui-kit-spec.md#3-trading-components).
 | ID | Task |
 | --- | --- |
 | U7.1 | `api` DataSource: REST client + SSE `EventSource` with reconnect/backoff + polling fallback |
-| U7.2 | Optimistic updates for strategy edits, pause/resume; server-authoritative state for approvals and execution |
+| U7.2 | Optimistic updates for strategy edits, pause/resume; server-authoritative state for execution |
 | U7.3 | Error envelope → toast/banner/inline mapping for every `ApiError.code` in [13 §2.1](../13-airwallex-contracts.md#21-error-codes--our-codes--ui); `fieldErrors` land on form fields |
 | U7.4 | Show real Airwallex IDs (short reference first; quote and transfer UUIDs) with copy buttons |
 | U7.5 | Run the e2e suite against `api` + sandbox (tagged `@sandbox`) |

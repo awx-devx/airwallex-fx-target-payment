@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Project Core
 
-Demo on an Airwallex **sandbox** account. Each foreign-currency bill is a "position" with a target rate or max cost. The worker watches the rate, locks a quote on a target hit and asks for approval. On the execution-deadline day it asks for approval at market, and at the cutoff it **auto-settles** under the standing instruction. Every armed bill is paid by its deadline.
+Demo on an Airwallex **sandbox** account. Each foreign-currency bill is a "position" with a target rate or max cost. The worker watches the rate, and on a target hit it locks a quote and pays. At the execution-deadline cutoff it pays at market under the standing instruction captured at submit. Every armed bill is paid by its deadline.
 
 ## Source of truth
 - Design lives in `docs/`. Read `docs/README.md` first, then the doc for the task (`03-domain-model.md` for state/math/schemas, `04-airwallex-integration.md` for API calls, `06`/`07` for UI).
@@ -23,7 +23,7 @@ Next.js App Router + TypeScript strict, MongoDB 7 (replica set) via Mongoose, Re
 - All bill state changes go through `transition()` in `src/server/domain/stateMachine.ts` plus a conditional, versioned `findOneAndUpdate`.
 - Deterministic `request_id`s and BullMQ `jobId`s. A retry never creates a second payment.
 - Time comes from the injected `Clock` only. Timers are Mongo fields, and the sweeper turns them into jobs.
-- The deadline overrides every non-terminal state. Nothing executes without approval of a valid quote or the standing instruction. The only exception is the demo Simulate auto-approval (`docs/08` §1.1, `DEMO_MODE` only).
+- The deadline overrides every non-terminal state. Nothing executes without the standing instruction captured at submit, on a still-valid quote, at a target hit or at the cutoff. Simulate (`docs/08` §1.1, `DEMO_MODE` only) uses that same path.
 - Charge amounts and quote requests are derived from the stored bill, never from client input.
 
 ## Layering

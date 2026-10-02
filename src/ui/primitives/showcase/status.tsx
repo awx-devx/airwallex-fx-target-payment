@@ -99,7 +99,7 @@ export const statusShowcases: Showcase[] = [
     sections: [
       {
         id: 'avatar-matrix',
-        title: 'Initials, image, approver ring',
+        title: 'Initials and image',
         render: () => (
           <Matrix>
             <Cell label="initials xs">
@@ -110,9 +110,6 @@ export const statusShowcases: Showcase[] = [
             </Cell>
             <Cell label="image">
               <Avatar name="Ada Lovelace" src={PORTRAIT} />
-            </Cell>
-            <Cell label="approver">
-              <Avatar name="Grace Hopper" approver />
             </Cell>
           </Matrix>
         ),

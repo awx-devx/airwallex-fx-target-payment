@@ -1,16 +1,12 @@
 import type { BillSummary } from '@/contracts/bill';
 import { D } from '@/contracts/money';
 
-export type BillFilter = 'all' | 'watching' | 'approval' | 'final-day' | 'paid';
+export type BillFilter = 'all' | 'watching' | 'paid';
 export type BillSort = 'deadline' | 'distance' | 'amount';
 
 const FILTERS: Record<BillFilter, (bill: BillSummary) => boolean> = {
   all: () => true,
   watching: (bill) => bill.state === 'WATCHING' || bill.state === 'PAUSED',
-  approval: (bill) =>
-    bill.state === 'TARGET_HIT' ||
-    bill.activeApproval?.status === 'PENDING',
-  'final-day': (bill) => bill.state === 'DEADLINE_WINDOW' || bill.state === 'AUTO_SETTLING',
   paid: (bill) => bill.state === 'PAID',
 };
 

@@ -778,10 +778,8 @@ function markerColor(kind: PlotMarker['kind'], colors: ChartColors): string {
     case 'TARGET_HIT':
     case 'SIM_START':
       return colors.orange;
-    case 'APPROVED':
     case 'EXECUTED':
       return colors.up;
-    case 'REJECTED':
     case 'SIM_END':
       return colors.fg3;
     default:

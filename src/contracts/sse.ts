@@ -4,7 +4,6 @@ import {
   executionSummarySchema,
   isoDateTimeSchema,
 } from '@/contracts/airwallex';
-import { approvalSummarySchema } from '@/contracts/approval';
 import { billSummarySchema, pairSchema } from '@/contracts/bill';
 
 export const RATE_SOURCES = ['AIRWALLEX', 'SIMULATED', 'REFERENCE'] as const;
@@ -14,7 +13,6 @@ export type RateSourceKind = z.infer<typeof rateSourceSchema>;
 export const SIM_PHASES = [
   'RAMPING',
   'TRIGGERED',
-  'AUTO_APPROVED',
   'EXECUTING',
   'SETTLING',
   'DONE',
@@ -28,7 +26,6 @@ export const NOTIFICATION_LEVELS = ['info', 'success', 'warn', 'danger'] as cons
 export const notificationSchema = z.object({
   id: z.string().min(1),
   billId: z.string().optional(),
-  approvalId: z.string().optional(),
   title: z.string().min(1),
   body: z.string(),
   level: z.enum(NOTIFICATION_LEVELS),
@@ -49,17 +46,6 @@ export const appEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('bill.updated'),
     bill: billSummarySchema,
-  }),
-  z.object({
-    type: z.literal('approval.requested'),
-    approval: approvalSummarySchema,
-    billId: z.string().min(1),
-  }),
-  z.object({
-    type: z.literal('approval.resolved'),
-    approvalId: z.string().min(1),
-    billId: z.string().min(1),
-    outcome: z.enum(['APPROVED', 'REJECTED', 'EXPIRED']),
   }),
   z.object({
     type: z.literal('execution.updated'),

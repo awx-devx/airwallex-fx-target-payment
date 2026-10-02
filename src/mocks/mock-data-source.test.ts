@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { billDetailSchema } from '@/contracts/api';
 import { billSummarySchema } from '@/contracts/bill';
 import { chartResponseSchema } from '@/contracts/chart';
-import { DataSourceError } from '@/contracts/data-source';
 import { appEventSchema } from '@/contracts/sse';
 import { FIXTURE_NOW } from '@/mocks/fixtures/build';
 import { ManualClock } from '@/mocks/market/clock';
@@ -18,56 +17,24 @@ function sourceAt(iso: string, readRealMs?: () => number): MockDataSource {
 describe('MockDataSource', () => {
   it('rejects an action the state does not allow', async () => {
     const source = sourceAt(FIXTURE_NOW);
-    await expect(source.pause('bill-draft', 'approver')).rejects.toMatchObject({
+    await expect(source.pause('bill-draft')).rejects.toMatchObject({
       status: 409,
       error: { code: 'INVALID_STATE' },
     });
   });
 
-  it('rejects a preparer approval', async () => {
+  it('pays a watching bill immediately', async () => {
     const source = sourceAt(FIXTURE_NOW);
-    await expect(
-      source.approve('ap-target', 'preparer'),
-    ).rejects.toBeInstanceOf(DataSourceError);
-    await expect(source.approve('ap-target', 'preparer')).rejects.toMatchObject(
-      {
-        status: 403,
-        error: { code: 'FORBIDDEN' },
-      },
-    );
-    expect((await source.getBill('bill-target-hit')).state).toBe('TARGET_HIT');
-  });
-
-  it('approves a target hit and stops at APPROVED', async () => {
-    const source = sourceAt(FIXTURE_NOW);
-    const summary = billSummarySchema.parse(
-      await source.approve('ap-target', 'approver'),
-    );
-    expect(summary.state).toBe('APPROVED');
-    expect(summary.activeApproval?.status).toBe('APPROVED');
-    expect(summary.activeApproval?.autoApproved).toBe(false);
-    expect(summary.execution).toBeUndefined();
-    const detail = billDetailSchema.parse(
-      await source.getBill('bill-target-hit'),
-    );
+    const summary = billSummarySchema.parse(await source.payNow('bill-watching'));
+    expect(summary.state).toBe('EXECUTING');
+    expect(summary.execution?.status).toBe('SCHEDULED');
+    expect(summary.execution?.mode).toBe('MANUAL');
+    const detail = billDetailSchema.parse(await source.getBill('bill-watching'));
     expect(
       detail.events.some(
-        (event) => event.type === 'APPROVED' && event.actor === 'user:approver',
+        (event) => event.type === 'QUOTE_LOCKED' && event.actor === 'user',
       ),
     ).toBe(true);
-  });
-
-  it('leaves the bill alone when the quote has expired', async () => {
-    const source = sourceAt('2026-10-01T15:00:00.000Z');
-    await expect(source.approve('ap-target', 'approver')).rejects.toMatchObject(
-      {
-        status: 409,
-        error: { code: 'QUOTE_EXPIRED' },
-      },
-    );
-    const bill = await source.getBill('bill-target-hit');
-    expect(bill.state).toBe('TARGET_HIT');
-    expect(bill.activeApproval?.status).toBe('PENDING');
   });
 
   it('emits contract ticks from the seeded market', () => {
@@ -84,26 +51,22 @@ describe('MockDataSource', () => {
     source.subscribe((event) => {
       if (event.type === 'demo.sim') seen.push(event.phase);
     });
-    await source.simulate('bill-watching', 'approver', { durationSec: 12 });
+    await source.simulate('bill-watching', { durationSec: 12 });
     real += 30_000;
     source.pump('bill-watching');
     const bill = billDetailSchema.parse(await source.getBill('bill-watching'));
     expect(bill.state).toBe('PAID');
     expect(bill.execution?.status).toBe('PAID');
-    expect(bill.activeApproval?.autoApproved).toBe(true);
-    expect(bill.activeApproval?.trigger?.simulated).toBe(true);
+    expect(bill.execution?.mode).toBe('TARGET');
     expect(
       bill.events.some(
         (event) =>
-          event.type === 'APPROVED' &&
-          event.actor === 'system:demo-sim' &&
-          event.payload?.auto === true,
+          event.type === 'QUOTE_LOCKED' && event.actor === 'system:demo-sim',
       ),
     ).toBe(true);
     expect(seen).toEqual([
       'RAMPING',
       'TRIGGERED',
-      'AUTO_APPROVED',
       'EXECUTING',
       'SETTLING',
       'SETTLING',
@@ -122,10 +85,10 @@ describe('MockDataSource', () => {
     source.subscribe((event) => {
       if (event.type === 'demo.sim') phases.push(event.phase);
     });
-    await source.simulate('bill-watching', 'approver');
+    await source.simulate('bill-watching');
     real += 1000;
     source.pump('bill-watching');
-    const stopped = await source.stopSimulation('bill-watching', 'approver');
+    const stopped = await source.stopSimulation('bill-watching');
     expect(stopped.state).toBe('WATCHING');
     expect(phases).toContain('ABORTED');
     expect(
@@ -145,13 +108,13 @@ describe('MockDataSource', () => {
     }
   });
 
-  it('jumps a watching bill onto its deadline day', () => {
+  it('pays a watching bill when the clock jumps to its deadline', async () => {
     const source = sourceAt(FIXTURE_NOW);
     source.jumpToDeadline('bill-watching');
     expect(source.clock.now().toISOString().slice(0, 10)).toBe('2026-10-09');
-    return source.getBill('bill-watching').then((bill) => {
-      expect(bill.state).toBe('DEADLINE_WINDOW');
-      expect(bill.activeApproval?.kind).toBe('DEADLINE');
-    });
+    const bill = await source.getBill('bill-watching');
+    expect(bill.state).toBe('EXECUTING');
+    expect(bill.execution?.mode).toBe('DEADLINE');
+    expect(bill.events.some((event) => event.type === 'AUTOSETTLE')).toBe(true);
   });
 });

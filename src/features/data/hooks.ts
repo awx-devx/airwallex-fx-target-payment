@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import type { ArmBody, PutStrategyBody, RejectBody } from '@/contracts/api';
+import type { ArmBody, PutStrategyBody } from '@/contracts/api';
 import type { BillSummary } from '@/contracts/bill';
 import type { ChartRange } from '@/contracts/chart';
 import { DataSourceError } from '@/contracts/data-source';
@@ -50,13 +50,6 @@ export function useEvents(id: string | undefined) {
     queryKey: qk.events(id ?? ''),
     queryFn: () => dataSource().listEvents(id ?? ''),
     enabled: Boolean(id),
-  });
-}
-
-export function useApprovals() {
-  return useQuery({
-    queryKey: qk.approvals,
-    queryFn: () => dataSource().listApprovals(),
   });
 }
 
@@ -125,10 +118,6 @@ export function useStream() {
         void client.invalidateQueries({ queryKey: qk.events(event.bill.id) });
         return;
       }
-      if (event.type === 'approval.requested' || event.type === 'approval.resolved') {
-        void client.invalidateQueries({ queryKey: qk.approvals });
-        setNotices((current) => [event, ...current].slice(0, 20));
-      }
       if (event.type === 'notification') {
         setNotices((current) => [event, ...current].slice(0, 20));
       }
@@ -151,7 +140,6 @@ export function useStream() {
 
 export function useBillActions() {
   const client = useQueryClient();
-  const role = useUiStore((state) => state.role);
 
   async function apply(run: () => Promise<BillSummary>) {
     try {
@@ -160,7 +148,6 @@ export function useBillActions() {
       client.setQueryData(qk.bill(bill.id), (detail: unknown) =>
         detail && typeof detail === 'object' ? { ...detail, ...bill } : detail,
       );
-      void client.invalidateQueries({ queryKey: qk.approvals });
       void client.invalidateQueries({ queryKey: qk.balances });
       void client.invalidateQueries({ queryKey: qk.events(bill.id) });
       return bill;
@@ -171,20 +158,16 @@ export function useBillActions() {
   }
 
   return {
-    role,
-    arm: (id: string, body: ArmBody) => apply(() => dataSource().arm(id, body, role)),
-    pause: (id: string) => apply(() => dataSource().pause(id, role)),
-    resume: (id: string) => apply(() => dataSource().resume(id, role)),
-    payNow: (id: string) => apply(() => dataSource().payNow(id, role)),
-    cancel: (id: string) => apply(() => dataSource().cancel(id, role)),
-    rearm: (id: string) => apply(() => dataSource().rearm(id, role)),
-    approve: (approvalId: string) => apply(() => dataSource().approve(approvalId, role)),
-    reject: (approvalId: string, body: RejectBody) =>
-      apply(() => dataSource().reject(approvalId, body, role)),
-    simulate: (id: string) => apply(() => dataSource().simulate(id, role)),
-    stop: (id: string) => apply(() => dataSource().stopSimulation(id, role)),
-    advance: (id: string) => apply(() => dataSource().advanceTransfer(id, role)),
+    arm: (id: string, body: ArmBody) => apply(() => dataSource().arm(id, body)),
+    pause: (id: string) => apply(() => dataSource().pause(id)),
+    resume: (id: string) => apply(() => dataSource().resume(id)),
+    payNow: (id: string) => apply(() => dataSource().payNow(id)),
+    cancel: (id: string) => apply(() => dataSource().cancel(id)),
+    rearm: (id: string) => apply(() => dataSource().rearm(id)),
+    simulate: (id: string) => apply(() => dataSource().simulate(id)),
+    stop: (id: string) => apply(() => dataSource().stopSimulation(id)),
+    advance: (id: string) => apply(() => dataSource().advanceTransfer(id)),
     putStrategy: (id: string, body: PutStrategyBody) =>
-      apply(() => dataSource().putStrategy(id, body, role)),
+      apply(() => dataSource().putStrategy(id, body)),
   };
 }

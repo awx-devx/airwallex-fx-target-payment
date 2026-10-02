@@ -9,13 +9,11 @@ import {
   beneficiaryFormSchemaSchema,
   executionSummarySchema,
 } from '@/contracts/airwallex';
-import { approvalSummarySchema } from '@/contracts/approval';
 import { billSummarySchema } from '@/contracts/bill';
 import { billEventSchema } from '@/contracts/events';
 import { balanceSummarySchema } from '@/contracts/airwallex';
 import { D, formatDecimal } from '@/contracts/money';
 import {
-  approvalCatalog,
   assertFixtureCoverage,
   balances,
   bills,
@@ -27,10 +25,9 @@ import {
 } from '@/mocks/fixtures';
 
 describe('fixtures', () => {
-  it('parses every bill, approval, execution, event and form', () => {
+  it('parses every bill, execution, event and form', () => {
     assertFixtureCoverage();
     for (const bill of bills) expect(billSummarySchema.parse(bill).id).toBe(bill.id);
-    for (const approval of approvalCatalog) approvalSummarySchema.parse(approval);
     for (const item of executionCatalog) executionSummarySchema.parse(item);
     for (const event of events) billEventSchema.parse(event);
     for (const balance of balances) balanceSummarySchema.parse(balance);
@@ -56,10 +53,6 @@ describe('fixtures', () => {
     expect(executionCatalog.some((item) => item.amountsTentative)).toBe(true);
     expect(executionCatalog.some((item) => !item.amountsTentative)).toBe(true);
     expect(executionCatalog.some((item) => item.lateFailureWatchUntil)).toBe(true);
-    expect(approvalCatalog.map((item) => item.kind)).toEqual(
-      expect.arrayContaining(['TARGET_HIT', 'DEADLINE']),
-    );
-    expect(approvalCatalog.some((item) => item.status === 'EXPIRED')).toBe(true);
     const kinds = new Set(formSchemas.flatMap((schema) => schema.fields.map((field) => field.type)));
     expect(kinds).toEqual(
       new Set(['INPUT', 'SELECT', 'DYNAMIC_SELECT', 'RADIO', 'TRANSFER_METHOD']),

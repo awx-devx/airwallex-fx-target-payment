@@ -1,6 +1,6 @@
 'use client';
 
-import type { BillSummary, Role } from '@/contracts/bill';
+import type { BillSummary } from '@/contracts/bill';
 import type { BillEvent } from '@/contracts/events';
 import { useState } from 'react';
 import { Banner } from '@/ui/primitives/banner';
@@ -15,7 +15,6 @@ import { PairLabel } from '@/ui/trading/pair-label';
 import { StateBadge } from '@/ui/trading/state-badge';
 import { StrategySummary } from '@/ui/trading/strategy-summary';
 import { formatUtcDate } from '@/ui/trading/time-label';
-import { ApprovalCard } from '@/ui/patterns/approval-card';
 import { ArmConfirm } from '@/ui/patterns/arm-confirm';
 import { TransferTracker } from '@/ui/patterns/transfer-tracker';
 
@@ -23,7 +22,6 @@ export function BillTicket({
   bill,
   now,
   events,
-  role = 'preparer',
   homeCurrency,
   cutoffLabel,
   onAction,
@@ -31,7 +29,6 @@ export function BillTicket({
   bill: BillSummary;
   now: string;
   events: readonly BillEvent[];
-  role?: Role;
   homeCurrency: string;
   cutoffLabel: string;
   onAction?: (action: string) => void;
@@ -58,7 +55,6 @@ export function BillTicket({
               <StrategyBody
                 bill={bill}
                 now={now}
-                role={role}
                 homeCurrency={homeCurrency}
                 cutoffLabel={cutoffLabel}
                 onAction={onAction}
@@ -93,14 +89,12 @@ export function BillTicket({
 function StrategyBody({
   bill,
   now,
-  role,
   homeCurrency,
   cutoffLabel,
   onAction,
 }: {
   bill: BillSummary;
   now: string;
-  role: Role;
   homeCurrency: string;
   cutoffLabel: string;
   onAction?: (action: string) => void;
@@ -114,21 +108,7 @@ function StrategyBody({
       />
     );
   }
-  if (bill.state === 'TARGET_HIT' || bill.state === 'DEADLINE_WINDOW') {
-    return (
-      <div className="space-y-3">
-        <DeadlineMeter
-          armedAt="2026-09-20"
-          now={now.slice(0, 10)}
-          executeBy={bill.executionDeadline}
-          due={bill.dueDate}
-          finalDay={bill.state === 'DEADLINE_WINDOW'}
-        />
-        <ApprovalCard bill={bill} now={now} role={role} homeCurrency={homeCurrency} onApprove={() => onAction?.('APPROVE')} onHold={() => onAction?.('HOLD')} onCancel={() => onAction?.('CANCEL')} />
-      </div>
-    );
-  }
-  if (bill.state === 'IN_FLIGHT' || bill.state === 'EXECUTING' || bill.state === 'APPROVED') {
+  if (bill.state === 'IN_FLIGHT' || bill.state === 'EXECUTING') {
     return bill.execution ? (
       <TransferTracker execution={bill.execution} />
     ) : (

@@ -15,12 +15,7 @@ There is no simple "limit order with a deadline" for payables.
 
 ## Users
 
-| Persona | Needs |
-| --- | --- |
-| **AP / Finance operator** (preparer) | Uploads bills, sets targets, monitors positions, reacts to alerts |
-| **Approver** (finance lead / CFO) | Approves conversions quickly from an alert with a locked quote and a clear cost breakdown |
-
-For the demo, one signed-in user holds both roles, with a role switcher so both sides of the flow can be shown.
+One person. They upload the bill, review the extracted fields, set the target, and submit. That submit authorizes the payment. The system then watches the rate and pays.
 
 ## Core flow
 
@@ -29,15 +24,14 @@ flowchart TD
   U[Upload one or more bills] --> X[Extract fields<br/>vendor, amount, currency, due date, bank details]
   X --> R[Review and confirm]
   R --> S[Set strategy<br/>target rate OR max cost]
-  S --> A[Arm: capture entry rate<br/>+ standing instruction consent]
+  S --> A[Submit: capture entry rate<br/>+ standing instruction consent]
   A --> W{Watching}
-  W -- rate reaches target --> Q[Lock quote<br/>alert approver]
-  Q -- approved before quote expiry --> P[Convert and pay]
-  Q -- rejected or expired --> W
-  W -- deadline day reached --> DQ[Lock quote at market<br/>request approval]
-  DQ -- approved --> P
-  DQ -- not approved by auto-settle cutoff --> AUTO[Auto-execute at market<br/>via standing instruction]
-  AUTO --> P
+  W -- rate at or under target --> P[Lock quote and pay]
+  W -- quote worse than target --> W
+  W -- user pauses --> PAUSED[Paused]
+  PAUSED -- resume --> W
+  W -- deadline cutoff, target never hit --> P
+  PAUSED -- cutoff still pays --> P
   P --> T[Track transfer<br/>SCHEDULED → PROCESSING → SENT → PAID]
 ```
 
@@ -55,8 +49,8 @@ We use the metaphor deliberately, because it gives users a fast and familiar way
 | Liquidation / expiry line | Execution deadline (vertical), due date (vertical) |
 | Unrealized PnL | Savings vs entry, in H |
 | Mark price | Current indicative rate |
-| Order ticket panel | Bill ticket: strategy, amounts, deadline, approval |
-| Positions / orders / history tabs | Active bills / awaiting approval / executed / activity log |
+| Order ticket panel | Bill ticket: strategy, amounts, deadline |
+| Positions / orders / history tabs | Active bills / executed / activity log |
 | Market switcher + watchlist | Bill list with sparklines, grouped by pair |
 | Fill | Conversion booked + transfer created |
 
@@ -65,8 +59,8 @@ Unlike a real perp, there is **no leverage and no liquidation risk**. The "expir
 ## Key product rules
 
 1. **The deadline is sacred.** Every armed bill *will* be paid by its execution deadline, no matter what the rate does.
-2. **Humans approve money movement.** Every payment path goes through an explicit approval. The only exception is the deadline auto-settle, which runs on a standing instruction the user explicitly consents to when arming the bill.
-3. **Approvals see a locked price.** An approver never approves an indicative rate; they approve a quote with a visible expiry countdown.
+2. **Submit authorizes the payment.** The standing instruction captured at submit covers both paths: pay when the rate is at or under the target, and pay at market at the execution-deadline cutoff if the target is never hit.
+3. **Payment uses a locked quote.** The worker locks a quote and pays in the same job. If that quote is worse than the target, the bill stays watching.
 4. **Everything is explainable.** Every state change is written to an activity log that is shown in the UI.
 
 ## Scope for the demo (in)
@@ -75,8 +69,7 @@ Unlike a real perp, there is **no leverage and no liquidation risk**. The "expir
 - Per-bill chart with entry, target, deadline and due-date lines; live ticking
 - Target by **rate** or by **max cost**, both displaying the equivalent of the other
 - Rate monitoring, target detection, quote locking, in-app alerts (toasts + notification centre; no email/Slack in the demo)
-- Approval flow with a quote countdown; reject → keep watching
-- Deadline-day approval request plus auto-settle at the cutoff
+- Automatic payment when the target is hit, and at the execution-deadline cutoff if it is not
 - Airwallex sandbox execution: quote → transfer (with conversion) → status tracking via webhooks
 - **Demo mode**: market simulator and time controls so the full lifecycle can be shown in minutes
 
@@ -91,5 +84,5 @@ Unlike a real perp, there is **no leverage and no liquidation risk**. The "expir
 ## Success criteria for the demo
 
 - A viewer understands the whole concept within 30 seconds of seeing the terminal.
-- Full lifecycle for three bills shown live in under 5 minutes: one hits its target, one is rejected and re-armed, and one auto-settles on the deadline.
+- Full lifecycle for three bills shown live in under 5 minutes: one hits its target and pays, one stays watching (pause or edit the target), and one pays at the deadline.
 - Real Airwallex sandbox transfer IDs are visible, and statuses update through webhooks.

@@ -7,8 +7,7 @@ import { SettingsForm, type SettingsValues } from '@/ui/patterns/settings-form';
 const INITIAL: SettingsValues = {
   homeCurrency: 'USD',
   leadDays: '1',
-  validity: 'MIN_30',
-  windowStart: '09:00',
+  validity: 'MIN_1',
   cutoff: '14:00',
   timeZone: 'America/Los_Angeles',
 };
@@ -25,7 +24,7 @@ function SettingsScreen() {
       <main className="relative z-10 mx-auto max-w-lg px-6 py-8">
         <h1 className="text-lg font-medium">Settings</h1>
         <p className="mt-1 text-fg-2">
-          Times in the terminal use your local zone. The deadline window is {values.timeZone}.
+          Times in the terminal use your local zone. Payments run on {values.timeZone}.
         </p>
         <div className="mt-6">
           <SettingsForm values={values} onChange={setValues} />

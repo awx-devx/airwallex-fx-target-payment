@@ -31,9 +31,9 @@ Endpoint reference: `docs/04-airwallex-integration.md` §2. Field, enum and erro
 ## Execution path
 - Primary: one `POST /api/v1/transfers/create` with `source_currency = H`, `transfer_currency = F`, `quote_id`, `reason` (required enum, the bill's `transferReason`, default `bill_payment`), `reference` (required), `fee_paid_by: PAYER`, SWIFT `swift_charge_option: PAYER` (D-18), `metadata.bill_id`, no `transfer_date`. This works for buy-only currencies (INR, PHP, IDR, …), which can't convert-and-hold.
 - `transfers/validate` runs at arming; pre-flight is the balance check (`available_amount`) before burning a quote.
-- Error names differ by endpoint: `quote_expired`/`quote_id_invalid` on transfers, `expired_quote`/`invalid_quote_id` on conversions. `errors.ts` aliases them. Expired: target flow → back to `WATCHING`; deadline/auto-settle flow → re-quote `MIN_1` and retry once. Full table: `docs/13` §2.1.
+- Error names differ by endpoint: `quote_expired`/`quote_id_invalid` on transfers, `expired_quote`/`invalid_quote_id` on conversions. `errors.ts` aliases them. An expired quote leaves the bill `WATCHING` and the worker retries. Full table: `docs/13` §2.1.
 - Status updates: `FAILED` overrides `PAID` (late failure); the automatic `CANCELLED` after `FAILED` never replaces `FAILED`.
-- Airwallex-side approval workflows can't be combined with quotes, so approval is ours, in-app (D-06).
+- Airwallex transfer-approval workflows can't use quotes, so that workflow stays off and execution is ours (D-23).
 
 ## Errors and logging
 - Throw `AirwallexError { status, code, message, source, details, fieldErrors, traceId }`; callers branch on the normalised `code`. `validation_failed` errors carry `details.errors[{ source, code, params }]`, which become `FieldError[]` for the UI.

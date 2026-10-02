@@ -393,7 +393,7 @@ function RangeDemo() {
 
 function MarkerCharts() {
   const series = WATCHING;
-  const times = [0.12, 0.22, 0.32, 0.42, 0.52, 0.62, 0.74, 0.84, 0.94].map((fraction) => {
+  const times = [0.12, 0.24, 0.36, 0.48, 0.62, 0.76, 0.9].map((fraction) => {
     const index = Math.min(series.length - 1, Math.round(fraction * (series.length - 1)));
     return series[index]?.time ?? NOW;
   });
@@ -401,8 +401,6 @@ function MarkerCharts() {
     'ARMED',
     'NEAR_MISS',
     'TARGET_HIT',
-    'APPROVED',
-    'REJECTED',
     'EXECUTED',
     'AUTOSETTLE',
     'SIM_START',
@@ -429,7 +427,7 @@ function MarkerCharts() {
             markers: [
               { time: clusterTime, kind: 'NEAR_MISS' },
               { time: clusterTime + 60, kind: 'TARGET_HIT' },
-              { time: clusterTime + 120, kind: 'REJECTED' },
+              { time: clusterTime + 120, kind: 'EXECUTED' },
             ],
           })}
         />

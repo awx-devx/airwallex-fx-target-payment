@@ -32,7 +32,7 @@ export function CountdownChip({
         urgency === 'normal' && 'border-line-2 text-fg-1',
       )}
     >
-      {kind === 'autosettle' && urgency !== 'expired' ? `Auto-settles ${body}` : body}
+      {kind === 'autosettle' && urgency !== 'expired' ? `Pays at market ${body}` : body}
       {kind === 'autosettle' && urgency === 'expired' ? ' · cutoff passed' : ''}
     </span>
   );

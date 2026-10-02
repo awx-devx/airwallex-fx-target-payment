@@ -1,7 +1,6 @@
 import type { BillSummary } from '@/contracts/bill';
 import { D, significantPrice } from '@/contracts/money';
 import {
-  approvalCatalog,
   balances,
   bills,
   events,
@@ -11,7 +10,7 @@ import { FIXTURE_NOW } from '@/mocks/fixtures/build';
 import { fieldErrorsByCorridor, formSchemaFor, formSchemas } from '@/mocks/fixtures/forms';
 
 export const PATTERN_NOW = FIXTURE_NOW;
-export { approvalCatalog, balances, bills, events, executionCatalog, fieldErrorsByCorridor, formSchemaFor, formSchemas };
+export { balances, bills, events, executionCatalog, fieldErrorsByCorridor, formSchemaFor, formSchemas };
 
 export function sparklineFor(price = '1.00000'): string[] {
   const end = D(price);

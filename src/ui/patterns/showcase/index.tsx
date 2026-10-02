@@ -6,8 +6,6 @@ import { useState } from 'react';
 import { baseOverlays, WATCHING } from '@/ui/chart/chart.fixtures';
 import { Cell } from '@/ui/primitives/showcase/frame';
 import type { Showcase } from '@/ui/showcase/types';
-import { ApprovalCard } from '@/ui/patterns/approval-card';
-import { ApprovalModalPreview } from '@/ui/patterns/approval-modal';
 import { BillList, BillListItem, PairGroupHeader } from '@/ui/patterns/bill-list';
 import { BillTicket } from '@/ui/patterns/bill-ticket';
 import { ArmConfirm } from '@/ui/patterns/arm-confirm';
@@ -17,7 +15,6 @@ import { ExtractionReview } from '@/ui/patterns/extraction-review';
 import { NotificationList } from '@/ui/patterns/notification-center';
 import { PositionsPanel, PositionsTable } from '@/ui/patterns/positions';
 import {
-  approvalCatalog,
   balances,
   billByState,
   billRows,
@@ -56,7 +53,7 @@ function ListDemo({
   virtualized?: boolean;
   grouped?: boolean;
 }) {
-  const [filter, setFilter] = useState<'all' | 'watching' | 'approval' | 'final-day' | 'paid'>('all');
+  const [filter, setFilter] = useState<'all' | 'watching' | 'paid'>('all');
   const [sort, setSort] = useState<'deadline' | 'distance' | 'amount'>('deadline');
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState(grouped);
@@ -137,8 +134,7 @@ function SchemaDemo({
 const SETTINGS: SettingsValues = {
   homeCurrency: 'USD',
   leadDays: '2',
-  validity: 'MIN_15',
-  windowStart: '09:00',
+  validity: 'MIN_1',
   cutoff: '14:00',
   timeZone: 'America/Los_Angeles',
 };
@@ -159,9 +155,9 @@ export const patternShowcases: Showcase[] = [
         title: 'Normal, demo, offline',
         render: () => (
           <div className="space-y-3">
-            <TopBar balances={balances} role="preparer" now={PATTERN_NOW} unread={2} />
-            <TopBar balances={balances} connection="simulated" role="approver" now={PATTERN_NOW} warp="60×" unread={0} />
-            <TopBar balances={balances} connection="offline" role="preparer" now={PATTERN_NOW} />
+            <TopBar balances={balances} now={PATTERN_NOW} unread={2} />
+            <TopBar balances={balances} connection="simulated" now={PATTERN_NOW} warp="60×" unread={0} />
+            <TopBar balances={balances} connection="offline" now={PATTERN_NOW} />
           </div>
         ),
       },
@@ -258,14 +254,13 @@ export const patternShowcases: Showcase[] = [
         title: 'Ready through failed',
         render: () => (
           <div className="grid gap-4 lg:grid-cols-2">
-            {(['READY', 'WATCHING', 'TARGET_HIT', 'DEADLINE_WINDOW', 'IN_FLIGHT', 'PAID', 'FAILED'] as const).map(
+            {(['READY', 'WATCHING', 'PAUSED', 'EXECUTING', 'IN_FLIGHT', 'PAID', 'FAILED'] as const).map(
               (state) => (
                 <Cell key={state} label={state} className="max-w-none">
                   <BillTicket
                     bill={bill(state)}
                     now={PATTERN_NOW}
                     events={events}
-                    role={state === 'TARGET_HIT' ? 'approver' : 'preparer'}
                     homeCurrency={HOME}
                     cutoffLabel="14:00 on Oct 9"
                   />
@@ -316,85 +311,6 @@ export const patternShowcases: Showcase[] = [
         id: 'strategy-wizard-matrix',
         title: 'Rate mode with a draggable target',
         render: () => <WizardDemo />,
-      },
-    ],
-  },
-  {
-    id: 'approval-card',
-    group: 'patterns',
-    title: 'ApprovalCard',
-    importPath: '@/ui/patterns/approval-card',
-    sections: [
-      {
-        id: 'approval-card-matrix',
-        title: 'Target, deadline, expired, balance, roles',
-        render: () => {
-          const base = bill('TARGET_HIT');
-          const withApproval = (id: string, extra?: Partial<BillSummary>): BillSummary => ({
-            ...base,
-            activeApproval: approvalCatalog.find((item) => item.id === id) ?? base.activeApproval,
-            ...extra,
-          });
-          return (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Cell label="target hit">
-                <ApprovalCard bill={base} now={PATTERN_NOW} role="approver" homeCurrency={HOME} />
-              </Cell>
-              <Cell label="deadline">
-                <ApprovalCard bill={withApproval('ap-deadline')} now={PATTERN_NOW} role="approver" homeCurrency={HOME} />
-              </Cell>
-              <Cell label="expired">
-                <ApprovalCard bill={withApproval('ap-expired')} now={PATTERN_NOW} role="approver" homeCurrency={HOME} />
-              </Cell>
-              <Cell label="insufficient balance">
-                <ApprovalCard
-                  bill={{ ...base, flags: { ...base.flags, insufficientBalance: true } }}
-                  now={PATTERN_NOW}
-                  role="approver"
-                  homeCurrency={HOME}
-                />
-              </Cell>
-              <Cell label="approving">
-                <ApprovalCard bill={base} now={PATTERN_NOW} role="approver" approving homeCurrency={HOME} />
-              </Cell>
-              <Cell label="approved">
-                <ApprovalCard
-                  bill={withApproval('ap-approved', {
-                    activeApproval: {
-                      ...(approvalCatalog.find((item) => item.id === 'ap-approved') ?? base.activeApproval!),
-                      autoApproved: false,
-                      trigger: { price: '1.07600', simulated: false },
-                    },
-                  })}
-                  now={PATTERN_NOW}
-                  role="approver"
-                  homeCurrency={HOME}
-                />
-              </Cell>
-              <Cell label="preparer">
-                <ApprovalCard bill={base} now={PATTERN_NOW} role="preparer" homeCurrency={HOME} />
-              </Cell>
-              <Cell label="simulated">
-                <ApprovalCard bill={withApproval('ap-approved')} now={PATTERN_NOW} role="approver" homeCurrency={HOME} />
-              </Cell>
-            </div>
-          );
-        },
-      },
-    ],
-  },
-  {
-    id: 'approval-modal',
-    group: 'patterns',
-    title: 'ApprovalModal',
-    importPath: '@/ui/patterns/approval-modal',
-    sections: [
-      {
-        id: 'approval-modal-matrix',
-        title: 'Glow dialog',
-        render: () => (
-          <ApprovalModalPreview bill={bill('TARGET_HIT')} now={PATTERN_NOW} role="approver" homeCurrency={HOME} />
-        ),
       },
     ],
   },
@@ -457,12 +373,11 @@ export const patternShowcases: Showcase[] = [
     sections: [
       {
         id: 'positions-panel-matrix',
-        title: 'Positions, approvals, executed, activity',
+        title: 'Positions, executed, activity',
         render: () => (
           <PositionsPanel
             bills={rows.map((row) => row.bill).filter((item) => item.state === 'WATCHING' || item.state === 'PAUSED')}
-            approvals={[bill('TARGET_HIT')]}
-            executed={[bill('PAID')]}
+            executed={[bill('PAID'), bill('EXECUTING')]}
             events={events}
             selectedId={bill('WATCHING').id}
           />
@@ -603,7 +518,7 @@ export const patternShowcases: Showcase[] = [
         render: () => (
           <NotificationList
             notices={[
-              { id: '1', billId: 'bill-target-hit', vendor: 'Acme GmbH', title: 'Target hit', unread: true, action: 'Approve' },
+              { id: '1', billId: 'bill-target-hit', vendor: 'Acme GmbH', title: 'Target hit · paying', unread: true },
               { id: '2', billId: 'bill-target-hit', vendor: 'Acme GmbH', title: 'Quote locked', unread: false },
               { id: '3', billId: 'bill-failed', vendor: 'Northwind', title: 'Transfer failed', unread: true, action: 'Fix' },
             ]}
@@ -629,7 +544,7 @@ export const patternShowcases: Showcase[] = [
               { id: '1', group: 'Bills', label: 'Acme GmbH · EUR' },
               { id: '2', group: 'Bills', label: 'Harbour Supplies · AUD' },
               { id: '3', group: 'Actions', label: 'Upload bills', hint: 'U' },
-              { id: '4', group: 'Actions', label: 'Approve pending', hint: 'A' },
+              { id: '4', group: 'Actions', label: 'Pay selected bill now' },
               { id: '5', group: 'Demo', label: 'Toggle demo panel' },
             ]}
           />

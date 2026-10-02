@@ -8,7 +8,6 @@ import { Stepper } from '@/ui/primitives/stepper';
 export const SIM_PHASES = [
   'ramping',
   'hit',
-  'approved',
   'executing',
   'settling',
   'paid',
@@ -19,7 +18,6 @@ export type SimPhase = (typeof SIM_PHASES)[number] | 'idle' | 'aborted' | 'faile
 const LABEL: Record<(typeof SIM_PHASES)[number], string> = {
   ramping: 'Ramping',
   hit: 'Target hit',
-  approved: 'Auto-approved',
   executing: 'Executing',
   settling: 'Settling',
   paid: 'Paid',

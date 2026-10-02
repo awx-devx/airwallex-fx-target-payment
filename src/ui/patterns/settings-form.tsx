@@ -8,7 +8,6 @@ export interface SettingsValues {
   homeCurrency: string;
   leadDays: string;
   validity: string;
-  windowStart: string;
   cutoff: string;
   timeZone: string;
 }
@@ -47,12 +46,7 @@ export function SettingsForm({
         options={QUOTE_VALIDITIES.map((validity) => ({ value: validity, label: validity }))}
       />
       <Input
-        aria-label="Deadline window opens"
-        value={values.windowStart}
-        onChange={(event) => patch({ windowStart: event.target.value })}
-      />
-      <Input
-        aria-label="Auto-settle cutoff"
+        aria-label="Pay at market at"
         value={values.cutoff}
         onChange={(event) => patch({ cutoff: event.target.value })}
       />

@@ -8,7 +8,6 @@ import type {
   NameMatch,
   TransferStatus,
 } from '@/contracts/airwallex';
-import type { ApprovalSummary } from '@/contracts/approval';
 import { BILL_STATES } from '@/contracts/bill';
 import {
   BILL_EVENT_TYPES,
@@ -21,7 +20,6 @@ import {
   buildBill,
   execution,
   FIXTURE_NOW,
-  quoteAt,
 } from '@/mocks/fixtures/build';
 
 const verified = (
@@ -93,91 +91,6 @@ const kyoto = beneficiary({
   methods: ['SWIFT'],
   verification: codeOnly('NOT_SUPPORTED'),
 });
-
-function approval(input: {
-  id: string;
-  kind: 'TARGET_HIT' | 'DEADLINE';
-  status: ApprovalSummary['status'];
-  price: string;
-  buyAmount: string;
-  expired?: boolean;
-  autosettleAt?: string;
-  simulated?: boolean;
-  autoApproved?: boolean;
-}): ApprovalSummary {
-  return {
-    id: input.id,
-    kind: input.kind,
-    status: input.status,
-    quote: quoteAt({
-      id: `quote_${input.id}`,
-      price: input.price,
-      buyAmount: input.buyAmount,
-      expired: input.expired,
-    }),
-    expiresAt: input.expired
-      ? '2026-10-01T12:30:00.000Z'
-      : '2026-10-01T14:30:00.000Z',
-    autosettleAt: input.autosettleAt,
-    trigger: { price: input.price, simulated: input.simulated ?? false },
-    autoApproved: input.autoApproved,
-  };
-}
-
-const targetHitApproval = approval({
-  id: 'ap-target',
-  kind: 'TARGET_HIT',
-  status: 'PENDING',
-  price: '1.07600',
-  buyAmount: '250000.00',
-});
-
-const deadlineApproval = approval({
-  id: 'ap-deadline',
-  kind: 'DEADLINE',
-  status: 'PENDING',
-  price: '1.27400',
-  buyAmount: '120000.00',
-  autosettleAt: '2026-10-01T21:00:00.000Z',
-});
-
-const expiredApproval = approval({
-  id: 'ap-expired',
-  kind: 'TARGET_HIT',
-  status: 'EXPIRED',
-  price: '1.07000',
-  buyAmount: '250000.00',
-  expired: true,
-});
-
-export const approvalCatalog: ApprovalSummary[] = [
-  targetHitApproval,
-  deadlineApproval,
-  expiredApproval,
-  approval({
-    id: 'ap-rejected',
-    kind: 'TARGET_HIT',
-    status: 'REJECTED',
-    price: '1.09000',
-    buyAmount: '80000.00',
-  }),
-  approval({
-    id: 'ap-approved',
-    kind: 'TARGET_HIT',
-    status: 'APPROVED',
-    price: '0.006700',
-    buyAmount: '8500000',
-    autoApproved: true,
-    simulated: true,
-  }),
-  approval({
-    id: 'ap-superseded',
-    kind: 'DEADLINE',
-    status: 'SUPERSEDED',
-    price: '1.27000',
-    buyAmount: '120000.00',
-  }),
-];
 
 const TRANSFER_STATUSES: TransferStatus[] = [
   'IN_APPROVAL',
@@ -340,7 +253,7 @@ export const bills = [
   }),
   buildBill({
     id: 'bill-target-hit',
-    state: 'TARGET_HIT',
+    state: 'WATCHING',
     vendorName: 'Acme GmbH',
     invoiceNumber: 'AC-2026-0208',
     pair: { base: 'EUR', quote: 'USD' },
@@ -350,13 +263,12 @@ export const bills = [
     entryPrice: '1.08500',
     targetPrice: '1.07632',
     strategyMode: 'TARGET_RATE',
-    lastPrice: '1.07600',
+    lastPrice: '1.08200',
     beneficiary: acme,
-    activeApproval: targetHitApproval,
   }),
   buildBill({
     id: 'bill-deadline',
-    state: 'DEADLINE_WINDOW',
+    state: 'WATCHING',
     vendorName: 'Northwind Ltd',
     invoiceNumber: 'NW-7781',
     pair: { base: 'GBP', quote: 'USD' },
@@ -369,12 +281,11 @@ export const bills = [
     strategyMode: 'MAX_COST',
     lastPrice: '1.27400',
     beneficiary: { ...northwind, verification: verificationCatalog[1] },
-    activeApproval: deadlineApproval,
     flags: { nameMismatch: true },
   }),
   buildBill({
     id: 'bill-autosettle',
-    state: 'AUTO_SETTLING',
+    state: 'WATCHING',
     vendorName: 'Bharat Textiles',
     invoiceNumber: 'BT-19',
     pair: { base: 'INR', quote: 'USD' },
@@ -388,18 +299,10 @@ export const bills = [
     transferMethod: 'LOCAL',
     beneficiary: bharat,
     flags: { noReferenceHistory: true },
-    activeApproval: approval({
-      id: 'ap-auto',
-      kind: 'DEADLINE',
-      status: 'APPROVED',
-      price: '0.01190',
-      buyAmount: '8500000.00',
-      autosettleAt: '2026-10-01T21:00:00.000Z',
-    }),
   }),
   buildBill({
     id: 'bill-approved',
-    state: 'APPROVED',
+    state: 'WATCHING',
     vendorName: 'Lion City Parts Pte Ltd',
     invoiceNumber: 'LC-88',
     pair: { base: 'SGD', quote: 'USD' },
@@ -409,7 +312,7 @@ export const bills = [
     entryPrice: '0.76000',
     targetPrice: '0.74800',
     strategyMode: 'TARGET_RATE',
-    lastPrice: '0.74750',
+    lastPrice: '0.75500',
     beneficiary: beneficiary({
       id: 'bf-lion',
       name: 'Lion City Parts Pte Ltd',
@@ -417,13 +320,6 @@ export const bills = [
       currency: 'SGD',
       maskedAccount: '••••9033',
       verification: codeOnly('EXTERNAL_SERVICE_UNAVAILABLE'),
-    }),
-    activeApproval: approval({
-      id: 'ap-sgd',
-      kind: 'TARGET_HIT',
-      status: 'APPROVED',
-      price: '0.74750',
-      buyAmount: '42000.00',
     }),
   }),
   buildBill({
@@ -546,8 +442,8 @@ export const events: BillEvent[] = BILL_EVENT_TYPES.map((type, index) => ({
         : 'bill-watching',
   ts: `2026-10-01T${String(index).padStart(2, '0')}:00:00.000Z`,
   type,
-  actor: type === 'APPROVED' ? 'system:demo-sim' : 'system',
-  payload: type === 'APPROVED' ? { auto: true, simId: 'sim-demo' } : { type },
+  actor: 'system',
+  payload: { type },
 }));
 
 export function assertFixtureCoverage(): void {

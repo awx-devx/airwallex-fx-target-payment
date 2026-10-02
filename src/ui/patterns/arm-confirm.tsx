@@ -44,13 +44,13 @@ export function ArmConfirm({
         {formatUtcDate(bill.dueDate, 'day')}
       </p>
       {alreadyMet ? (
-        <Banner tone="warn">The target is already met. Arming will ask for approval now.</Banner>
+        <Banner tone="warn">The target is already met. Arming will pay at the current rate.</Banner>
       ) : null}
       {/* DEMO-ONLY: consent is one checkbox. PROD: a stored payment mandate. */}
       <Checkbox
         checked={checked}
         onCheckedChange={setChecked}
-        label={`If not approved by ${cutoffLabel}, pay at market`}
+        label={`If the target is not hit by ${cutoffLabel}, pay at market`}
       />
       {!checked ? <p className="text-xs text-down">Standing instruction is required.</p> : null}
       <Button disabled={!checked} onClick={onArm}>

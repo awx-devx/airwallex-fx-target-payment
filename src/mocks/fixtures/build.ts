@@ -1,4 +1,3 @@
-import type { ApprovalSummary } from '@/contracts/approval';
 import type {
   AccountVerification,
   BeneficiarySummary,
@@ -49,7 +48,7 @@ export function quoteAt(input: {
     clientRateOriented: input.price,
     midPrice: formatDecimal(mid, 6),
     spreadBps: spread.toDecimalPlaces(1).toNumber(),
-    validity: 'MIN_30',
+    validity: 'MIN_1',
     validFromAt: input.expired ? '2026-10-01T12:00:00.000Z' : FIXTURE_NOW,
     validToAt:
       input.validToAt ??
@@ -124,7 +123,7 @@ export function execution(input: {
     failure: input.failure,
     lateFailureWatchUntil: input.lateFailureWatchUntil,
     updatedAt: FIXTURE_NOW,
-    mode: input.mode ?? 'APPROVED',
+    mode: input.mode ?? 'TARGET',
   };
 }
 
@@ -145,7 +144,6 @@ export interface BillDraft {
   transferMethod?: 'LOCAL' | 'SWIFT';
   reference?: string;
   beneficiary?: BeneficiarySummary;
-  activeApproval?: ApprovalSummary;
   execution?: ExecutionSummary;
   flags?: BillFlags;
 }
@@ -195,12 +193,11 @@ export function buildBill(draft: BillDraft): BillSummary {
     transferReason: 'bill_payment',
     reference: draft.reference ?? draft.invoiceNumber,
     beneficiary: draft.beneficiary,
-    activeApproval: draft.activeApproval,
     execution: draft.execution,
     flags: draft.flags ?? {},
   };
   return {
     ...summary,
-    allowedActions: allowedActions(summary, 'approver', { demoMode: true }),
+    allowedActions: allowedActions(summary, { demoMode: true }),
   };
 }

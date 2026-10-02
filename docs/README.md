@@ -2,7 +2,7 @@
 
 Internal implementation documentation for the **FX Target Payment** demo built on Airwallex.
 
-> Enter a foreign-currency bill, set a target FX rate or maximum cost, and monitor the rate until the due date. Alert the user when the target is reached, then get approval to convert and pay. If the target is not reached, request approval and pay at the current rate on the final day.
+> Enter a foreign-currency bill, set a target FX rate or maximum cost, and submit. The system watches the rate and pays when the target is hit. If the target is not hit, it pays at market at the execution-deadline cutoff.
 
 The product is presented like a **perps trading terminal**: every bill is a "position" with its own chart of the currency pair, horizontal lines for **entry** and **target**, and vertical lines for the **execution deadline** and **due date**. Multiple bills can be uploaded and switched between like markets/positions.
 
@@ -69,6 +69,6 @@ flowchart LR
 | **Execution deadline** | Last day we can safely execute so funds arrive by the due date (due date − payout lead time). Vertical line. |
 | **Due date** | Invoice due date. Vertical line. |
 | **Indicative rate** | Non-binding current rate from `GET /api/v1/fx/rates/current`. Drives the chart and trigger. |
-| **Quote** | Binding locked rate from `POST /api/v1/fx/quotes/create`, valid 1 min–24 h. Used for approvals. |
+| **Quote** | Binding locked rate from `POST /api/v1/fx/quotes/create`, valid 1 min–24 h. Locked in the same job that creates the transfer. Default `MIN_1`. |
 | **Savings (PnL)** | `A × (entry_rate − current_rate)` in H. Positive = cheaper than entry. |
-| **Standing instruction** | Consent captured at arming: "if not approved by the auto-settle cutoff on the deadline day, pay at market". |
+| **Standing instruction** | Consent captured at submit. It authorizes payment when the target is hit, and payment at market at the cutoff if the target is not hit. |

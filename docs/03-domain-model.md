@@ -9,16 +9,10 @@ stateDiagram-v2
   READY --> WATCHING: armed (entry captured, standing instruction accepted)
   WATCHING --> PAUSED: user pauses
   PAUSED --> WATCHING: user resumes
-  WATCHING --> TARGET_HIT: confirmed trigger + quote <= target
-  TARGET_HIT --> APPROVED: approver approves before quote expiry
-  TARGET_HIT --> WATCHING: rejected ("hold for better") / quote expired
-  WATCHING --> DEADLINE_WINDOW: execution-deadline day, window opens
-  PAUSED --> DEADLINE_WINDOW: deadline overrides pause
-  TARGET_HIT --> DEADLINE_WINDOW: quote expires on deadline day
-  DEADLINE_WINDOW --> APPROVED: approver approves market quote
-  DEADLINE_WINDOW --> AUTO_SETTLING: cutoff reached, no decision
-  APPROVED --> EXECUTING: executor picks up job
-  AUTO_SETTLING --> EXECUTING
+  READY --> EXECUTING: deadline already past at arming
+  WATCHING --> EXECUTING: confirmed trigger + quote at or under target
+  WATCHING --> EXECUTING: deadline cutoff, target never hit
+  PAUSED --> EXECUTING: cutoff still pays
   EXECUTING --> IN_FLIGHT: transfer created (SCHEDULED/PROCESSING)
   EXECUTING --> FAILED: create failed (non-retryable)
   IN_FLIGHT --> PAID: payout.transfer.paid (+ grace window)
@@ -38,13 +32,9 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | `DRAFT` | Extracted or entered, not yet reviewed | `Draft` (muted) | User review |
 | `READY` | Valid bill + beneficiary, no strategy armed | `Ready` (neutral) | User arms |
-| `WATCHING` | Monitoring rate against target | `Watching` (orange pulse) | Worker trigger, scheduler, user |
-| `PAUSED` | Monitoring suspended; **deadline still enforced** | `Paused` (muted) | User, scheduler |
-| `TARGET_HIT` | Quote locked at/under target; awaiting approval | `Target hit` (green glow + countdown) | Approver, quote expiry |
-| `DEADLINE_WINDOW` | Final day; market quote awaiting approval | `Final day` (amber + countdown) | Approver, cutoff job |
-| `AUTO_SETTLING` | Cutoff passed, executing under standing instruction | `Auto-settling` (amber) | Executor |
-| `APPROVED` | Approved, execution queued | `Approved` | Executor |
-| `EXECUTING` | Calling Airwallex | `Executing` (spinner) | Executor |
+| `WATCHING` | Armed; the worker is comparing the live rate to this bill's target | `Watching` (orange pulse) | Worker trigger, cutoff, user |
+| `PAUSED` | Monitoring suspended; **deadline still enforced** | `Paused` (muted) | User, cutoff |
+| `EXECUTING` | Quote locked and the transfer is being created | `Executing` (spinner) | Executor |
 | `IN_FLIGHT` | Transfer exists at Airwallex, not yet paid | `In flight · SENT` etc. | Webhooks / reconciler |
 | `PAID` | Beneficiary paid | `Paid` (green) | Terminal |
 | `FAILED` | Execution or payout failed | `Failed` (red) | User |
@@ -52,11 +42,10 @@ stateDiagram-v2
 
 ### Invariants
 
-1. **At most one live approval per bill** (`PENDING`). Creating a new one expires the old one.
-2. **At most one successful execution per bill.** Enforced by a partial unique index on `executions { billId: 1 }` with `partialFilterExpression: { active: true }`, by a deterministic `request_id`, and by the BullMQ `jobId` `execute:{billId}:{attempt}`.
-3. **All transitions go through `transition(bill, event)`** in `server/domain/stateMachine.ts`. The service applies it as one atomic conditional `findOneAndUpdate` on the bill (`state ∈ allowedFrom` and `version = expected`, then `$inc: { version: 1 }`), then inserts a `bill_events` document. A `null` result means another process won the race. See [02 §9.3](./02-architecture.md#93-consistency-without-row-locks).
-4. **The deadline overrides everything except terminal states.** `PAUSED` and `TARGET_HIT` both flow into `DEADLINE_WINDOW`.
-5. **Approval needs a valid quote.** Approving after `quote.valid_to_at` is rejected with `QUOTE_EXPIRED`.
+1. **At most one active execution per bill.** Enforced by a partial unique index on `executions { billId: 1 }` with `partialFilterExpression: { active: true }`, by a deterministic `request_id`, and by the BullMQ `jobId` `execute:{billId}:{attempt}`.
+2. **All transitions go through `transition(bill, event)`** in `server/domain/stateMachine.ts`. The service applies it as one atomic conditional `findOneAndUpdate` on the bill (`state ∈ allowedFrom` and `version = expected`, then `$inc: { version: 1 }`), then inserts a `bill_events` document. A `null` result means another process won the race. See [02 §9.3](./02-architecture.md#93-consistency-without-row-locks).
+3. **The deadline overrides every non-terminal state.** A `WATCHING` or `PAUSED` bill whose cutoff has passed moves to `EXECUTING` and pays at market.
+4. **A payment uses a quote locked in the same job.** If the locked quote is worse than the target, or it expires before the transfer is created, the bill stays `WATCHING`. A multi-document transaction is used only when creating the execution.
 
 ---
 
@@ -112,23 +101,21 @@ Evaluated by the strategy engine on every tick for `WATCHING` bills:
 1. **Threshold:** `p_now ≤ p_target × (1 − buffer_bps/10_000)` (default buffer 0).
 2. **Confirmation:** the threshold holds for `TRIGGER_CONFIRM_TICKS` consecutive ticks (default 2). This avoids reacting to single-tick noise.
 3. **Freshness:** the tick must be younger than `2 × POLL_INTERVAL_MS`. Stale feeds never trigger.
-4. **Cooldown:** after a rejection or a near miss, do not re-trigger for `REARM_COOLDOWN` (default 10 min, or 2 min in demo), unless the price improves by ≥ `REARM_IMPROVE_BPS` (default 10 bps).
-5. **Quote check:** lock a quote. Define `p_quote = sell_amount / buy_amount` from the quote.
-   - `p_quote ≤ p_target` → `TARGET_HIT` + approval request.
+4. **Cooldown:** after a near miss, do not re-trigger for `REARM_COOLDOWN` (default 10 min, or 2 min in demo), unless the price improves by ≥ `REARM_IMPROVE_BPS` (default 10 bps).
+5. **Quote check:** lock a quote with the shortest validity Airwallex offers, long enough for this job to create the transfer. Define `p_quote = sell_amount / buy_amount` from the quote.
+   - `p_quote ≤ p_target` → `EXECUTING` in the same job. The activity log records `QUOTE_LOCKED`; the chart marks it `TARGET_HIT`.
    - Otherwise → `NEAR_MISS` event (shown on the chart as a hollow marker) and stay `WATCHING`.
-   - **Demo exception:** when the triggering tick is simulated (`source = 'SIMULATED'`: a Simulate run or `RATE_SOURCE=simulated`), a real sandbox quote can't be expected to follow it. The check then compares the simulated price with the target instead of `p_quote`, and records both on the approval. The transfer still executes at the real quote. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
+   - If the wallet balance in H is short, stay `WATCHING`, raise `insufficientBalance`, and retry until the cutoff.
+   - **Demo exception:** when the triggering tick is simulated (`source = 'SIMULATED'`: a Simulate run or `RATE_SOURCE=simulated`), a real sandbox quote can't be expected to follow it. The check then compares the simulated price with the target instead of `p_quote`, and records both on the `QUOTE_LOCKED` event. The transfer still executes at the real quote. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
 
 ### Deadline rules
 
 - `execution_deadline = subtractBusinessDays(due_date, lead_days(method), skip)` in `AIRWALLEX_ACCOUNT_TZ`. Weekends and the pair's **non-conversion days** (`GET /reference/invalid_conversion_dates`, [13 §6](./13-airwallex-contracts.md#6-balances-and-reference-data)) are skipped. Payout-rail holidays are still not modelled; the lead days absorb them.
   - Default `lead_days`: the chosen transfer method's `flight_time.max` from the beneficiary form schema + 1 business day ([13 §5.3](./13-airwallex-contracts.md#53-method-lead-days-and-limits)), falling back to `LOCAL = 1`, `SWIFT = 3`. Configurable per bill.
-  - If `execution_deadline` is already in the past when arming, the bill goes straight to `DEADLINE_WINDOW` (UI: "Due now").
-- At arming, write two timers onto the bill document: `timers.deadlineOpenAt` and `timers.autosettleAt` (UTC instants computed in the account time zone):
-  - `deadlineOpenAt` = `execution_deadline @ DEADLINE_WINDOW_OPEN` (09:00): lock a quote (`QUOTE_VALIDITY_DEADLINE`), create an approval, and notify.
-  - `autosettleAt` = `execution_deadline @ DEADLINE_AUTOSETTLE_CUTOFF` (14:00): if the bill is still in `DEADLINE_WINDOW`, move it to `AUTO_SETTLING` and execute (fresh `MIN_1` quote, then transfer).
-- The worker **sweeper** runs every second. It queries `{ 'timers.deadlineOpenAt': { $lte: clock.now() }, 'timers.deadlineOpenFiredAt': null, state: { $in: [...] } }` (and the equivalent for `autosettleAt` and approval `expiresAt`), then adds BullMQ jobs with the deterministic IDs `deadline.open:{billId}` and `deadline.autosettle:{billId}`. The job marks `*FiredAt` when it completes.
+  - If `execution_deadline` is already in the past when arming, the bill goes straight to `EXECUTING` (UI: "Due now") and pays at market.
+- At arming, write one timer onto the bill document: `timers.autosettleAt` (a UTC instant computed in the account time zone) = `execution_deadline @ DEADLINE_AUTOSETTLE_CUTOFF` (14:00). If the bill is still `WATCHING` or `PAUSED`, lock a short quote and move it to `EXECUTING`. The activity log records `AUTOSETTLE`. The ticket's deadline meter already says the bill pays at market that day if the target is not hit.
+- The worker **sweeper** runs every second. It queries `{ 'timers.autosettleAt': { $lte: clock.now() }, 'timers.autosettleFiredAt': null, state: { $in: ['WATCHING', 'PAUSED'] } }`, then adds a BullMQ job with the deterministic ID `deadline.autosettle:{billId}`. The job marks `autosettleFiredAt` when it completes. If the quote cannot be locked, the bill stays `WATCHING` and the sweeper retries.
 - Jobs are idempotent and state-guarded. Because timers are data, restarts need no special handling: any timer that became due while the worker was down is picked up by the first sweep.
-- If the deadline-day quote expires before the cutoff, re-quote automatically and update the approval, keeping the same approval ID.
 
 ---
 
@@ -137,18 +124,16 @@ Evaluated by the strategy engine on every tick for `WATCHING` bills:
 Conventions:
 - Models live in `src/server/db/models/*.ts`. Fields are camelCase, collection names are snake_case plurals, and every schema has `timestamps: true`.
 - Money and rate fields are `Decimal128` (shown as **D128** below), converted to `decimal.js` at the repository boundary. See [02 §9.4](./02-architecture.md#94-money-in-mongodb).
-- Things that are 1:1 with a bill and always read with it (strategy, timers, entry) are **embedded**. Things with their own lifecycle or unbounded growth (approvals, executions, events, ticks) are **separate collections** that reference `billId`.
+- Things that are 1:1 with a bill and always read with it (strategy, timers, entry) are **embedded**. Things with their own lifecycle or unbounded growth (executions, events, ticks) are **separate collections** that reference `billId`.
 - Indexes are declared on the schemas and synced by `pnpm db:indexes` (`Model.syncIndexes()`), so there is no `autoIndex` in production. Data migrations, if any, use `migrate-mongo` in `scripts/migrations`.
 
 ```mermaid
 erDiagram
   bills ||--o{ bill_documents : has
   bills ||--o{ quotes : locks
-  bills ||--o{ approvals : requests
   bills ||--o{ executions : executes
   bills ||--o{ bill_events : logs
   beneficiaries ||--o{ bills : pays
-  users ||--o{ approvals : decides
   rate_ticks }o--o| bills : sampled_for
   webhook_events }o--o| executions : updates
 ```
@@ -188,13 +173,11 @@ erDiagram
     autosettleCutoff: string,             // 'HH:mm' account tz
   },
   timers: {                               // read by the sweeper
-    deadlineOpenAt?: Date, deadlineOpenFiredAt?: Date,
     autosettleAt?: Date, autosettleFiredAt?: Date,
     cooldownUntil?: Date,
   },
   trigger: { consecutiveHits: number, lastEvaluatedTickAt?: Date },
   last?: { price: D128, at: Date, source: RateSourceKind },  // denormalised mark price for list views
-  activeApprovalId?: ObjectId,
   activeExecutionId?: ObjectId,
   recentEvents: BillEventLite[],          // capped at 20 via $slice, for fast ticket rendering
   displayInverted: boolean,
@@ -204,7 +187,7 @@ erDiagram
   createdAt: Date, updatedAt: Date,
 }
 ```
-Indexes: `{ state: 1, 'timers.deadlineOpenAt': 1 }`, `{ state: 1, 'timers.autosettleAt': 1 }`, `{ state: 1, billCurrency: 1, homeCurrency: 1 }`, and non-unique `{ vendorName: 1, invoiceNumber: 1 }` used by the duplicate-invoice check. A duplicate is a review **warning**, not a hard block, so this index is deliberately not unique.
+Indexes: `{ state: 1, 'timers.autosettleAt': 1 }`, `{ state: 1, billCurrency: 1, homeCurrency: 1 }`, and non-unique `{ vendorName: 1, invoiceNumber: 1 }` used by the duplicate-invoice check. A duplicate is a review **warning**, not a hard block, so this index is deliberately not unique.
 
 **`bill_documents`**: `{ billId, filename, mime, size, sha256, storageKey, airwallexFileId?, extraction: { status: 'PENDING'|'RUNNING'|'DONE'|'FAILED', result?: ExtractedBill, error? }, createdAt }`. `ExtractedBill` (per-field value, confidence, source, reasons, evidence, boxes) is defined in [12 §3](./12-bill-extraction.md#3-contract). Indexes `{ billId: 1 }` and `{ sha256: 1 }` (extraction cache: the same file is never sent to the model twice).
 
@@ -220,17 +203,15 @@ Secondary index `{ 'meta.base': 1, 'meta.quote': 1, ts: 1 }`. Chart candles come
 
 **`quotes`**: `{ billId, airwallexQuoteId (unique), purpose: 'TARGET'|'DEADLINE'|'AUTOSETTLE'|'MANUAL', validity, usage, currencyPair, conversionDate, price: D128, clientRate: D128, awxRate?: D128, midRate?: D128, buyAmount: D128, sellAmount: D128, validFromAt, validToAt, raw: Mixed }`. `clientRate`/`midRate` are stored as Airwallex sends them (market convention of `currencyPair`); `price` is the canonical `p`.
 
-**`approvals`**: `{ billId, quoteId, kind: 'TARGET_HIT'|'DEADLINE', status: 'PENDING'|'APPROVED'|'REJECTED'|'EXPIRED'|'SUPERSEDED', requestedAt, expiresAt, expiryFiredAt?, decidedAt?, decidedBy?, decisionNote?, triggerPrice?: D128, simId?: string }`. `decidedBy` is a user id, or `system:demo-sim` for a Simulate auto-approval. Indexes: partial unique `{ billId: 1 }` where `{ status: 'PENDING' }` (invariant 1), and `{ status: 1, expiresAt: 1 }` for the sweeper.
+**`executions`**: `{ billId, mode: 'TARGET'|'DEADLINE'|'MANUAL', attempt, requestId (unique), active: boolean, airwallexTransferId?, shortReferenceId?, transferStatus?, fundingStatus?, statusUpdatedAt?, awxUpdatedAt?, conversionRate?: D128, sourceAmount?: D128, amountPayerPays?: D128, amountBeneficiaryReceives?: D128, feeAmount?: D128, feeCurrency?, feePaidBy?, swiftChargeOption?, dispatchDate?, lateFailureWatchUntil?, failure?: { code?, message?, reasonCodes?, category }, raw: Mixed }`. `mode` is why the payment started: the target was hit (`TARGET`), the cutoff paid at market (`DEADLINE`), or the user chose pay now (`MANUAL`). `awxUpdatedAt` is Airwallex's `updated_at` and is used for the ordering guard. Field mapping: [13 §4.2](./13-airwallex-contracts.md#42-response--executions--executionsummary--transfertracker). Indexes: partial unique `{ billId: 1 }` where `{ active: true }` (invariant 1), unique sparse `{ airwallexTransferId: 1 }`.
 
-**`executions`**: `{ billId, approvalId?, mode: 'APPROVED'|'STANDING_INSTRUCTION', attempt, requestId (unique), active: boolean, airwallexTransferId?, shortReferenceId?, transferStatus?, fundingStatus?, statusUpdatedAt?, awxUpdatedAt?, conversionRate?: D128, sourceAmount?: D128, amountPayerPays?: D128, amountBeneficiaryReceives?: D128, feeAmount?: D128, feeCurrency?, feePaidBy?, swiftChargeOption?, dispatchDate?, lateFailureWatchUntil?, failure?: { code?, message?, reasonCodes?, category }, raw: Mixed }`. `awxUpdatedAt` is Airwallex's `updated_at` and is used for the ordering guard. Field mapping: [13 §4.2](./13-airwallex-contracts.md#42-response--executions--executionsummary--transfertracker). Indexes: partial unique `{ billId: 1 }` where `{ active: true }` (invariant 2), unique sparse `{ airwallexTransferId: 1 }`.
-
-**`bill_events`** (append-only audit log that drives the Activity feed): `{ billId, ts, type, actor: 'user:<id>'|'system'|'airwallex', payload: Mixed }`. Types: `ARMED`, `TICK_CROSSED`, `QUOTE_LOCKED`, `NEAR_MISS`, `APPROVAL_REQUESTED`, `APPROVED`, `REJECTED`, `QUOTE_EXPIRED`, `DEADLINE_OPENED`, `AUTOSETTLE`, `TRANSFER_CREATED`, `TRANSFER_STATUS`, `PAID`, `FAILED`, `STRATEGY_UPDATED`, `PAUSED`, `RESUMED`, `CATCH_UP`, `SIM_STARTED`, `SIM_ENDED` (demo only). Auto-approvals from a Simulate run are `APPROVED` with actor `system:demo-sim` and payload `{ auto: true, simId }`. Index `{ billId: 1, ts: -1 }`.
+**`bill_events`** (append-only audit log that drives the Activity feed): `{ billId, ts, type, actor: 'user:<id>'|'system'|'airwallex', payload: Mixed }`. Types: `ARMED`, `TICK_CROSSED`, `QUOTE_LOCKED`, `NEAR_MISS`, `QUOTE_EXPIRED`, `AUTOSETTLE`, `CANCELLED`, `TRANSFER_CREATED`, `TRANSFER_STATUS`, `PAID`, `FAILED`, `STRATEGY_UPDATED`, `PAUSED`, `RESUMED`, `CATCH_UP`, `SIM_STARTED`, `SIM_ENDED` (demo only). A target hit is `QUOTE_LOCKED`. A deadline payment is `AUTOSETTLE`. A Simulate run records `QUOTE_LOCKED` with actor `system:demo-sim` and payload `{ simId, price }`. Index `{ billId: 1, ts: -1 }`.
 
 **`webhook_events`**: `{ _id: <Airwallex event id>, name, createdAt, receivedAt, payload: Mixed, processedAt?, error? }`. An insert that fails with duplicate-key error `11000` identifies a duplicate delivery.
 
-**`users`** (demo): `{ name, email (unique), roles: string[] }`.
+**`users`** (demo): `{ name, email (unique) }`.
 
-**`settings`** (single document, `_id: 'global'`): home currency, default lead days, validities, cutoff times.
+**`settings`** (single document, `_id: 'global'`): home currency, default lead days, quote validity, the 14:00 cutoff.
 
 ---
 
@@ -240,8 +221,7 @@ These live in `src/contracts`. They are defined **before** the UI kit is built, 
 
 ```ts
 type Ccy = string; // ISO 4217, validated against currencies table
-type BillState = 'DRAFT'|'READY'|'WATCHING'|'PAUSED'|'TARGET_HIT'|'DEADLINE_WINDOW'
-  |'AUTO_SETTLING'|'APPROVED'|'EXECUTING'|'IN_FLIGHT'|'PAID'|'FAILED'|'CANCELLED';
+type BillState = 'DRAFT'|'READY'|'WATCHING'|'PAUSED'|'EXECUTING'|'IN_FLIGHT'|'PAID'|'FAILED'|'CANCELLED';
 
 interface BillSummary {
   id: string;
@@ -266,28 +246,16 @@ interface BillSummary {
   transferReason: TransferReason;          // Airwallex `reason` enum, default 'bill_payment' (13 §4.1)
   reference: string;                       // shown to the vendor; defaults to the invoice number
   beneficiary?: BeneficiarySummary;        // incl. account verification (13 §5.4)
-  activeApproval?: ApprovalSummary;
   execution?: ExecutionSummary;
   flags: { stale?: boolean; insufficientBalance?: boolean; noReferenceHistory?: boolean;
            overdue?: boolean; awxApproval?: boolean; amountLimit?: boolean; routeUnsupported?: boolean; nameMismatch?: boolean };
-  allowedActions: BillAction[];            // for the current user's role; see below
+  allowedActions: BillAction[];            // from the bill state; see below
 }
 
 type BillAction =
   | 'REVIEW' | 'EDIT' | 'RESOLVE_BENEFICIARY' | 'ARM' | 'EDIT_STRATEGY'
-  | 'PAUSE' | 'RESUME' | 'PAY_NOW' | 'APPROVE' | 'HOLD' | 'CANCEL' | 'REARM'
+  | 'PAUSE' | 'RESUME' | 'PAY_NOW' | 'CANCEL' | 'REARM'
   | 'ADVANCE_TRANSFER' | 'SIMULATE' | 'STOP_SIMULATION';   // demo only (DEMO_MODE + sandbox); see 08 §1.1
-
-interface ApprovalSummary {
-  id: string;
-  kind: 'TARGET_HIT'|'DEADLINE';
-  status: 'PENDING'|'APPROVED'|'REJECTED'|'EXPIRED'|'SUPERSEDED';
-  quote: QuoteSummary;                     // 13 §8
-  expiresAt: string;
-  autosettleAt?: string;                   // deadline kind only
-  trigger?: { price: string; simulated: boolean };   // tick that caused a TARGET_HIT; simulated = Simulate run
-  autoApproved?: boolean;                  // demo: approved by system:demo-sim
-}
 
 // ExecutionSummary, QuoteSummary, BalanceSummary, CurrencyInfo, BeneficiarySummary,
 // BeneficiaryFormSchema, FieldError and ApiError are field-mapped from Airwallex in 13 §8.
@@ -296,12 +264,12 @@ interface ChartSeriesPoint { time: number; value: string }       // unix seconds
 interface ChartOverlays {
   entry?: string; target?: string; quote?: { price: string; from: number; to: number };
   executionDeadline: number; dueDate: number; now: number;
-  markers: Array<{ time: number; kind: 'ARMED'|'NEAR_MISS'|'TARGET_HIT'|'APPROVED'|'REJECTED'|'EXECUTED'|'AUTOSETTLE'|'SIM_START'|'SIM_END'; label?: string }>;
+  markers: Array<{ time: number; kind: 'ARMED'|'NEAR_MISS'|'TARGET_HIT'|'EXECUTED'|'AUTOSETTLE'|'SIM_START'|'SIM_END'; label?: string }>;
   simulatedRanges?: Array<{ from: number; to?: number }>;   // demo: segments drawn in the simulated style
 }
 ```
 
-**`allowedActions`** is computed by a pure `allowedActions(bill, role)` in `src/contracts/permissions.ts`, from the bill state (§1) and the role (`APPROVE`/`HOLD` require `approver`). The server uses it to fill the DTO and to reject a request early with `INVALID_STATE`/`FORBIDDEN` before calling `transition()`. The mock `DataSource` uses the same function. The UI renders ticket and row actions only from this list and never re-derives state rules.
+**`allowedActions`** is computed by a pure `allowedActions(bill)` in `src/contracts/permissions.ts`, from the bill state (§1). The server uses it to fill the DTO and to reject a request early with `INVALID_STATE` before calling `transition()`. The mock `DataSource` uses the same function. The UI renders ticket and row actions only from this list and never re-derives state rules.
 
 ## 6. Internal REST API
 
@@ -315,12 +283,10 @@ interface ChartOverlays {
 | `PUT` | `/api/bills/:id/strategy` | Set/update strategy (allowed in WATCHING; re-evaluates) |
 | `POST` | `/api/bills/:id/arm` | Capture entry, consent, schedule deadline jobs |
 | `POST` | `/api/bills/:id/pause` / `resume` | |
-| `POST` | `/api/bills/:id/pay-now` | Manual "market" execution: locks a quote and creates an approval |
+| `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
 | `GET` | `/api/bills/:id/chart?range=1D` | `ChartSeriesPoint[]` + `ChartOverlays` + reference history |
 | `GET` | `/api/bills/:id/events` | Activity log |
-| `POST` | `/api/approvals/:id/approve` | Approver only |
-| `POST` | `/api/approvals/:id/reject` | Body: `{ action: 'HOLD' \| 'CANCEL', note? }` |
 | `GET` | `/api/balances` | Proxy of Airwallex balances (cached 30 s) |
 | `POST` | `/api/bills/:id/validate-transfer` | `transfers/validate` dry run (also run by `arm`); returns `FieldError[]` |
 | `POST` | `/api/beneficiaries/schema` | Beneficiary form schema for a corridor (cached 24 h) |

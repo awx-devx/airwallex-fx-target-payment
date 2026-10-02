@@ -6,7 +6,6 @@ export {
   quoteAt,
 } from '@/mocks/fixtures/build';
 export {
-  approvalCatalog,
   assertFixtureCoverage,
   balances,
   bills,

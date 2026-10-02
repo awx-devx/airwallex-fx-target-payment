@@ -164,7 +164,7 @@ export const executionSummarySchema = z.object({
     .optional(),
   lateFailureWatchUntil: isoDateTimeSchema.optional(),
   updatedAt: isoDateTimeSchema,
-  mode: z.enum(['APPROVED', 'STANDING_INSTRUCTION']),
+  mode: z.enum(['TARGET', 'DEADLINE', 'MANUAL']),
 });
 export type ExecutionSummary = z.infer<typeof executionSummarySchema>;
 

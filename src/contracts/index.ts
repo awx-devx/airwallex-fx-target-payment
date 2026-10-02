@@ -1,7 +1,6 @@
 export * from '@/contracts/airwallex';
 export * from '@/contracts/airwallex-errors';
 export * from '@/contracts/api';
-export * from '@/contracts/approval';
 export * from '@/contracts/bill';
 export * from '@/contracts/chart';
 export * from '@/contracts/currencies';

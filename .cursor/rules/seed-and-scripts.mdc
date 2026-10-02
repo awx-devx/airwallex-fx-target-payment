@@ -15,7 +15,7 @@ Spec: `docs/11-test-data-and-seeding.md` (generator), `docs/08-demo-plan.md` §1
 ## Seeds and the generator
 - **Idempotent**: bills carry a `seedKey` (`demo:…` or `gen:v{generatorVersion}:{seed}:{index}`) and are skipped when it exists. Beneficiaries are pooled and reused (`gen:bf:{corridor}:{slot}`). Airwallex `request_id`s are derived from those keys.
 - **Deterministic**: all randomness comes from the seeded PRNG in `src/mocks/generators/rng.ts` (Faker is seeded from it). Never call `Math.random()` or unseeded Faker. A new random seed is always printed.
-- **States only through services**: reach `WATCHING`, `TARGET_HIT`, `PAID`, … by calling the real services, market moves and Simulate runs (`docs/11` §3). Never set `state` directly, and **never write fake Airwallex IDs** into a sandbox-backed DB.
+- **States only through services**: reach `WATCHING`, `EXECUTING`, `PAID`, … by calling the real services, market moves and Simulate runs (`docs/11` §3). Never set `state` directly, and **never write fake Airwallex IDs** into a sandbox-backed DB.
 - `src/mocks/generators/**` is pure and browser-safe (no Node APIs, no I/O). Rendering (Playwright, `sharp`) and Airwallex calls live in `scripts/generate/**`.
 - Money in generated invoices uses `decimal.js` and currency precision; line items must sum exactly to the totals.
 - Generated data is fictional (`.example` email domains, bank ids from the V12 allowlist) and tagged `DEMO-ONLY:`.

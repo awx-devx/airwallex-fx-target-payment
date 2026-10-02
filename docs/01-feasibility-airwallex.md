@@ -15,7 +15,7 @@
 | R4 | Monitor the rate until the due date | Indicative current rate, 24/7, size- and date-aware | `GET /api/v1/fx/rates/current` | ✅ Native data, **we poll**. |
 | R5 | Per-bill chart with history | No historical/time-series endpoint | — | 🛠 **We record ticks** + backfill from a third-party reference source (see §4.3). |
 | R6 | Alert when the target is reached | None for rate thresholds. Webhooks cover conversions/transfers only. | — | 🛠 **We build** (in-app alerts). |
-| R7 | Get approval with a guaranteed price | Quotes: locked rate for 1 min–24 h, multi-use | `POST /api/v1/fx/quotes/create`, `GET /api/v1/fx/quotes/{id}` | ✅ Native. |
+| R7 | Lock a price for the payment | Quotes: locked rate for 1 min–24 h, multi-use | `POST /api/v1/fx/quotes/create`, `GET /api/v1/fx/quotes/{id}` | ✅ Native. |
 | R8 | Convert and pay | Transfer with an underlying conversion, optionally pinned to a quote | `POST /api/v1/transfers/create` (with `quote_id`) | ✅ Native, one call. |
 | R8b | Convert only (hold in wallet) | Conversions | `POST /api/v1/fx/conversions/create` | ✅ Native, **but not for buy-only currencies** (see §3.2). |
 | R9 | Final-day fallback at current rate | Transfer at market (no `quote_id`), or a fresh short quote | `POST /api/v1/transfers/create` | ✅ Native. |
@@ -43,9 +43,9 @@ Legend: ✅ native · ⚠️ partial or beta · 🛠 we build it
 
 - `POST /api/v1/fx/quotes/create` with `buy_currency`, `sell_currency`, one of `buy_amount`/`sell_amount`, `validity` ∈ `MIN_1 | MIN_15 | MIN_30 | HR_1 | HR_4 | HR_8 | HR_24`, and optionally `conversion_date`.
 - It returns `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `valid_from_at`, `valid_to_at`, and `usage` (the API reference lists both `SINGLE_USE` and `MULTI_USE`; we store it and never reuse a quote either way).
-- The quote **price depends on the validity period**. Longer validity means a wider price, so we pick the shortest validity that still covers the approval SLA.
+- The quote **price depends on the validity period**. Longer validity means a wider price, so we pick the shortest validity that still covers the job that creates the transfer (`MIN_1`).
 - A quote must be consumed before `valid_to_at`. The currencies (and any future `conversion_date`) in the consuming request must match.
-- **Quotes cannot be used with Airwallex's own "submit for approval" transfers.** This is fine, because we run approval in our app and only call Airwallex after approval.
+- **Quotes cannot be used with Airwallex's own "submit for approval" transfers.** That workflow stays off (D-23). We call `transfers/create` with the quote.
 
 ### 2.3 Conversions
 
@@ -90,7 +90,7 @@ Legend: ✅ native · ⚠️ partial or beta · 🛠 we build it
 
 ### 3.1 No conditional orders → we own the "limit order"
 
-Airwallex executes at **current** prices only. The target logic (polling, detection, alerting, quoting and approval) runs in our worker. The trigger fires on **indicative** rates, and every approval is backed by a **binding quote** that we check against the target again before alerting (see [03 §3](./03-domain-model.md#3-trigger-rules)).
+Airwallex executes at **current** prices only. The target logic (polling, detection, alerting, quoting and paying) runs in our worker. The trigger fires on **indicative** rates, and every payment is backed by a **binding quote** that we check against the target again before creating the transfer (see [03 §3](./03-domain-model.md#3-trigger-rules)).
 
 ### 3.2 Buy-only currencies → execute through a single transfer, not conversion then payout
 
@@ -112,9 +112,9 @@ Exotic pairs without third-party coverage show only our own ticks from the armin
 
 Sandbox allows 10 req/s on `fx/rates/current`. Polling each active bill every 10 s gives about 0.1 req/s per bill, so **~50 bills fit comfortably** with headroom for quotes and transfers. The poller uses a token-bucket limiter shared across the worker. If needed, requests are coalesced by `(F, H, amount bucket)`.
 
-### 3.5 Quote validity vs approval SLA
+### 3.5 Quote validity
 
-The quote is locked when the target is hit. The approver has until `valid_to_at`. Defaults: `MIN_30` for target hits and `HR_1` for deadline-day approvals (both configurable). When a quote expires unapproved, the bill goes back to **WATCHING** (or, on deadline day, to a fresh quote or auto-settle). Longer validity means a wider price, which is a trade-off we show in the settings UI.
+The quote is locked in the same job that creates the transfer, so the default validity is `MIN_1` (the shortest Airwallex offers). If the quote expires before that transfer is created, the bill stays **WATCHING** and the worker retries. Longer validity means a wider price; the settings form still lists the other Airwallex validities.
 
 ### 3.6 Payout lead time → execution deadline ≠ due date
 
@@ -122,7 +122,7 @@ The quote is locked when the target is hit. The approver has until `valid_to_at`
 
 ### 3.7 Pre-funding
 
-Before creating a transfer, we call `GET /api/v1/balances/current`. If H is insufficient, the approval card shows **"Insufficient balance"** and blocks approval. In sandbox, wallets are pre-credited, and deposits can be simulated for the demo.
+Before creating a transfer, we call `GET /api/v1/balances/current`. If H is insufficient, the bill stays **WATCHING**, `BalancePill` turns red, and a banner names the shortfall. The worker retries until the cutoff. In sandbox, wallets are pre-credited, and deposits can be simulated for the demo.
 
 ### 3.8 Rate orientation
 
@@ -140,8 +140,8 @@ Before creating a transfer, we call `GET /api/v1/balances/current`. If H is insu
 | Rate polling + tick store | **Us** (data from Airwallex) | `fx/rates/current`. |
 | Historical context | Third party | Frankfurter/ECB by default; swappable `HistorySource`. |
 | Alerting | **Us** | In-app (SSE + toasts + notification centre). No out-of-band channel in the demo (Q-05). |
-| Locked price for approval | Airwallex | Quotes. |
-| Approval workflow | **Us** | Our `approvals` collection. We do not use Airwallex transfer approvals, since they are incompatible with quotes. |
+| Locked price for the payment | Airwallex | Quotes. |
+| Payment authorization | **Us** | The standing instruction captured at submit (D-23). We do not use Airwallex transfer approvals, since they are incompatible with quotes. |
 | Conversion + payout | Airwallex | Transfers with `quote_id`. |
 | Deadline scheduler | **Us** | Timers stored in MongoDB, a sweeper that enqueues BullMQ jobs, and an optional Airwallex-side scheduled transfer as a safety net. |
 | Status tracking | Airwallex → us | Webhooks + reconciliation polling. |
@@ -150,14 +150,14 @@ Before creating a transfer, we call `GET /api/v1/balances/current`. If H is insu
 
 ## 5. Deadline guarantee: two layers
 
-**Layer A (default, in-app):** our scheduler opens the deadline window at 09:00 account time on the execution-deadline day, locks an `HR_1` quote, and requests approval. If there is no decision by the **auto-settle cutoff** (default 14:00 account time), it executes at market under the standing instruction.
+**Layer A (default, in-app):** at the cutoff (default 14:00 account time) on the execution-deadline day, if the bill is still `WATCHING` or `PAUSED`, the worker locks a `MIN_1` quote and pays at market under the standing instruction.
 
 **Layer B (optional, "belt and braces"):** at arming, we also create an Airwallex **future-dated transfer** for the execution-deadline date with `lock_rate_on_create=false`. The rate is unconfirmed and no prepayment is held; funds are deducted at 09:00 on that date. If the target path executes first, we **cancel** the scheduled transfer. This guarantees payment even if our worker is down.
 
 Trade-offs of Layer B:
 - The cancellation fee behaviour for an unlocked scheduled transfer needs confirmation (docs say an "FX cancellation delta fee may apply" for `SCHEDULED`). See checklist item V6.
 - It is limited to about 90 days ahead with a conversion.
-- It executes at 09:00 without a last-minute approval. That is acceptable only because the standing instruction covers it.
+- It executes at 09:00. The standing instruction captured at arming covers that payment.
 
 **Demo default:** Layer A only, with Layer B behind a feature flag (`DEADLINE_SAFETY_NET=airwallex`).
 
@@ -169,12 +169,12 @@ Trade-offs of Layer B:
 | --- | --- | --- |
 | Sandbox rates are simulated and may barely move | The chart looks dead in the demo | Demo-mode market simulator (seeded GBM + scripted moves). Real sandbox calls are still made for quotes and transfers. |
 | Quote price differs from the indicative rate that triggered | False "target hit" | Re-check the quote against the target. If it misses, log a **near miss** and keep watching. Optional trigger buffer (bps). |
-| Approver misses the alert | Savings lost | Quote countdown, multi-channel alert, re-arm on expiry. The deadline guarantee still holds. |
+| The locked quote expires before the transfer is created | Payment delayed | Stay watching and retry. The cutoff still pays. |
 | Worker downtime | Missed deadline | Idempotent jobs with catch-up on boot, plus optional Layer B safety net. |
 | Duplicate execution | Double payment | `request_id` = deterministic `bill_id:attempt` idempotency key. State changes are atomic conditional updates with a `version` check. A partial unique index allows only one active execution per bill, and the BullMQ `jobId` is deterministic. |
 | Webhook duplicates / reordering | Wrong status shown | Dedupe on event `id`. Monotonic status-rank guard. Periodic reconciliation with `GET /transfers/{id}`. |
 | `PAID` then `FAILED` | False "paid" state | Keep listening. The UI shows "Paid (settling)" until the grace window passes. |
-| Insufficient wallet balance | Transfer fails or auto-cancels | Balance pre-check before approval and on deadline day. Warning surfaced in the UI. |
+| Insufficient wallet balance | Transfer fails or auto-cancels | Balance pre-check before the transfer is created, including at the cutoff. The bill stays watching and the UI shows a warning. |
 | API version drift between endpoint groups | `incorrect_version` errors | Per-endpoint-group version config in the client, plus a contract test suite against sandbox. |
 | Extraction errors on bills | Wrong amount or payee | Mandatory human review. Show a per-field confidence score. Validate the beneficiary against the Airwallex schema. |
 | Exotic pair not covered by the history source | Empty chart backfill | Show our own ticks only, with an explicit "No reference history" chip. |
@@ -188,7 +188,7 @@ Trade-offs of Layer B:
 | V1 | Auth + token reuse, `x-api-version: 2026-08-21` accepted by the rates, quotes, transfers and beneficiaries endpoints | Version drift across groups |
 | V2 | `fx/rates/current` with `buy_amount` = bill amount returns a CLIENT `rate_details` entry; derive `sell_amount/buy_amount` | Canonical price derivation |
 | V3 | ~~`POST /api/v1/fx/conversions/create` vs `/api/v1/conversions/create`~~ **Resolved from the API reference:** `/api/v1/fx/conversions/create` (retrieve: `/api/v1/fx/conversions/{conversion_id}`). The smoke still calls it once. | Path discrepancy in docs |
-| V4 | Quote `MIN_30` → `transfers/create` with `quote_id` (no `transfer_date`) succeeds; returned `conversion.rate` matches the quote | Primary execution path |
+| V4 | Quote `MIN_1` → `transfers/create` with `quote_id` (no `transfer_date`) succeeds; returned `conversion.rate` matches the quote | Primary execution path |
 | V5 | Quote consumed after `valid_to_at` → expect `quote_expired` on `transfers/create` (`expired_quote` is the conversions spelling) | Expiry handling |
 | V6 | Future-dated transfer with `lock_rate_on_create=false` → cancel → confirm fee/charges | Layer B safety net cost |
 | V7 | Can a `quote_id` be combined with a future `transfer_date`? | Enables "lock now, pay on due date" |

@@ -11,8 +11,6 @@ const TEXT: Record<ChartMarkerKind, string> = {
   ARMED: '',
   NEAR_MISS: '',
   TARGET_HIT: '',
-  APPROVED: '',
-  REJECTED: '×',
   EXECUTED: '✓',
   AUTOSETTLE: '⚡',
   // DEMO-ONLY: simulation flags exist only for the Simulate run.

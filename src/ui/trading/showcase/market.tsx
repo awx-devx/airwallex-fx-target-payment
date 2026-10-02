@@ -178,7 +178,7 @@ export const marketShowcases: Showcase[] = [
     sections: [
       {
         id: 'countdown-matrix',
-        title: 'Quote, deadline, auto-settle, urgency',
+        title: 'Quote, deadline, cutoff, urgency',
         render: () => (
           <Matrix>
             <Cell label="quote">
@@ -196,7 +196,7 @@ export const marketShowcases: Showcase[] = [
             <Cell label="deadline">
               <CountdownChip now={NOW} until="2026-10-03T16:00:00.000Z" kind="deadline" />
             </Cell>
-            <Cell label="auto-settle">
+            <Cell label="pays at market">
               <CountdownChip now={NOW} until="2026-10-01T14:00:00.000Z" kind="autosettle" />
             </Cell>
           </Matrix>

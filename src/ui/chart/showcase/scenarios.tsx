@@ -136,7 +136,7 @@ function SimulateScenario() {
   const frozen = useTimeFrozen();
   const base = seriesEnding('1.08800', 80);
   const [series, setSeries] = useState(base);
-  const [phase, setPhase] = useState<'idle' | 'ramping' | 'hit' | 'approved' | 'executed'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'ramping' | 'hit' | 'executed'>('idle');
   const elapsed = useRef(0);
   const from = base[base.length - 1]?.value ?? '1.08800';
   const startTime = base[base.length - 1]?.time ?? NOW;
@@ -158,8 +158,7 @@ function SimulateScenario() {
         );
         return [...current, { time, value: price }];
       });
-      if (ms >= 7000) setPhase('executed');
-      else if (ms >= 5500) setPhase('approved');
+      if (ms >= 5500) setPhase('executed');
       else if (ms >= 4000) setPhase('hit');
       else setPhase('ramping');
     }, 200);
@@ -171,11 +170,8 @@ function SimulateScenario() {
     { time: base[0]?.time ?? NOW, kind: 'ARMED' },
     { time: simFrom, kind: 'SIM_START' },
   ];
-  if (phase === 'hit' || phase === 'approved' || phase === 'executed') {
+  if (phase === 'hit' || phase === 'executed') {
     markers.push({ time: startTime + 20, kind: 'TARGET_HIT' });
-  }
-  if (phase === 'approved' || phase === 'executed') {
-    markers.push({ time: startTime + 28, kind: 'APPROVED' });
   }
   if (phase === 'executed') {
     markers.push({ time: startTime + 35, kind: 'EXECUTED' });
@@ -202,10 +198,8 @@ function SimulateScenario() {
             : phase === 'ramping'
               ? 'Ramping into the target'
               : phase === 'hit'
-                ? 'Target hit'
-                : phase === 'approved'
-                  ? 'Auto-approved'
-                  : 'Executed'}
+                ? 'Target hit · paying'
+                : 'Executed'}
         </p>
       </div>
       <Story
@@ -216,7 +210,7 @@ function SimulateScenario() {
           markers,
           simulatedRanges: phase === 'idle' ? [] : [{ from: simFrom, to: phase === 'executed' ? startTime + 35 : undefined }],
           quote:
-            phase === 'hit' || phase === 'approved'
+            phase === 'hit'
               ? { price: '1.07420', from: startTime + 20, to: startTime + 20 + 60 }
               : undefined,
         })}
@@ -303,7 +297,7 @@ export const chartScenarioShowcases: Showcase[] = [
   {
     id: 'scenario-rejected',
     group: 'chart',
-    title: 'Rejected and re-armed',
+    title: 'Near miss, still watching',
     importPath: '@/ui/chart/fx-chart',
     sections: [
       {
@@ -317,7 +311,7 @@ export const chartScenarioShowcases: Showcase[] = [
             overlays={baseOverlays(BOUNCE, {
               markers: [
                 { time: BOUNCE[0]?.time ?? NOW, kind: 'ARMED' },
-                { time: BOUNCE[40]?.time ?? NOW, kind: 'REJECTED' },
+                { time: BOUNCE[40]?.time ?? NOW, kind: 'NEAR_MISS' },
                 { time: BOUNCE[48]?.time ?? NOW, kind: 'ARMED' },
               ],
             })}
@@ -329,26 +323,20 @@ export const chartScenarioShowcases: Showcase[] = [
   {
     id: 'scenario-final-day',
     group: 'chart',
-    title: 'Final day',
+    title: 'Deadline day',
     importPath: '@/ui/chart/fx-chart',
     sections: [
       {
         id: 'scenario-final-day-chart',
-        title: 'Now on the deadline, amber quote',
+        title: 'Now on the deadline, pays at the cutoff',
         render: () => (
           <Story
             pair={PAIR}
             series={WATCHING}
-            quoteTone="deadline"
             autosettleAt={new Date((NOW + 12 * DAY + 2 * 3600) * 1000).toISOString()}
             overlays={baseOverlays(WATCHING, {
               now: NOW + 12 * DAY,
               executionDeadline: NOW + 12 * DAY,
-              quote: {
-                price: '1.08600',
-                from: NOW + 12 * DAY - 30,
-                to: NOW + 12 * DAY + 15 * 60,
-              },
             })}
           />
         ),
@@ -358,12 +346,12 @@ export const chartScenarioShowcases: Showcase[] = [
   {
     id: 'scenario-autosettle',
     group: 'chart',
-    title: 'Auto-settled',
+    title: 'Deadline payment',
     importPath: '@/ui/chart/fx-chart',
     sections: [
       {
         id: 'scenario-autosettle-chart',
-        title: 'Auto-settle marker',
+        title: 'Deadline payment marker',
         render: () => (
           <Story
             pair={PAIR}
@@ -515,7 +503,7 @@ export const chartScenarioShowcases: Showcase[] = [
     sections: [
       {
         id: 'scenario-simulate-chart',
-        title: 'Ramp, target hit, auto-approved, executed',
+        title: 'Ramp, target hit, executed',
         render: () => <SimulateScenario />,
       },
     ],

@@ -39,7 +39,7 @@ flowchart LR
 
 | Profile | Bills | What it's for | Default path | Gateway |
 | --- | --- | --- | --- | --- |
-| `mixed` (default) | 12 across EUR, GBP, JPY, SGD, AUD, INR | Everyday development: 2 `DRAFT`, 2 `READY`, 5 `WATCHING` (targets 0.1–0.3%, 0.8% and 3% away), 1 `PAUSED`, 1 `DEADLINE_WINDOW`, 1 `PAID` | direct | `airwallex` (sandbox) |
+| `mixed` (default) | 12 across EUR, GBP, JPY, SGD, AUD, INR | Everyday development: 2 `DRAFT`, 2 `READY`, 5 `WATCHING` (targets 0.1–0.3%, 0.8% and 3% away), 1 `PAUSED`, 1 `EXECUTING`, 1 `PAID` | direct | `airwallex` (sandbox) |
 | `lifecycle` | One per `BillState` | The live analogue of the C0.3 fixtures; every ticket state visible at once | direct + pipeline | `airwallex` |
 | `deadline` | 6 | Execution deadline today / tomorrow / +2 business days, over a weekend, LOCAL vs SWIFT lead days, in `AIRWALLEX_ACCOUNT_TZ`. Pair with the warp clock | direct | `airwallex` |
 | `corridors` | One per enabled corridor | Beneficiary creation and transfers per corridor, including buy-only (INR, PHP, IDR), 0-dp (JPY) and SWIFT-only corridors | direct + pipeline | `airwallex` |
@@ -62,9 +62,8 @@ Bills are only ever put into states that match reality in the sandbox. **We neve
 | `READY` | `DRAFT` + resolve the beneficiary (from the pool) + mark the fields reviewed, through the normal services |
 | `WATCHING` | `READY` + strategy + standing instruction + `arm` service. The target is set relative to the current price by a profile rule (e.g. "0.8% below entry") |
 | `PAUSED` | `WATCHING` + `pause` |
-| `TARGET_HIT` | `WATCHING` + a scripted market move for that bill (`/api/demo/market`, ramp past the target), with **no** auto-approval. It waits for a human |
-| `DEADLINE_WINDOW` | Due date chosen so the execution deadline is today and the window has opened; the sweeper opens it naturally |
-| `APPROVED` → `IN_FLIGHT` | A Simulate run ([08 §1.1](./08-demo-plan.md#11-simulate-button)) with transfer advance stopped at `SENT` |
+| `EXECUTING` | Pay now, a target hit, or the cutoff. The seeder stops before the transfer leaves `SCHEDULED` |
+| `IN_FLIGHT` | A Simulate run ([08 §1.1](./08-demo-plan.md#11-simulate-button)) with transfer advance stopped at `SENT` |
 | `PAID` | A full Simulate run |
 | `FAILED` | A Simulate run with the transfer advanced to `FAILED` (sandbox simulation `failure_type`) |
 | `CANCELLED` | `READY` or `WATCHING` + `cancel` |
@@ -134,7 +133,7 @@ With `--gateway mock` (and always in `stress`), the same steps run against the m
 - **`seedKey`** on each generated bill: `gen:v{generatorVersion}:{seed}:{index}` (unique, sparse). Re-running the same seed skips existing bills. `--fresh` picks a new random seed and prints it so a run can be reproduced.
 - Beneficiaries are keyed by `gen:bf:{corridor}:{poolSlot}` and reused. Airwallex `request_id`s are deterministic from these keys (`seedbf:{seedKey}`), so a retried run never creates duplicates.
 - Generated bills are marked `generated: true`, and demo mode shows a small "GEN" chip on them.
-- **Cleanup:** `pnpm seed:reset --generated` removes generated bills, their events, approvals, executions and files, and keeps beneficiaries. `/api/demo/reset` (full reset) also removes them. In-flight sandbox transfers are cancelled first when still cancellable.
+- **Cleanup:** `pnpm seed:reset --generated` removes generated bills, their events, executions and files, and keeps beneficiaries. `/api/demo/reset` (full reset) also removes them. In-flight sandbox transfers are cancelled first when still cancellable.
 
 ---
 

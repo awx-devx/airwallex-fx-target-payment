@@ -16,9 +16,9 @@ This codebase is a base for others (humans and LLMs). Shortcuts must be tagged *
 | `AIRWALLEX:` | Non-obvious API behaviour/constraint the code relies on, with a docs link when possible. |
 
 ```ts
-// DEMO-ONLY: role switcher; anyone can act as the approver.
-// PROD: real auth with approver permissions and an approval audit trail.
-const role = session.role ?? 'approver';
+// DEMO-ONLY: a simulated tick is compared with the target, because the sandbox quote will not follow it.
+// PROD: require p_quote <= p_target on a real tick. The same job still creates the transfer.
+const priceToCheck = tick.source === 'SIMULATED' ? tick.price : quote.price;
 
 // SANDBOX: moves the transfer to the next status on demand.
 await awx.simulation.transitionTransfer(transferId, 'SENT');

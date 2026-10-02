@@ -2,8 +2,7 @@ import { Kbd } from '@/ui/primitives/kbd';
 
 const SHORTCUTS = [
   ['J / K', 'Next / previous bill'],
-  ['A', 'Approve the open quote'],
-  ['H', 'Hold for a better rate'],
+  ['P', 'Pause or resume'],
   ['⌘K', 'Command palette'],
   ['?', 'This sheet'],
   ['U', 'Upload bills'],

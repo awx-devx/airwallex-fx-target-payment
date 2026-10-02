@@ -15,8 +15,6 @@ export const CHART_MARKER_KINDS = [
   'ARMED',
   'NEAR_MISS',
   'TARGET_HIT',
-  'APPROVED',
-  'REJECTED',
   'EXECUTED',
   'AUTOSETTLE',
   'SIM_START',

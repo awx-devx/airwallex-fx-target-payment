@@ -32,7 +32,7 @@ export function CommandList({
     <div className="space-y-2">
       <Input
         aria-label="Command"
-        placeholder="Jump to a bill, upload, or approve"
+        placeholder="Jump to a bill or upload"
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
       />
@@ -81,7 +81,7 @@ export function CommandPalette({
       open={open}
       onOpenChange={onOpenChange}
       title="Command palette"
-      description="Jump, upload, or approve"
+      description="Jump or upload"
       trigger={
         <Button
           variant="secondary"

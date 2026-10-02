@@ -65,7 +65,7 @@ Mapping: `price = CLIENT.sell_amount / CLIENT.buy_amount`, stored as a `rate_tic
 
 Errors: `amount_above_limit` (flag the bill: "Amount above FX limit, contact account manager"), `unsupported_currency` (block arming).
 
-### 2.2 Quote: binding price for approval
+### 2.2 Quote: binding price for the payment
 
 `POST /fx/quotes/create`
 
@@ -74,7 +74,7 @@ Errors: `amount_above_limit` (flag the bill: "Amount above FX limit, contact acc
   "buy_currency": "EUR",
   "buy_amount": "250000.00",
   "sell_currency": "USD",
-  "validity": "MIN_30"
+  "validity": "MIN_1"
 }
 ```
 
@@ -82,10 +82,9 @@ Store `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `buy_amount`, `sell_amo
 
 | Purpose | Validity (default) |
 | --- | --- |
-| Target hit | `MIN_30` |
-| Deadline window | `HR_1` (auto re-quote until the cutoff) |
-| Auto-settle | `MIN_1` (consumed immediately) |
-| Manual "pay now" | `MIN_15` |
+| Target hit | `MIN_1` (consumed in the same job) |
+| Deadline payment | `MIN_1` |
+| Pay now | `MIN_1` |
 
 ### 2.3 Transfer with conversion: primary execution path
 
@@ -110,19 +109,19 @@ Store `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `buy_amount`, `sell_amo
 - `reason` and `reference` are **required**. `reason` is an enum (default `bill_payment`; the bill's `transferReason`); `reference` defaults to the invoice number. See [13 §4.1](./13-airwallex-contracts.md#41-request-fields-we-set-post-apiv1transferscreate).
 - `fee_paid_by: PAYER` (default). For SWIFT, `swift_charge_option: PAYER` so the vendor receives the full amount (D-18, V17).
 - `quote_id` must match `sell_currency = source_currency` and `buy_currency = transfer_currency`.
-- For auto-settle without a quote, omit `quote_id`. Airwallex then books at market. If the account returns `quote_id_required`, auto-settle must always lock a `MIN_1` quote first.
+- The cutoff always locks a `MIN_1` quote first and sends `quote_id`. Some accounts return `quote_id_required` if it is omitted.
 - Store `id`, `short_reference_id`, `status`, `funding.status`, `conversion.rate`, `source_amount`, `amount_payer_pays`, `amount_beneficiary_receives`, `fee_amount`, `fee_currency`, `fee_paid_by`, `dispatch_date`, `failure` and `updated_at`. Fee and amounts are **tentative until `SCHEDULED`**.
 
 **Validation at arming:** `POST /transfers/validate` with the same body (no `quote_id`, no `request_id`) runs when the user arms the bill. `validation_failed` field errors, account/method limits and beneficiary problems show up in review, not at trigger time ([13 §4.4](./13-airwallex-contracts.md#44-validation-at-arming)).
 
 **Pre-flight (executor):**
-1. `GET /balances/current`: require `available_amount(H) ≥ quote.sell_amount + fee_est`. Otherwise fail with `INSUFFICIENT_BALANCE` (the bill stays approved-but-blocked and the UI shows a top-up prompt).
+1. `GET /balances/current`: require `available_amount(H) ≥ quote.sell_amount + fee_est`. Otherwise the bill stays `WATCHING` with `insufficientBalance` and the UI shows a top-up prompt. The worker retries until the cutoff.
 2. Optional: `POST /transfers/validate` again if the beneficiary changed since arming.
 
 **Error handling** (full table with UI treatment: [13 §2.1](./13-airwallex-contracts.md#21-error-codes--our-codes--ui)):
 | Error | Action |
 | --- | --- |
-| `quote_expired` (on `transfers/create`; `expired_quote` on conversions) | If the bill is approved and in the target flow, return to `WATCHING` + notify. On deadline or auto-settle, re-quote `MIN_1` and retry once. |
+| `quote_expired` (on `transfers/create`; `expired_quote` on conversions) | Stay `WATCHING` and retry. |
 | `quote_id_invalid` (`invalid_quote_id` on conversions) | Re-quote once; if it fails again, `FAILED`. |
 | `duplicate_request_id` / `request_id_duplicate` (legacy) | Not a failure: `details.id` is the existing transfer. `GET /transfers/{id}` and continue. |
 | `409 request_pending` | The same `request_id` is still being processed. Back off, then retry with the same `request_id`. |
@@ -141,7 +140,7 @@ Store `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `buy_amount`, `sell_amo
 | `PAID` | `PAID` (grace: keep listening for `failed` for 72 h) | "Paid" |
 | `FAILED` | `FAILED` | "Failed · {category}" ([13 §4.5](./13-airwallex-contracts.md#45-failure-categories)) |
 | `CANCELLED` | `CANCELLED` if we requested it; `FAILED` ("Not funded") after `OVERDUE`; **ignored after `FAILED`** | |
-| `IN_APPROVAL` / `APPROVAL_*` | `IN_FLIGHT` + `awxApproval` flag | "Awaiting Airwallex approval". It should never happen because the runbook disables the Airwallex approval workflow. |
+| `IN_APPROVAL` / `APPROVAL_*` | `IN_FLIGHT` + `awxApproval` flag | "Awaiting Airwallex approval". It should never happen: the runbook disables that workflow because those transfers cannot use quotes (D-23). |
 
 Status rank for monotonic updates: `SCHEDULED(1) = OVERDUE(1) < PROCESSING(2) < SENT(3) < PAID(4)`. `FAILED` overrides anything, including `PAID` (late failure after `PAID` is documented). Airwallex **auto-cancels a failed transfer within seconds**, so a `CANCELLED` after `FAILED` must not replace `FAILED`. `CANCELLED` only applies from a non-terminal status. `funding.status` is stored alongside and shown when not `FUNDED`.
 
@@ -216,7 +215,7 @@ Deposits simulation (`POST /simulation/deposit/create` with `global_account_id`,
 2. Note the **account time zone** (from the onboarding entity) and set `AIRWALLEX_ACCOUNT_TZ`.
 3. **Developer → API keys**: create a **scoped** key with FX (rates, quotes, conversions), transfers, beneficiaries, balances and files write access. Add spend/org scopes only if the stretch goal is taken.
 4. Ask the account manager or support to confirm that **Quotes** are enabled for the sandbox account (FX product: Rates + Quotes), and the funding mode (pre-fund default, auto-funding; not manual `confirm_funding`).
-   - Make sure **no Airwallex transfer-approval workflow** is active (otherwise transfers stop in `IN_APPROVAL`; our approval happens in-app). Create or note a **Global Account in H** for deposit simulation and set `AIRWALLEX_GLOBAL_ACCOUNT_ID`.
+   - Make sure **no Airwallex transfer-approval workflow** is active (otherwise transfers stop in `IN_APPROVAL`; those transfers cannot use quotes, D-23). Create or note a **Global Account in H** for deposit simulation and set `AIRWALLEX_GLOBAL_ACCOUNT_ID`.
 5. **Developer → Webhooks**: register the tunnel URL, select the events in §3, and copy the secret into `AIRWALLEX_WEBHOOK_SECRET`.
 6. Run `pnpm airwallex:smoke`, which executes the verification checklist from [01 §7](./01-feasibility-airwallex.md#7-verification-checklist-run-in-sandbox-during-b1b2), prints a pass/fail table, and **records every raw response** (redacted) to `src/server/adapters/airwallex/__fixtures__/` for the mapper tests.
 7. Run `pnpm seed:beneficiaries` and `pnpm seed:demo`.

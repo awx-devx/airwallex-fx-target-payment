@@ -33,7 +33,6 @@ import { AccountStrip, TopBar } from '@/ui/patterns/top-bar';
 import { EmptyState } from '@/ui/primitives/empty-state';
 import type { DropFile } from '@/ui/primitives/file-dropzone';
 import { useToasts } from '@/ui/primitives/toast';
-import { ApprovalCard } from '@/ui/patterns/approval-card';
 import { Menu, PanelRight } from 'lucide-react';
 import type { AppEvent } from '@/contracts/sse';
 
@@ -48,13 +47,7 @@ function useWidth() {
   return width;
 }
 
-export function TerminalScreen({
-  billId,
-  approvalId,
-}: {
-  billId?: string;
-  approvalId?: string;
-}) {
+export function TerminalScreen({ billId }: { billId?: string }) {
   const router = useRouter();
   const width = useWidth();
   const bills = useBills();
@@ -99,8 +92,6 @@ export function TerminalScreen({
   }, [rows, ui.query, ui.filter, ui.sort]);
 
   const selected = detail.data ?? bills.data?.find((bill) => bill.id === selectedId);
-  const approvalBill =
-    bills.data?.find((bill) => bill.activeApproval?.id === approvalId) ?? selected;
 
   function select(id: string) {
     ui.setListOpen(false);
@@ -140,12 +131,7 @@ export function TerminalScreen({
       else if (action === 'RESUME') await actions.resume(bill.id);
       else if (action === 'PAY_NOW') await actions.payNow(bill.id);
       else if (action === 'CANCEL') await actions.cancel(bill.id);
-      else if (action === 'APPROVE' && bill.activeApproval) {
-        await actions.approve(bill.activeApproval.id);
-        toasts.push({ tone: 'success', title: 'Approved' });
-      } else if (action === 'HOLD' && bill.activeApproval) {
-        await actions.reject(bill.activeApproval.id, { action: 'HOLD' });
-      } else if (action === 'RESOLVE_BENEFICIARY' || action === 'REARM') {
+      else if (action === 'RESOLVE_BENEFICIARY' || action === 'REARM') {
         await actions.rearm(bill.id);
       } else if (action === 'SIMULATE') await actions.simulate(bill.id);
       else if (action === 'STOP_SIMULATION') await actions.stop(bill.id);
@@ -163,11 +149,12 @@ export function TerminalScreen({
     if (notices.length <= toasted.current) return;
     const fresh = notices.slice(0, notices.length - toasted.current);
     toasted.current = notices.length;
-    if (!fresh.some((event) => event.type === 'approval.requested')) return;
+    const notice = fresh.find((event) => event.type === 'notification');
+    if (!notice || notice.type !== 'notification') return;
     toasts.push({
-      tone: 'target-hit',
-      title: 'Target hit',
-      body: 'A quote is waiting for approval.',
+      tone: notice.notification.title === 'Target hit' ? 'target-hit' : 'info',
+      title: notice.notification.title,
+      body: notice.notification.body,
     });
   }, [notices, toasts]);
 
@@ -188,9 +175,7 @@ export function TerminalScreen({
       } else if (key === '/') {
         event.preventDefault();
         document.querySelector<HTMLInputElement>('[aria-label="Search bills"]')?.focus();
-      } else if (key === 'u') ui.setUpload(true);
-      else if (key === 'a') void onAction('APPROVE');
-      else if (key === 'h') void onAction('HOLD');
+      }       else if (key === 'u') ui.setUpload(true);
       else if (key === 'p') {
         void onAction(selected?.state === 'PAUSED' ? 'RESUME' : 'PAUSE');
       } else if (key === 't') {
@@ -212,7 +197,7 @@ export function TerminalScreen({
   const stack = width < 1024;
   const commands: CommandItem[] = [
     { id: 'upload', group: 'Actions', label: 'Upload bills', hint: 'U' },
-    { id: 'approve', group: 'Actions', label: 'Approve active quote', hint: 'A' },
+    { id: 'pay', group: 'Actions', label: 'Pay selected bill now' },
     ...(bills.data ?? []).map((bill) => ({
       id: bill.id,
       group: 'Bills',
@@ -223,7 +208,7 @@ export function TerminalScreen({
   function onPick(item: CommandItem) {
     ui.setPalette(false);
     if (item.id === 'upload') ui.setUpload(true);
-    else if (item.id === 'approve') void onAction('APPROVE');
+    else if (item.id === 'pay') void onAction('PAY_NOW');
     else select(item.id);
   }
 
@@ -252,8 +237,6 @@ export function TerminalScreen({
         <AccountStrip
           balances={balances.data ?? []}
           connection={connection === 'delayed' ? 'delayed' : 'simulated'}
-          role={ui.role}
-          onRoleChange={ui.setRole}
           now={now}
         />
       ) : null}
@@ -284,7 +267,6 @@ export function TerminalScreen({
       bill={selected}
       now={now}
       events={events.data ?? detail.data?.events ?? []}
-      role={ui.role}
       homeCurrency="USD"
       cutoffLabel="14:00 Los Angeles"
       onAction={(action) => void onAction(action)}
@@ -303,8 +285,6 @@ export function TerminalScreen({
           balances={balances.data ?? []}
           connection={connection === 'delayed' ? 'delayed' : 'simulated'}
           unread={notices.length}
-          role={ui.role}
-          onRoleChange={ui.setRole}
           now={now}
           onNotifications={() => ui.setNoticesOpen(true)}
           leading={
@@ -423,7 +403,6 @@ export function TerminalScreen({
               <PositionsPanel
                 fill={!stack}
                 bills={(bills.data ?? []).filter((bill) => placeBill(bill) === 'positions')}
-                approvals={(bills.data ?? []).filter((bill) => placeBill(bill) === 'approvals')}
                 executed={(bills.data ?? []).filter((bill) => placeBill(bill) === 'executed')}
                 events={events.data ?? []}
                 selectedId={selectedId}
@@ -497,35 +476,19 @@ export function TerminalScreen({
       <Dialog open={ui.shortcuts} onOpenChange={ui.setShortcuts} title="Shortcuts">
         <ShortcutsSheet />
       </Dialog>
-      <Dialog
-        open={Boolean(approvalId && approvalBill)}
-        onOpenChange={(open) => {
-          if (!open && approvalBill) router.push(`/bills/${approvalBill.id}`);
-        }}
-        title={approvalBill?.vendorName ?? 'Approval'}
-        description="Approval"
-        tone="glow"
-        size="lg"
-      >
-        {approvalBill ? (
-          <ApprovalCard
-            bill={approvalBill}
-            now={now}
-            role={ui.role}
-            homeCurrency="USD"
-            onApprove={() => void onAction('APPROVE', approvalBill)}
-            onHold={() => void onAction('HOLD', approvalBill)}
-          />
-        ) : null}
-      </Dialog>
       </div>
     </div>
   );
 }
 
-function placeBill(bill: BillSummary): 'positions' | 'approvals' | 'executed' {
-  if (bill.state === 'TARGET_HIT' || bill.state === 'DEADLINE_WINDOW') return 'approvals';
-  if (bill.state === 'IN_FLIGHT' || bill.state === 'PAID' || bill.state === 'FAILED' || bill.state === 'CANCELLED') {
+function placeBill(bill: BillSummary): 'positions' | 'executed' {
+  if (
+    bill.state === 'EXECUTING' ||
+    bill.state === 'IN_FLIGHT' ||
+    bill.state === 'PAID' ||
+    bill.state === 'FAILED' ||
+    bill.state === 'CANCELLED'
+  ) {
     return 'executed';
   }
   return 'positions';
@@ -550,7 +513,9 @@ function NoticeList({
           <li key={index}>
             <button type="button" className="text-left" onClick={() => id && onOpen(id)}>
               <span className="block text-fg-2">{bill?.vendorName ?? 'Bill'}</span>
-              <span>{notice.type === 'approval.requested' ? 'Target hit — approve' : notice.type}</span>
+              <span>
+                {notice.type === 'notification' ? notice.notification.title : notice.type}
+              </span>
             </button>
           </li>
         );

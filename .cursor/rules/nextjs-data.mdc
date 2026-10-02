@@ -14,20 +14,20 @@ This Next.js version may differ from your training data. Before using an App Rou
 - Page → `features/**` hooks (TanStack Query) → `DataSource` (`NEXT_PUBLIC_DATA_SOURCE=mock|api`) → `/api/*` + `/api/stream`.
 - Components never call `fetch` or the `DataSource` directly; they always go through a hook. **No server actions** for data.
 - DTOs, inputs, SSE event types and error codes come from `src/contracts` only.
-- Buttons and ticket actions come from `allowedActions` on `BillSummary` (computed by `src/contracts/permissions.ts` from state + role). Components never re-derive state or role rules.
+- Buttons and ticket actions come from `allowedActions` on `BillSummary` (computed by `src/contracts/permissions.ts` from the bill state). Components never re-derive state rules.
 - Query keys come from one `qk` factory. No inline key arrays.
 - SSE events patch the cache (`setQueryData`) or invalidate it. Ticks update only price fields, and each row is memoised so a tick doesn't re-render the whole list.
 - The SSE client reconnects with backoff and falls back to polling. `ConnectionIndicator` reflects the state, and stale data is visibly stale.
 
 ## Mutations
 - Mutations return the updated `BillSummary`: `setQueryData(qk.bill(id), bill)`, then invalidate lists/activity (and balances when money moves).
-- **No optimistic updates for money actions** (arm, approve, reject, pay now, cancel). Server-authoritative only. Optimistic updates are allowed for strategy edits and pause/resume (U7.2).
+- **No optimistic updates for money actions** (arm, pay now, cancel). Server-authoritative only. Optimistic updates are allowed for strategy edits and pause/resume (U7.2).
 - Map the error envelope to UI in one place (`QUOTE_EXPIRED` → re-quote prompt, `INSUFFICIENT_BALANCE` → top-up banner, `INVALID_STATE` → refetch + toast).
 
 ## State
 - Server state lives in the Query cache only. Don't copy it into `useState`, context or Zustand.
 - Zustand holds **UI state only**: selected bill, layout/splitters, density, panel tabs. Nothing from the server.
-- URL state: the selected bill (`/bills/:id`), approvals (`/approvals/:id`), chart range in `searchParams`. Forms use `react-hook-form` + the zod resolver with schemas from `src/contracts`.
+- URL state: the selected bill (`/bills/:id`) and the chart range in `searchParams`. Forms use `react-hook-form` + the zod resolver with schemas from `src/contracts`.
 
 ## Rendering and boundaries
 - `page.tsx` is a thin server component that renders a client feature screen. No data fetching in server components.
@@ -35,11 +35,10 @@ This Next.js version may differ from your training data. Before using an App Rou
 - `/dev/*` pages and `/api/demo/*` routes check `DEMO_MODE` (404 otherwise).
 
 ## Route handlers (`src/app/api/**`)
-- Thin: auth/role → zod-validate the input → call a `server/services` function → return the contract DTO or the error envelope `{ error: { code, message, details? } }`.
+- Thin: auth → zod-validate the input → call a `server/services` function → return the contract DTO or the error envelope `{ error: { code, message, details? } }`.
 - `export const runtime = 'nodejs'` on anything touching Mongo, Redis or Airwallex.
-- Approve/reject require the `approver` role.
 
 ## Mocks (`src/mocks`)
 - The mock `DataSource` must match the contracts and the state machine. It uses `src/contracts/permissions.ts`, emits the same SSE event union, and returns 409 `INVALID_STATE` for invalid actions.
-- Fixtures cover **every** `BillState`, approval kind/status and transfer status, and stay aligned with the three demo bills in `docs/08` §2.
+- Fixtures cover **every** `BillState` and transfer status, and stay aligned with the three demo bills in `docs/08` §2.
 - The simulated market (`src/mocks/market`) is seeded and deterministic, and shared by browser mock mode and the server `SimulatedRateSource`. Keep it free of browser-only or Node-only APIs.

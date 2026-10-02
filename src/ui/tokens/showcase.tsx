@@ -183,7 +183,7 @@ function Glows() {
         />
         <GlowCard
           className={pulse ? 'glow-pulse-strong' : 'glow-lg'}
-          name="TARGET_HIT · strong"
+          name="Target hit · brief"
         />
       </div>
     </div>

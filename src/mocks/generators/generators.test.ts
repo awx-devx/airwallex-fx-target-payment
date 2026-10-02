@@ -88,7 +88,7 @@ describe('generateSnapshot', () => {
     expect(counts.get('READY')).toBe(2);
     expect(counts.get('WATCHING')).toBe(5);
     expect(counts.get('PAUSED')).toBe(1);
-    expect(counts.get('DEADLINE_WINDOW')).toBe(1);
+    expect(counts.get('EXECUTING')).toBe(1);
     expect(counts.get('PAID')).toBe(1);
     expect(
       mixed.bills.filter((bill) => bill.strategyMode === 'MAX_COST'),
@@ -132,8 +132,8 @@ describe('generateSnapshot', () => {
       'DRAFT',
       'READY',
       'WATCHING',
-      'TARGET_HIT',
-      'DEADLINE_WINDOW',
+      'PAUSED',
+      'EXECUTING',
       'PAID',
     ]);
 

@@ -1,6 +1,6 @@
 # B — Backend & Integration Track
 
-**Goal:** a reliable worker and API that watch rates, lock quotes, run approvals, guarantee the deadline, and execute real Airwallex sandbox transfers, all behind the same contracts the UI was built on.
+**Goal:** a reliable worker and API that watch rates, lock quotes, pay when the target is hit or at the deadline, and execute real Airwallex sandbox transfers, all behind the same contracts the UI was built on.
 
 **References:** [01 Feasibility](../01-feasibility-airwallex.md) · [02 Architecture](../02-architecture.md) · [03 Domain model](../03-domain-model.md) · [04 Airwallex integration](../04-airwallex-integration.md) · [13 Airwallex → Contracts & UI](../13-airwallex-contracts.md) · [08 Demo plan](../08-demo-plan.md)
 
@@ -60,7 +60,7 @@ Estimates are for one engineer.
 | B3.2 | `stateMachine.ts`: states/events per [03 §1](../03-domain-model.md#1-bill-lifecycle-state-machine), guards, invariants; exhaustive transition table tests |
 | B3.3 | `deadline.ts`: execution deadline (business days, account tz), window open/cutoff instants; DST tests for `Australia/Melbourne`, `Europe/London`, `America/Los_Angeles` |
 | B3.4 | `trigger.ts`: threshold, confirmation ticks, freshness, cooldown, re-arm improvement |
-| B3.5 | Repositories (Mongoose, `lean()` reads mapped to contracts) + `transition()` service: conditional `findOneAndUpdate` with `version`, event append, publish; the transactional helpers for approve and execution-create |
+| B3.5 | Repositories (Mongoose, `lean()` reads mapped to contracts) + `transition()` service: conditional `findOneAndUpdate` with `version`, event append, publish; the transactional helper for execution-create |
 | B3.6 | REST routes for bills CRUD, strategy, arm/pause/resume/cancel, events, balances (per [03 §6](../03-domain-model.md#6-internal-rest-api)), validating with the contracts |
 
 ## B4 — Bill ingestion · ~2 days
@@ -81,33 +81,33 @@ Estimates are for one engineer.
 | ID | Task |
 | --- | --- |
 | B5.1 | `RateSource`: `airwallex` (bill-sized `rates/current`) and `simulated` (server-side use of `src/mocks/market`, anchored on one real rate at boot) |
-| B5.2 | Poller: schedules each `WATCHING`/`PAUSED`/`TARGET_HIT`/`DEADLINE_WINDOW` bill every `POLL_INTERVAL_MS`, shares the limiter, marks stale feeds; coalesces by `(F, H, amount)` |
+| B5.2 | Poller: schedules each `WATCHING`/`PAUSED` bill every `POLL_INTERVAL_MS`, shares the limiter, marks stale feeds; coalesces by `(F, H, amount)` |
 | B5.3 | Tick store in the `rate_ticks` time-series collection (TTL 30 days) + repeatable BullMQ job writing 1-minute rollups into `rate_candles_1m`; chart aggregation with `$dateTrunc` |
 | B5.4 | `HistorySource`: Frankfurter daily series cached in a `reference_rates` collection; `none` fallback sets `flags.noReferenceHistory` |
 | B5.5 | `GET /api/bills/:id/chart?range=`: merges reference + own ticks/candles, builds `ChartOverlays` (entry, target, quote band, deadline, due, now, markers from `bill_events`) |
 | B5.6 | SSE event serialisation per [02 §6](../02-architecture.md#6-realtime-events-sse); heartbeat every 15 s; per-client backpressure |
 
-## B6 — Strategy engine, quotes & approvals · ~2.5 days
+## B6 — Strategy engine, quotes & execution · ~2.5 days
 
 | ID | Task |
 | --- | --- |
 | B6.1 | The strategy engine subscribes to ticks and evaluates the trigger rules for `WATCHING` bills |
-| B6.2 | On trigger: lock the quote (`QUOTE_VALIDITY_TARGET`), re-check it against the target → `TARGET_HIT` + approval, or a `NEAR_MISS` event |
-| B6.3 | Approval endpoints: approve (role check, quote validity check, balance pre-check → `APPROVED` + enqueue execution) and reject (`HOLD` → `WATCHING` + cooldown; `CANCEL` → `CANCELLED`) |
-| B6.4 | Quote expiry: the sweeper finds `PENDING` approvals past `expiresAt` → `quote-expiry` job → `EXPIRED` → bill back to `WATCHING` (or `DEADLINE_WINDOW` on deadline day) |
-| B6.5 | "Pay now" (manual market) path: `MIN_15` quote + approval of kind `TARGET_HIT` with a `manual` flag |
-| B6.6 | Notifier: in-app only (SSE `notification` → toast + `NotificationCenter`, with deep link `/approvals/:id`; Q-05); messages for target hit, final day, auto-settled, paid, failed |
+| B6.2 | On trigger: lock the quote (`QUOTE_VALIDITY_TARGET`), re-check it against the target → `EXECUTING` in the same job, or a `NEAR_MISS` event that stays `WATCHING` |
+| B6.3 | Cancel from `DRAFT`/`READY`/`WATCHING`/`PAUSED`. There is no approve or hold endpoint |
+| B6.4 | Quote expires before the transfer is created → stay `WATCHING` and retry (`quote-retry:{billId}`) |
+| B6.5 | "Pay now" locks a `MIN_1` quote and enqueues execution with mode `MANUAL` |
+| B6.6 | Notifier: in-app only (SSE `notification` → toast + `NotificationCenter`, deep link `/bills/:id`; Q-05); messages for target hit (paying), deadline payment, paid, failed |
 | B6.7 | Strategy edits while `WATCHING`: recompute the target (max-cost mode), re-evaluate immediately, log `STRATEGY_UPDATED` |
 
 ## B7 — Deadline scheduler & auto-settle · ~2 days
 
 | ID | Task |
 | --- | --- |
-| B7.1 | At arming: compute the deadline instants and write `timers.deadlineOpenAt` / `timers.autosettleAt` on the bill; recompute on due-date/lead-day edits (clearing `*FiredAt` if the timer moves into the future) |
-| B7.2 | `deadline.open`: lock a `HR_1` quote, create a `DEADLINE` approval (superseding any open approval), notify |
-| B7.3 | Deadline quote refresh: re-quote on expiry until the cutoff, keeping the approval ID |
-| B7.4 | `deadline.autosettle`: guard state → `AUTO_SETTLING` → execution with mode `STANDING_INSTRUCTION` (fresh `MIN_1` quote) |
-| B7.5 | Sweeper (`worker/sweeper.ts`): every 1 s, query due timers (bills and approvals) against `clock.now()` and add BullMQ jobs with deterministic `jobId`s; log `CATCH_UP` when a timer is more than 1 min late (restart recovery) |
+| B7.1 | At arming: compute the cutoff and write `timers.autosettleAt` on the bill; recompute on due-date/lead-day edits (clearing `autosettleFiredAt` if the timer moves into the future). If the deadline is already past, go straight to `EXECUTING` |
+| B7.2 | `deadline.autosettle`: if the bill is still `WATCHING` or `PAUSED`, lock a `MIN_1` quote and execute with mode `DEADLINE` |
+| B7.3 | If that quote cannot be locked, stay `WATCHING` and let the sweeper retry |
+| B7.4 | Pay-now and the cutoff share the executor. Mode is `MANUAL` or `DEADLINE`; a target hit is `TARGET` |
+| B7.5 | Sweeper (`worker/sweeper.ts`): every 1 s, query due `autosettleAt` timers against `clock.now()` and add the `deadline.autosettle:{billId}` job; log `CATCH_UP` when a timer is more than 1 min late (restart recovery) |
 | B7.6 | Warp-clock check: at 1,000× the sweeper fires deadline actions in the right order, and no timer fires twice (tests with a fake clock) |
 | B7.7 | *(Flag `DEADLINE_SAFETY_NET=airwallex`)* Layer B: create a future-dated transfer with `lock_rate_on_create=false` on arming; cancel it when another path executes; surface its ID in the ticket |
 
@@ -129,8 +129,8 @@ Estimates are for one engineer.
 | --- | --- |
 | B9.1 | Contract conformance: every route returns zod-validated payloads identical to the mock `DataSource` |
 | B9.2 | Demo endpoints ([08 §1](../08-demo-plan.md#1-demo-mode-building-blocks)): clock, market, scenario, transfer advance (via the simulation API), reset |
-| B9.3 | Scenario scripts: `target-hit` (= Simulate on demo bill 1), `reject-rearm`, `deadline-autosettle`, `insufficient-balance` |
-| B9.6 | Simulate button backend ([08 §1.1](../08-demo-plan.md#11-simulate-button)): `/api/demo/bills/:id/simulate` + `/stop`, `RoutingRateSource`, the worker `demoSim` loop (scripted 1 s ticks, auto-approve via the approve service as `system:demo-sim`, transfer advance + immediate status read), the simulated-tick quote-check exception, `demo.sim` SSE events. Test: a sandbox run reaches `PAID` in < 40 s, and a second click while running returns `INVALID_STATE` |
+| B9.3 | Scenario scripts: `target-hit` (= Simulate on demo bill 1), `stay-watching`, `deadline-pay`, `insufficient-balance` |
+| B9.6 | Simulate button backend ([08 §1.1](../08-demo-plan.md#11-simulate-button)): `/api/demo/bills/:id/simulate` + `/stop`, `RoutingRateSource`, the worker `demoSim` loop (scripted 1 s ticks into the normal execute path, transfer advance + immediate status read), the simulated-tick quote-check exception, `demo.sim` SSE events. Test: a sandbox run reaches `PAID` in < 40 s, and a second click while running returns `INVALID_STATE` |
 | B9.7 | Test-data generator ([11](../11-test-data-and-seeding.md)): `pnpm gen:invoices`, `pnpm seed:generate` (profiles `mixed`, `lifecycle`, `deadline`, `corridors`, `extraction`, `upload`, `stress`, `e2e`), pooled beneficiaries, states reached through services, funding check, `seed:reset --generated`, `POST /api/demo/generate`, "Add sample invoices" in the upload modal, `/dev/market` Test data panel. Test: the same seed run twice creates nothing new; `lifecycle` shows every state with real sandbox IDs |
 | B9.4 | `pnpm seed:demo`: 3 invoice PDFs → bills (runs real extraction or uses a cached extraction for determinism) |
 | B9.5 | End-to-end run with the UI on `api` + sandbox; fix contract drift |
@@ -139,7 +139,7 @@ Estimates are for one engineer.
 
 | ID | Task |
 | --- | --- |
-| B10.1 | Idempotency/race tests: double-approve, approve during expiry, webhook before the create response, worker restart mid-execution |
+| B10.1 | Idempotency/race tests: double-execute, a quote expiring before create, webhook before the create response, worker restart mid-execution |
 | B10.2 | Observability: `/api/health` (Mongo, Redis, worker heartbeat, Airwallex token, feed freshness), queue depths and failed jobs per queue, a minimal ops page in `/dev/market` |
 | B10.3 | Rate-limit soak (V10) at the target bill count; tune the poll interval |
 | B10.4 | Security pass: scoped key, secrets never in the client bundle, `/dev` and `/api/demo` disabled when not in demo, webhook IP allowlist (if hosted) |

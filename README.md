@@ -1,6 +1,6 @@
 # FX Target Payment (Airwallex demo)
 
-Treat every foreign-currency bill like a position in a perps terminal: set a target rate or maximum cost, watch the pair live, approve a locked quote when the target hits, and get guaranteed payment at market on the final safe day if it doesn't.
+Treat every foreign-currency bill like a position in a perps terminal: set a target rate or maximum cost, watch the pair live, and pay automatically when the target hits. If it does not, the bill pays at market on the final safe day.
 
 Built on Airwallex Transactional FX (rates, quotes) and Payouts (transfers with conversion).
 

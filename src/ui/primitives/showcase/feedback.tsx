@@ -48,14 +48,8 @@ function ToastStack() {
             title={tone === 'target-hit' ? 'Target hit · EUR/USD' : tone}
             body={
               tone === 'target-hit'
-                ? '1.07480 is through the target. Quote locked.'
+                ? 'Paying at the locked quote.'
                 : 'Stacked with the cards above and below.'
-            }
-            countdown={tone === 'target-hit' ? '00:14' : undefined}
-            action={
-              tone === 'target-hit' ? (
-                <Button size="sm">Approve</Button>
-              ) : undefined
             }
             onDismiss={() => undefined}
           />

@@ -32,8 +32,6 @@ const ACTION_LABEL: Record<BillAction, string> = {
   PAUSE: 'Pause',
   RESUME: 'Resume',
   PAY_NOW: 'Pay now',
-  APPROVE: 'Approve',
-  HOLD: 'Hold',
   CANCEL: 'Cancel',
   REARM: 'Re-arm',
   ADVANCE_TRANSFER: 'Advance status',
@@ -337,7 +335,6 @@ function PositionRow({
 
 export function PositionsPanel({
   bills,
-  approvals,
   executed,
   events,
   selectedId,
@@ -348,7 +345,6 @@ export function PositionsPanel({
   fill = false,
 }: {
   bills: readonly BillSummary[];
-  approvals: readonly BillSummary[];
   executed: readonly BillSummary[];
   events: readonly BillEvent[];
   selectedId?: string;
@@ -381,17 +377,6 @@ export function PositionsPanel({
           ) : (
             <PositionsTable bills={bills} selectedId={selectedId} onSelect={onSelect} onAction={onAction} onOpenTicket={onOpenTicket} stickyHeader={fill} />
           ),
-        },
-        {
-          value: 'approvals',
-          label: 'Approvals',
-          count: approvals.length,
-          content:
-            approvals.length === 0 ? (
-              <EmptyState title="No approvals waiting" />
-            ) : (
-              <PositionsTable bills={approvals} selectedId={selectedId} onSelect={onSelect} onAction={onAction} onOpenTicket={onOpenTicket} stickyHeader={fill} />
-            ),
         },
         {
           value: 'executed',

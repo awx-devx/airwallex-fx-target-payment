@@ -58,8 +58,8 @@ Each component ships with: a typed props interface, all variants, a `*.fixtures.
 | `Skeleton` | line, block, circle, chart skeleton | — | shimmer |
 | `Spinner` | ring, dots | `xs` `sm` `md` | — |
 | `ProgressBar` | linear determinate/indeterminate; segmented (steps) | — | orange / up / warn |
-| `Avatar` | image, initials; role ring (approver = orange) | `xs` `sm` | — |
-| `Toast` | `info`, `success`, `warning`, `error`, `target-hit` (rich, with action buttons + countdown). 4px corner, hairline, no drop shadow. | — | stacking, auto-dismiss vs sticky |
+| `Avatar` | image, initials | `xs` `sm` | — |
+| `Toast` | `info`, `success`, `warning`, `error`, `target-hit` (informational: title and body, no action). 4px corner, hairline, no drop shadow. | — | stacking, auto-dismiss vs sticky |
 | `Banner` | inline alert: `info`, `warn`, `error`, `demo-mode` | — | dismissible |
 | `EmptyState` | icon + title + body + action | — | — |
 | `ScrollArea` | vertical, horizontal | — | — |
@@ -80,16 +80,16 @@ Each component ships with: a typed props interface, all variants, a `*.fixtures.
 | `MoneyDisplay` | Amount + currency with precision | `sm` `md` `lg` `hero`; signed (PnL); masked (••••) |
 | `SavingsCell` (PnL) | Savings in H + % | positive / negative / zero; tween on change |
 | `DistanceToTarget` | Bar + label showing how far the price is from the target | far (>1%), near (<0.25%, warn), at/through target (flat orange fill), inverted |
-| `CountdownChip` | Time left | `quote` (mm:ss), `deadline` (d h), `autosettle`; normal / < 5 min warn / < 60 s urgent pulse / expired |
+| `CountdownChip` | Time left | `quote` (mm:ss), `deadline` (d h), `autosettle` ("Pays at market"); normal / < 5 min warn / < 60 s urgent pulse / expired |
 | `DeadlineMeter` | Horizontal timeline: armed → now → execute-by → due | normal, final day, overdue, with skipped non-conversion day ("Skipped Dec 25: Christmas Day"); compact (list) / full (ticket) |
-| `StateBadge` | Bill state badge (see [03 §1](./03-domain-model.md#state-reference)) | every `BillState`, with pulse for `WATCHING`/`TARGET_HIT`/`DEADLINE_WINDOW` |
+| `StateBadge` | Bill state badge (see [03 §1](./03-domain-model.md#state-reference)) | every `BillState`, with pulse for `WATCHING` |
 | `TransferStatusPill` | Airwallex status with step dots `Scheduled → Processing → Sent → Paid` | every `TransferStatus` ([13 §4.3](./13-airwallex-contracts.md#43-status-maps)) incl. `OVERDUE`, `FAILED` with category, "Failed after paid" (late failure), "Awaiting Airwallex approval" (`IN_APPROVAL` family) |
 | `ConnectionIndicator` | Feed health dot | live (green pulse), delayed (warn), offline (down), simulated (orange "SIM") |
 | `EnvBadge` | `SANDBOX` / `PRODUCTION` / `DEMO · SIMULATED MARKET` | — |
 | `BalancePill` | Wallet balance (`available`) for a currency; tooltip with pending / reserved / total | normal, low (warn), insufficient for selected bill (down) |
 | `Sparkline` | Tiny line with the target line + last dot | favourable/adverse; with target hit dot; loading |
 | `StrategySummary` | "Target 1.07500 · Max cost 268,750 USD · Buffer 0 bps" | rate mode / max-cost mode / not set |
-| `QuoteCard` | Locked quote: price, sell/buy amounts, fees, validity countdown, "Settles {date}", spread vs mid (bps), Airwallex quote ID ([13 §3.2](./13-airwallex-contracts.md#32-quote--quotes--quotesummary--quotecard--approvalcard)) | `target` (green glow), `deadline` (amber), `expired` (muted + "re-quote"), `near-miss` info |
+| `QuoteCard` | Locked quote: price, sell/buy amounts, fees, validity countdown, "Settles {date}", spread vs mid (bps), Airwallex quote ID ([13 §3.2](./13-airwallex-contracts.md#32-quote--quotes--quotesummary--quotecard)) | `target` (green glow), `deadline` (amber), `expired` (muted + "re-quote"), `near-miss` info |
 | `CostBreakdown` | Bill amount × price, fee (paid by), SWIFT-charges note, total you pay, "vendor receives", vs entry, vs target ([13 §4.2](./13-airwallex-contracts.md#42-response--executions--executionsummary--transfertracker)) | estimated, **tentative** (transfer created, not yet `SCHEDULED`), locked; fee-unknown note; vendor receives less than invoice (warn) |
 | `ActivityItem` | One `bill_event` row (icon, text, ts, actor) | one variant per event type |
 | `KeyValueList` | Dense label/value rows | — |
@@ -143,16 +143,16 @@ interface FxChartProps {
 1. **Watching, far from target**: price hovering above the target, deadline 12 days out
 2. **Approaching target**: distance < 0.25%, near-miss marker
 3. **Target hit**: price through the target
-4. **Rejected & re-armed**: rejected marker, price bounced, still watching
-5. **Final day**: now line on the deadline line, autosettle countdown
-6. **Auto-settled**: ⚡ marker, executed
+4. **Near miss**: hollow marker, price bounced, still watching
+5. **Deadline day**: now line on the deadline line, pays-at-market countdown
+6. **Deadline payment**: ⚡ marker, executed
 7. **Paid**: executed ✓ marker, lines frozen, post-execution series dimmed
 8. **Max-cost mode**: target label shows cost
 9. **Inverted pair** (USD/JPY display for a JPY bill)
 10. **No reference history** (exotic pair, only own ticks)
 11. **Loading / empty / stale / error**
 12. **Live simulation**: attached to the in-browser simulated market (from `src/mocks/market`) and ticking every 500 ms; exposes buttons to "nudge down 20 pips" and "jump to deadline day"
-13. **Simulate run**: a Simulate button on the scenario replays the full [08 §1.1](./08-demo-plan.md#11-simulate-button) timeline in the browser: the simulated segment eases into the target zone, then target-hit pulse, auto-approved marker, executed marker
+13. **Simulate run**: a Simulate button on the scenario replays the full [08 §1.1](./08-demo-plan.md#11-simulate-button) timeline in the browser: the simulated segment eases into the target zone, then a target-hit pulse and an executed marker
 
 ---
 
@@ -160,27 +160,25 @@ interface FxChartProps {
 
 | Pattern | Contents | Variants / states |
 | --- | --- | --- |
-| `TopBar` | Logomark (no product name), `BalancePill`s (H + top 3), `ConnectionIndicator`, notifications bell (count), role switcher (Preparer/Approver), clock (shows warp speed in demo) | normal, demo mode, offline |
+| `TopBar` | Logomark (no product name), `BalancePill`s (H + top 3), `ConnectionIndicator`, notifications bell (count), clock (shows warp speed in demo) | normal, demo mode, offline |
 | `BillListItem` (market row) | `PairLabel`, vendor, amount, `Sparkline`, `PriceTicker` mini, `DistanceToTarget` mini, `CountdownChip` (deadline), `StateBadge` | every state; selected (orange wash + 2px inset rule); hover; compact vs comfortable |
-| `BillList` (left rail) | Search, filter chips (All / Watching / Needs approval / Final day / Paid), group-by-pair toggle, sort (deadline, distance, amount), list of `BillListItem`, "Upload bills" CTA | empty, loading, many (virtualised) |
+| `BillList` (left rail) | Search, filter chips (All / Watching / Paid), group-by-pair toggle, sort (deadline, distance, amount), list of `BillListItem`, "Upload bills" CTA | empty, loading, many (virtualised) |
 | `PairGroupHeader` | When grouped: pair, total exposure in F and H, count | — |
-| `BillTicket` (right drawer) | Tabbed: **Strategy** (mode toggle rate/max cost, `RateInput`/`AmountInput`, equivalents, advanced: buffer, confirm ticks, validity, cutoff), **Details** (bill fields, documents, beneficiary), **Activity** | per bill state: READY (arm form), WATCHING (edit + pause/pay now), TARGET_HIT (shows `ApprovalCard` inline), DEADLINE_WINDOW, IN_FLIGHT (transfer tracker), PAID (receipt), FAILED (error + fix) |
-| `ArmConfirm` | Summary + **standing instruction consent** checkbox ("If not approved by 14:00 on Oct 14, pay at market") | valid, missing consent, target already met |
-| `ApprovalCard` | `QuoteCard` + `CostBreakdown` + savings vs entry + balance check + Approve (primary, `A`) / Hold for better (`H`) / Cancel bill | target-hit, deadline, expired, insufficient balance, approving (loading), approved, as preparer (read-only "waiting for approver"), **simulated trigger** (shows "Triggered at … (simulated) · Airwallex quote … (actual)"), **auto-approved (simulation)** |
-| `ApprovalModal` | `ApprovalCard` in a `glow` dialog, opened from a toast or a notification | — |
+| `BillTicket` (right drawer) | Tabbed: **Strategy** (mode toggle rate/max cost, `RateInput`/`AmountInput`, equivalents, advanced: buffer, confirm ticks, validity, cutoff), **Details** (bill fields, documents, beneficiary), **Activity** | per bill state: READY (arm form), WATCHING (edit + pause/pay now), PAUSED, EXECUTING (progress), IN_FLIGHT (transfer tracker), PAID (receipt), FAILED (error + fix) |
+| `ArmConfirm` | Summary + **standing instruction consent** checkbox ("If the target is not hit by 14:00 on Oct 14, pay at market") | valid, missing consent, target already met (arming pays at the current rate) |
 | `TransferTracker` | `TransferStatusPill` + timeline + Airwallex IDs (short ref first; transfer and quote UUIDs) + amounts + funding sub-row (shown when not `FUNDED`) + dispatch date | each status; tentative vs confirmed amounts; failed per `FailureCategory` with next step ([13 §4.5](./13-airwallex-contracts.md#45-failure-categories)); late failure after paid; demo "advance status" button slot |
-| `PositionsPanel` (bottom) | Tabs: **Positions** (active bills table), **Approvals** (pending), **Executed**, **Activity** (global feed) | each tab: loading, empty, populated |
+| `PositionsPanel` (bottom) | Tabs: **Positions** (active bills table), **Executed**, **Activity** (global feed) | each tab: loading, empty, populated |
 | `PositionsTable` | Columns: row menu, Pair, Vendor, Amount, Entry, Mark, Target, Savings, Est. cost, Execute by, State | sortable; row selected; row flashing on tick; every row has a three-dot menu whose first item is Open ticket; the menu column stays put and transparent when the table scrolls sideways, and the other columns clip at its edge; other items from `allowedActions`, sentence case, Cancel in `--down` |
 | `UploadModal` | `FileDropzone` multi-file → per-file extraction progress → "Review n bills"; demo-only "Add sample invoices" (1–5 generated files, [11 §7](./11-test-data-and-seeding.md#7-interfaces)). The extracting state shows a `ThinkingOrb` (`thinking-orbs`) per file, `state` following the stage (`working` → `searching` → `solving`), paused under reduced motion ([07 §2](./07-pages-spec.md#2-upload--review-flow-upload-also-a-modal-over-the-terminal)) | idle, dragging, uploading, extracting (each orb state), partial failure, generating samples |
 | `ExtractionReview` | Split view: document preview (PDF/image) on the left, `ExtractionField` form on the right, bill n of m stepper, transfer reason `Select` + payment reference, beneficiary resolution (match existing, or `SchemaForm`), "Save as draft" / "Continue to strategy" | high confidence, low-confidence fields highlighted, missing bank details, duplicate invoice warning, Airwallex `FieldError`s inline (from validate-at-arm) |
 | `SchemaForm` | Renders a `BeneficiaryFormSchema` ([13 §5.2](./13-airwallex-contracts.md#52-dynamic-form--beneficiaryformschema--schemaform)): `INPUT`/`SELECT`/`DYNAMIC_SELECT`/`RADIO`/`TRANSFER_METHOD` fields, required markers, help tips, regex validation, `refresh` refetch, bank search; maps `FieldError.path` onto fields | fixtures EUR/IBAN (DE), GBP/sort code, INR/IFSC, USD/ACH; loading schema; refetching after a `refresh` field; field errors; submit → validate → verify |
 | `StrategyWizardStep` | Target setup with a mini `FxChart` (draggable target) + equivalents | rate mode, max-cost mode |
 | `NotificationCenter` | Popover list of notifications, grouped by bill | unread, read, action-required |
-| `CommandPalette` | `⌘K`: jump to bill, upload, approve pending, toggle demo panel | — |
+| `CommandPalette` | `⌘K`: jump to bill, upload, pay the selected bill now, toggle demo panel | — |
 | `ShortcutsSheet` | `?` overlay listing shortcuts | — |
 | `DemoControlBar` | (demo only) floating bar: market speed, time warp, nudge price, jump to deadline, advance transfer, **Simulate selected bill** | collapsed / expanded |
-| `SimulateButton` | (demo only) ticket action on `WATCHING` bills: "Simulate target hit" with a small popover for duration (5–60 s). While running it becomes `SimProgress`: phase stepper (Ramping → Target hit → Auto-approved → Executing → Settling → Paid), ETA, and Stop | idle, running per phase, done, aborted, failed (error from the pipeline) |
-| `SettingsForm` | Home currency, lead days, validities, deadline window and cutoff (account time zone shown) | — |
+| `SimulateButton` | (demo only) ticket action on `WATCHING` bills: "Simulate target hit" with a small popover for duration (5–60 s). While running it becomes `SimProgress`: phase stepper (Ramping → Target hit → Executing → Settling → Paid), ETA, and Stop | idle, running per phase, done, aborted, failed (error from the pipeline) |
+| `SettingsForm` | Home currency, lead days, quote validity, cutoff (account time zone shown) | — |
 
 ---
 
@@ -209,5 +207,5 @@ interface FxChartProps {
 - [ ] Chart scenarios 1–13 render correctly at 1280/1440/1920
 - [ ] Keyboard focus visible everywhere; dialogs trap focus
 - [ ] Reduced-motion mode verified
-- [ ] Glow usage review: glow only on the chart target line, a locked target quote (`--glow-up`), and the target-hit approval dialog (`--glow-lg`)
+- [ ] Glow usage review: glow only on the chart target line, a locked target quote (`--glow-up`), and the brief target-hit toast (`--glow-lg`)
 - [ ] Sign-off recorded in [09](./09-decisions-and-open-questions.md) (date + reviewers)

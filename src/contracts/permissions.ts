@@ -1,4 +1,4 @@
-import type { BillAction, BillState, BillSummary, Role } from '@/contracts/bill';
+import type { BillAction, BillState, BillSummary } from '@/contracts/bill';
 import { BILL_ACTIONS } from '@/contracts/bill';
 
 export interface PermissionOptions {
@@ -11,15 +11,12 @@ export interface PermissionOptions {
   simulationRunning?: boolean;
 }
 
-const APPROVER_ONLY = new Set<BillAction>(['APPROVE', 'HOLD']);
-
 /**
- * Actions the ticket may render. `APPROVE` and `HOLD` require the approver role.
+ * Actions the ticket may render.
  * The server and the mock data source both call this before changing state.
  */
 export function allowedActions(
   bill: Pick<BillSummary, 'state' | 'flags' | 'beneficiary'>,
-  role: Role,
   options?: PermissionOptions,
 ): BillAction[] {
   const actions = new Set<BillAction>(actionsForState(bill));
@@ -27,9 +24,6 @@ export function allowedActions(
     for (const action of demoActions(bill.state, options.simulationRunning === true)) {
       actions.add(action);
     }
-  }
-  if (role !== 'approver') {
-    for (const action of APPROVER_ONLY) actions.delete(action);
   }
   return BILL_ACTIONS.filter((action) => actions.has(action));
 }
@@ -53,14 +47,8 @@ function actionsForState(
       return ['EDIT_STRATEGY', 'PAUSE', 'PAY_NOW', 'CANCEL'];
     case 'PAUSED':
       return ['EDIT_STRATEGY', 'RESUME', 'CANCEL'];
-    case 'TARGET_HIT':
-      return ['APPROVE', 'HOLD', 'CANCEL'];
-    case 'DEADLINE_WINDOW':
-      return ['APPROVE', 'CANCEL'];
     case 'FAILED':
       return ['EDIT', 'RESOLVE_BENEFICIARY', 'REARM'];
-    case 'AUTO_SETTLING':
-    case 'APPROVED':
     case 'EXECUTING':
     case 'IN_FLIGHT':
     case 'PAID':

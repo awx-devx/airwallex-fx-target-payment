@@ -9,17 +9,11 @@ import {
   transferMethodSchema,
   transferReasonSchema,
 } from '@/contracts/airwallex';
-import { approvalSummarySchema } from '@/contracts/approval';
-
 export const BILL_STATES = [
   'DRAFT',
   'READY',
   'WATCHING',
   'PAUSED',
-  'TARGET_HIT',
-  'DEADLINE_WINDOW',
-  'AUTO_SETTLING',
-  'APPROVED',
   'EXECUTING',
   'IN_FLIGHT',
   'PAID',
@@ -38,8 +32,6 @@ export const BILL_ACTIONS = [
   'PAUSE',
   'RESUME',
   'PAY_NOW',
-  'APPROVE',
-  'HOLD',
   'CANCEL',
   'REARM',
   'ADVANCE_TRANSFER',
@@ -94,13 +86,8 @@ export const billSummarySchema = z.object({
   transferReason: transferReasonSchema,
   reference: z.string().min(1),
   beneficiary: beneficiarySummarySchema.optional(),
-  activeApproval: approvalSummarySchema.optional(),
   execution: executionSummarySchema.optional(),
   flags: billFlagsSchema,
   allowedActions: z.array(billActionSchema),
 });
 export type BillSummary = z.infer<typeof billSummarySchema>;
-
-export const ROLES = ['preparer', 'approver'] as const;
-export const roleSchema = z.enum(ROLES);
-export type Role = z.infer<typeof roleSchema>;

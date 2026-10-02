@@ -17,7 +17,7 @@ Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (
 - Bound retention: `removeOnComplete: { age: 86400, count: 1000 }`, `removeOnFail: { age: 604800 }`.
 
 ## Timers and the sweeper
-- Deadline open, auto-settle and approval expiry are **timestamps in Mongo** (`timers.*`, `approvals.expiresAt`), not BullMQ delayed jobs. This keeps them warp-clock safe and restart safe.
+- The deadline cutoff is a **timestamp in Mongo** (`timers.autosettleAt`), not a BullMQ delayed job. This keeps it warp-clock safe and restart safe.
 - The sweeper (1 s loop) queries due timers with `clock.now()` and enqueues jobs. The job sets `*FiredAt` when it completes. Catch-up after downtime needs no special code.
 - Anything new that must happen "at time T" follows the same pattern: a field + a sweeper query + an index.
 
@@ -28,7 +28,7 @@ Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (
 ## Demo Simulate loop (`src/worker/demoSim.ts`)
 - Runs every 1 s, only on the leader, only while a `demo:sim:*` key exists, and only in `DEMO_MODE`. Spec: `docs/08` §1.1.
 - Pacing uses wall-clock seconds even under the warp clock. This is the one allowed exception to "time from `Clock`"; tag it `DEMO-ONLY:`.
-- It produces ticks for sim bills through `RoutingRateSource`, auto-approves through the approve service, advances the transfer through the sandbox simulation endpoint, and applies the status with `applyTransferStatus`. Any pipeline error ends the run (`SIM_ENDED`, phase `ABORTED`).
+- It produces ticks for sim bills through `RoutingRateSource`. Those ticks pay through the normal execute path. It advances the transfer through the sandbox simulation endpoint and applies the status with `applyTransferStatus`. Any pipeline error ends the run (`SIM_ENDED`, phase `ABORTED`).
 
 ## Singleton
 - The poller and the sweeper start only while holding the Redis leader lock (`SET worker:leader <id> NX PX 15000`, renewed every 5 s). They stop immediately if the lock is lost.
