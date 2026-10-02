@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { KitShell } from '@/app/dev/ui-kit/kit-shell';
 
 export const metadata: Metadata = {
-  title: 'UI kit · FX Target Payment',
+  title: 'UI kit',
 };
 
 export default function UiKitPage() {

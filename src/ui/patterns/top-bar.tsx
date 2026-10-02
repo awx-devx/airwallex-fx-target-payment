@@ -8,13 +8,11 @@ import { Button } from '@/ui/primitives/button';
 import { SegmentedControl } from '@/ui/primitives/segmented';
 import { BalancePill } from '@/ui/trading/balance-pill';
 import { ConnectionIndicator } from '@/ui/trading/connection-indicator';
-import { EnvBadge } from '@/ui/trading/env-badge';
 import { formatUtcDate } from '@/ui/trading/time-label';
 
 type Connection = 'live' | 'delayed' | 'offline' | 'simulated';
 
 export function TopBar({
-  env = 'SANDBOX',
   balances,
   connection = 'live',
   unread = 0,
@@ -28,7 +26,6 @@ export function TopBar({
   trailing,
   divider = true,
 }: {
-  env?: 'SANDBOX' | 'PRODUCTION' | 'DEMO';
   balances: readonly BalanceSummary[];
   connection?: Connection;
   unread?: number;
@@ -53,8 +50,11 @@ export function TopBar({
       }
     >
       {leading}
-      <p className="shrink-0 text-sm font-medium tracking-tight">FX Target</p>
-      <EnvBadge env={env} />
+      <img
+        src="/logomark.svg"
+        alt="FX Target Bill Payment"
+        className="size-5.5 shrink-0"
+      />
       <div className="hidden min-w-0 items-center gap-1.5 xl:flex">
         {shown.map((balance, index) => (
           <BalancePill

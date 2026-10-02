@@ -27,7 +27,7 @@ POST /api/demo/bills/:id/simulate/stop
 POST /api/demo/reset
 ```
 
-The **`EnvBadge` shows `DEMO · SIMULATED MARKET`** whenever `RATE_SOURCE=simulated`, so it is clear which parts are simulated. Quote and transfer IDs shown in the UI are real sandbox IDs.
+The **`ConnectionIndicator` shows `SIM`** whenever the feed is simulated, so it is clear which parts are simulated. Quote and transfer IDs shown in the UI are real sandbox IDs.
 
 ### 1.1 Simulate button
 

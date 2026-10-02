@@ -160,7 +160,7 @@ interface FxChartProps {
 
 | Pattern | Contents | Variants / states |
 | --- | --- | --- |
-| `TopBar` | Logo/wordmark, `EnvBadge`, `BalancePill`s (H + top 3), `ConnectionIndicator`, notifications bell (count), role switcher (Preparer/Approver), clock (shows warp speed in demo) | normal, demo mode, offline |
+| `TopBar` | Logomark (no product name), `BalancePill`s (H + top 3), `ConnectionIndicator`, notifications bell (count), role switcher (Preparer/Approver), clock (shows warp speed in demo) | normal, demo mode, offline |
 | `BillListItem` (market row) | `PairLabel`, vendor, amount, `Sparkline`, `PriceTicker` mini, `DistanceToTarget` mini, `CountdownChip` (deadline), `StateBadge` | every state; selected (orange wash + 2px inset rule); hover; compact vs comfortable |
 | `BillList` (left rail) | Search, filter chips (All / Watching / Needs approval / Final day / Paid), group-by-pair toggle, sort (deadline, distance, amount), list of `BillListItem`, "Upload bills" CTA | empty, loading, many (virtualised) |
 | `PairGroupHeader` | When grouped: pair, total exposure in F and H, count | — |

@@ -159,9 +159,9 @@ export const patternShowcases: Showcase[] = [
         title: 'Normal, demo, offline',
         render: () => (
           <div className="space-y-3">
-            <TopBar env="SANDBOX" balances={balances} role="preparer" now={PATTERN_NOW} unread={2} />
-            <TopBar env="DEMO" balances={balances} connection="simulated" role="approver" now={PATTERN_NOW} warp="60×" unread={0} />
-            <TopBar env="SANDBOX" balances={balances} connection="offline" role="preparer" now={PATTERN_NOW} />
+            <TopBar balances={balances} role="preparer" now={PATTERN_NOW} unread={2} />
+            <TopBar balances={balances} connection="simulated" role="approver" now={PATTERN_NOW} warp="60×" unread={0} />
+            <TopBar balances={balances} connection="offline" role="preparer" now={PATTERN_NOW} />
           </div>
         ),
       },

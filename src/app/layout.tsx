@@ -19,10 +19,30 @@ const jetbrains = JetBrains_Mono({
   display: 'swap',
 });
 
+const title = 'FX Target Bill Payment';
+const description =
+  'Set a target rate on each foreign-currency bill. Pay when the rate hits, or at market by the deadline — never late.';
+
 export const metadata: Metadata = {
-  title: 'FX Target Payment',
-  description:
-    'Watch a target rate and settle foreign-currency bills by their deadline.',
+  title: {
+    default: title,
+    template: `%s · ${title}`,
+  },
+  description,
+  icons: {
+    icon: '/logomark.png',
+    apple: '/logomark.png',
+  },
+  openGraph: {
+    title,
+    description,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

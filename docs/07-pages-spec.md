@@ -10,7 +10,7 @@ The main screen, modelled on a perps trading terminal.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-│ TopBar: ◆ FX Target · SANDBOX · USD 1,240,000 · EUR 80,000 · ● Live · 🔔3 · Approver ▾   │
+│ TopBar: [mark] · USD 1,240,000 · EUR 80,000 · ● Live · 🔔3 · Approver ▾                    │
 ├──────────────┬──────────────────────────────────────────────────────────┬─────────────────┤
 │ BillList     │ ChartHeader: 🇪🇺🇺🇸 EUR/USD  1.08412 ▼0.21%  ● Live  1H 1D 1W 1M TO_DUE │ BillTicket      │
 │ [search]     │──────────────────────────────────────────────────────────│ [Strategy|Det.| │
@@ -61,7 +61,7 @@ Desktop is the design target (the pitch runs at 1440+), but every page must stay
 | ≥ 1440 px (`2xl`) | Bill list and centre (chart + bottom panel). The ticket is a right drawer, opened from **Open ticket** on a row or the Ticket button in the top bar |
 | 1280–1439 px (`xl`) | Same. The ticket stays a drawer |
 | 1024–1279 px (`lg`) | The bill list collapses too: a **menu button** in the top bar opens it as a left drawer. The centre fills the width |
-| < 1024 px | As above, and the chart stacks above the bottom panel instead of beside it. The top bar keeps the wordmark, the menu button, the ticket button and the notification bell. Below `xl`, balances, the role switch, and the connection label leave the bar and sit at the top of the bill list — the rail while it is open, otherwise the menu drawer |
+| < 1024 px | As above, and the chart stacks above the bottom panel instead of beside it. The top bar keeps the logomark, the menu button, the ticket button and the notification bell. Below `xl`, balances, the role switch, and the connection label leave the bar and sit at the top of the bill list — the rail while it is open, otherwise the menu drawer |
 
 Other pages follow the same split: the upload review's document preview stacks above the fields below `lg`, and settings uses a single column. Dialogs that are wider than the viewport shrink to full width. Touch targets stay at least 32 px, which the comfortable density already gives.
 

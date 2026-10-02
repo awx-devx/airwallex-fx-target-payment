@@ -49,4 +49,4 @@ Specs: `docs/05-design-system.md` (tokens, rules, typography, motion, chart styl
 
 ## Copy
 - Pairs are shown as `F/H` (e.g. `EUR/USD`). Say "target hit", "quote locked · 29:59", "auto-settles at 14:00 (standing instruction)", "paid".
-- Buttons name the outcome and amount ("Approve · pay USD 271,430.12"). The simulated market is always labelled (`EnvBadge`: `DEMO · SIMULATED MARKET`).
+- Buttons name the outcome and amount ("Approve · pay USD 271,430.12"). The simulated market is always labelled (`ConnectionIndicator`: `SIM`).
