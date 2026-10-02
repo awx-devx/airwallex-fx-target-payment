@@ -5,8 +5,9 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // This repo already has AGENTS.md. Don't let `next dev` append a block to it.
   agentRules: false,
-  // Playwright and the browser use 127.0.0.1; dev HMR is otherwise blocked.
-  allowedDevOrigins: ['127.0.0.1'],
+  // Cross-origin hosts that may hit the dev server (HMR, RSC, assets).
+  // Playwright uses 127.0.0.1; quick tunnels use *.trycloudflare.com.
+  allowedDevOrigins: ['127.0.0.1', '*.trycloudflare.com'],
 };
 
 export default nextConfig;
