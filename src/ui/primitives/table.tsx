@@ -42,6 +42,7 @@ export function Th({
   sortable?: boolean;
   sorted?: 'asc' | 'desc';
   onSort?: () => void;
+  /** Pin to the top of the scrollport. */
   sticky?: boolean;
 }) {
   const content = (
