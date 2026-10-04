@@ -77,6 +77,30 @@ const eslintConfig = defineConfig([
     },
   })),
   {
+    files: [
+      'src/server/domain/**/*.ts',
+      'src/server/services/**/*.ts',
+      'src/worker/**/*.ts',
+    ],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message:
+            'Use the injected Clock. new Date() is only allowed in adapters.',
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message:
+            'Use the injected Clock. Date.now() is only allowed in adapters.',
+        },
+      ],
+    },
+  },
+  {
     files: ['src/ui/**/*.fixtures.ts'],
     rules: {
       'no-restricted-imports': [

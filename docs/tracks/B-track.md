@@ -85,7 +85,7 @@ Ask for the Airwallex values in the Environment table before B2.1. Do not call t
 | B4.1 | `POST /api/uploads`: multipart, many files, stored under `storage/` (local disk for the demo; S3-compatible adapter optional); creates `DRAFT` bills |
 | B4.2 | Extraction pipeline per [12](../12-bill-extraction.md): preflight + SHA-256 cache, deterministic readers (e-invoice XML, EPC/Swiss QR, text layer), `anthropic` extractor (PDF `document` block, JSON-schema structured output, Haiku → Sonnet escalation), merge, validators, evidence → boxes. Plus the `mock` extractor (generator truth by file hash, [11 §4](../11-test-data-and-seeding.md#4-invoice-rendering)) and the optional `ollama` adapter |
 | B4.2b | Benchmark with `pnpm test:extraction` ([12 §5](../12-bill-extraction.md#5-benchmark-and-gates)) across Haiku-only / escalation / Sonnet-only; tune the prompt until the gates pass; record the chosen default in D-15. Ask for `ANTHROPIC_API_KEY` first (Environment table). |
-| B4.3 | BullMQ `extraction` queue (concurrency 4, `jobId: extract:{documentId}`); progress events over SSE |
+| B4.3 | BullMQ `extraction` queue (concurrency 4, `jobId: extract.{documentId}`); progress events over SSE |
 | B4.4 | Validation: currency payable (static capability table overridden by `supported_currencies`), payout precision, FX amount limits ($1–$5M default), IDR/VND quota, due date, duplicate invoice detection (vendor + invoice # + amount). On arm: `transfers/validate` dry run → `FieldError[]` ([13 §4.4](../13-airwallex-contracts.md#44-validation-at-arming)) |
 | B4.5 | Beneficiary resolution: match existing (name / IBAN / account number), or create through the Airwallex API: form-schema proxy (cached 24 h), bank search proxy, `beneficiaries/validate`, create, then `verify_account` where supported (SEPA/UK/VN); store only masked fields + verification result ([13 §5](../13-airwallex-contracts.md#5-beneficiaries)) |
 | B4.7 | Reference data: `supported_currencies`, `invalid_conversion_dates` per pair (fed to `subtractBusinessDays`), quota; Redis cache 24 h; `GET /api/reference/*` routes |
@@ -109,7 +109,7 @@ Ask for the Airwallex values in the Environment table before B2.1. Do not call t
 | B6.1 | The strategy engine subscribes to ticks and evaluates the trigger rules for `WATCHING` bills |
 | B6.2 | On trigger: lock the quote (`QUOTE_VALIDITY_TARGET`), re-check it against the target → `EXECUTING` in the same job, or a `NEAR_MISS` event that stays `WATCHING` |
 | B6.3 | Cancel from `DRAFT`/`READY`/`WATCHING`/`PAUSED`. There is no approve or hold endpoint |
-| B6.4 | Quote expires before the transfer is created → stay `WATCHING` and retry (`quote-retry:{billId}`) |
+| B6.4 | Quote expires before the transfer is created → stay `WATCHING` and retry (`quote-retry.{billId}`) |
 | B6.5 | "Pay now" locks a `MIN_1` quote and enqueues execution with mode `MANUAL` |
 | B6.6 | Notifier: in-app only (SSE `notification` → toast + `NotificationCenter`, deep link `/bills/:id`; Q-05); messages for target hit (paying), deadline payment, paid, failed |
 | B6.7 | Strategy edits while `WATCHING`: recompute the target (max-cost mode), re-evaluate immediately, log `STRATEGY_UPDATED` |
@@ -122,7 +122,7 @@ Ask for the Airwallex values in the Environment table before B2.1. Do not call t
 | B7.2 | `deadline.autosettle`: if the bill is still `WATCHING` or `PAUSED`, lock a `MIN_1` quote and execute with mode `DEADLINE` |
 | B7.3 | If that quote cannot be locked, stay `WATCHING` and let the sweeper retry |
 | B7.4 | Pay-now and the cutoff share the executor. Mode is `MANUAL` or `DEADLINE`; a target hit is `TARGET` |
-| B7.5 | Sweeper (`worker/sweeper.ts`): every 1 s, query due `autosettleAt` timers against `clock.now()` and add the `deadline.autosettle:{billId}` job; log `CATCH_UP` when a timer is more than 1 min late (restart recovery) |
+| B7.5 | Sweeper (`worker/sweeper.ts`): every 1 s, query due `autosettleAt` timers against `clock.now()` and add the `deadline.autosettle.{billId}` job; log `CATCH_UP` when a timer is more than 1 min late (restart recovery) |
 | B7.6 | Warp-clock check: at 1,000× the sweeper fires deadline actions in the right order, and no timer fires twice (tests with a fake clock) |
 | B7.7 | *(Flag `DEADLINE_SAFETY_NET=airwallex`)* Layer B: create a future-dated transfer with `lock_rate_on_create=false` on arming; cancel it when another path executes; surface its ID in the ticket |
 

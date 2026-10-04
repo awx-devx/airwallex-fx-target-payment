@@ -217,7 +217,7 @@ sequenceDiagram
   participant AWX as Airwallex
   participant WH as /api/webhooks/airwallex
 
-  Q->>EX: execute (jobId = execute:{billId}:{attempt})
+  Q->>EX: execute (jobId = execute.{billId}.{attempt})
   EX->>AWX: GET balances/current (check H >= est. cost)
   EX->>AWX: POST transfers/create {quote_id, request_id=tr:bill:attempt}
   AWX-->>EX: transfer (SCHEDULED/PROCESSING)
@@ -237,7 +237,7 @@ sequenceDiagram
   participant SE as Strategy engine
   participant AWX as Airwallex
   participant N as Notifier
-  S->>Q: bill.timers.autosettleAt <= clock.now() → add deadline.autosettle (jobId = deadline.autosettle:{billId})
+  S->>Q: bill.timers.autosettleAt <= clock.now() → add deadline.autosettle (jobId = deadline.autosettle.{billId})
   Q->>SE: deadline.autosettle(bill) @ cutoff (default 14:00)
   alt still WATCHING or PAUSED
     SE->>AWX: lock MIN_1 quote, transfers/create
@@ -330,14 +330,16 @@ MongoDB has no built-in job queue or cross-process push. Without Redis we would 
 
 | Queue | Producer | Concurrency | `jobId` | Retries |
 | --- | --- | --- | --- | --- |
-| `extraction` | `POST /api/uploads` | 4 | `extract:{documentId}` | 3, exp 5 s |
-| `strategy` | poller (on trigger) | 4 | `trigger:{billId}:{tickId}` | 2 |
-| `deadline` | sweeper | 2 | `deadline.autosettle:{billId}` | 5, exp 10 s |
-| `quote-retry` | sweeper | 4 | `quote-retry:{billId}` | 3 |
-| `execution` | strategy, cutoff, pay-now | 2 | `execute:{billId}:{attempt}` | 5, exp 2 s (same `request_id`) |
-| `webhook` | webhook route | 4 | `webhook:{eventId}` | 10, exp 5 s |
-| `notify` | services | 4 | `notify:{notificationId}` | 5 |
+| `extraction` | `POST /api/uploads` | 4 | `extract.{documentId}` | 3, exp 5 s |
+| `strategy` | poller (on trigger) | 4 | `trigger.{billId}.{tickId}` | 2 |
+| `deadline` | sweeper | 2 | `deadline.autosettle.{billId}` | 5, exp 10 s |
+| `quote-retry` | sweeper | 4 | `quote-retry.{billId}` | 3 |
+| `execution` | strategy, cutoff, pay-now | 2 | `execute.{billId}.{attempt}` | 5, exp 2 s (same `request_id`) |
+| `webhook` | webhook route | 4 | `webhook.{eventId}` | 10, exp 5 s |
+| `notify` | services | 4 | `notify.{notificationId}` | 5 |
 | `reconcile` | repeatable job, every 60 s | 1 | repeatable | — |
+
+BullMQ rejects a custom `jobId` that contains `:`. The separator is `.`. A `:` inside an id segment is stored as `_`.
 
 The poller is a plain loop inside the worker, not a queue, so tick timing stays predictable.
 

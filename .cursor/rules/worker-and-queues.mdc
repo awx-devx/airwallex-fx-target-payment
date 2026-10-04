@@ -10,7 +10,7 @@ Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (
 
 ## Queues (`src/server/queue`)
 - Queue names, job names and **typed payloads** (zod) live in `src/server/queue`. Producers and processors import them from there; no string literals elsewhere.
-- Every `add` uses a **deterministic `jobId`** from the table in `docs/02` §9.2 (`execute:{billId}:{attempt}`, `deadline.open:{billId}`, `webhook:{eventId}`, …). A duplicate `add` is a no-op, which is the point.
+- Every `add` uses a **deterministic `jobId`** from the table in `docs/02` §9.2 (`execute.{billId}.{attempt}`, `deadline.autosettle.{billId}`, `webhook.{eventId}`, …). A duplicate `add` is a no-op, which is the point. BullMQ rejects `:` in a custom id, so the separator is `.`.
 - Processors are **idempotent and state-guarded**: reload the bill, check its state/version, and exit quietly if the work is already done. A retry must never double-act.
 - One processor file per queue in `src/worker/processors/`. Processors call `server/services`; business logic doesn't live in processors.
 - Worker Redis connections use `maxRetriesPerRequest: null`. Pub/sub subscribers use their own connection.

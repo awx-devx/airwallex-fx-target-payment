@@ -12,7 +12,7 @@ Full spec: `docs/04-airwallex-integration.md` §3.
 - `export const runtime = 'nodejs'`.
 - Read the body with `await req.text()` and verify **before** parsing: HMAC-SHA256 hex of `x-timestamp + rawBody` with `AIRWALLEX_WEBHOOK_SECRET`, `crypto.timingSafeEqual`, and a 5-minute timestamp tolerance. Invalid → 400.
 - Store it: `WebhookEvent.create({ _id: event.id, name, payload, receivedAt })`. Duplicate-key `11000` → return 200 without enqueuing again.
-- Enqueue a BullMQ `webhook` job (`jobId: webhook:{eventId}`) and **return 200 immediately**. Never call Airwallex or run business logic in the route.
+- Enqueue a BullMQ `webhook` job (`jobId: webhook.{eventId}`) and **return 200 immediately**. Never call Airwallex or run business logic in the route.
 - Normalise payloads in one place (`webhooks.ts`): `data.object ?? data`, `account_id ?? accountId`.
 
 ## Processor

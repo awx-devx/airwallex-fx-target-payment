@@ -201,7 +201,7 @@ Deposits simulation (`POST /simulation/deposit/create` with `global_account_id`,
 1. Read the **raw** body string. Do not parse it yet.
 2. `expected = HMAC_SHA256(secret, x-timestamp + rawBody).hex()`. Constant-time compare with `x-signature`. Reject if `|now − x-timestamp| > 5 min`.
 3. Parse, then `WebhookEvent.create({ _id: event.id, … })`. A duplicate-key error (`11000`) means the event was already received, so return `200`.
-4. **Respond `200` immediately**, then process asynchronously by adding a BullMQ `webhook` job with `jobId: webhook:{eventId}`.
+4. **Respond `200` immediately**, then process asynchronously by adding a BullMQ `webhook` job with `jobId: webhook.{eventId}`.
 5. Processor: `data.object` has the same shape as the Retrieve response, so it goes through the **same mapper** as `GET /transfers/{id}`. Find the execution by `data.object.id` (transfer id) or `metadata.bill_id`, then apply the status with the monotonic rank guard, write a `bill_event`, and publish to Redis `app_events`. If the event `version` ≠ `AIRWALLEX_API_VERSION`, log a warning.
 6. Ordering: never rely on delivery order. Compare the object's `updated_at` with the stored value.
 

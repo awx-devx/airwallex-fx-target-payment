@@ -42,7 +42,7 @@ stateDiagram-v2
 
 ### Invariants
 
-1. **At most one active execution per bill.** Enforced by a partial unique index on `executions { billId: 1 }` with `partialFilterExpression: { active: true }`, by a deterministic `request_id`, and by the BullMQ `jobId` `execute:{billId}:{attempt}`.
+1. **At most one active execution per bill.** Enforced by a partial unique index on `executions { billId: 1 }` with `partialFilterExpression: { active: true }`, by a deterministic `request_id`, and by the BullMQ `jobId` `execute.{billId}.{attempt}`.
 2. **All transitions go through `transition(bill, event)`** in `server/domain/stateMachine.ts`. The service applies it as one atomic conditional `findOneAndUpdate` on the bill (`state ∈ allowedFrom` and `version = expected`, then `$inc: { version: 1 }`), then inserts a `bill_events` document. A `null` result means another process won the race. See [02 §9.3](./02-architecture.md#93-consistency-without-row-locks).
 3. **The deadline overrides every non-terminal state.** A `WATCHING` or `PAUSED` bill whose cutoff has passed moves to `EXECUTING` and pays at market.
 4. **A payment uses a quote locked in the same job.** If the locked quote is worse than the target, or it expires before the transfer is created, the bill stays `WATCHING`. A multi-document transaction is used only when creating the execution.
@@ -114,7 +114,7 @@ Evaluated by the strategy engine on every tick for `WATCHING` bills:
   - Default `lead_days`: the chosen transfer method's `flight_time.max` from the beneficiary form schema + 1 business day ([13 §5.3](./13-airwallex-contracts.md#53-method-lead-days-and-limits)), falling back to `LOCAL = 1`, `SWIFT = 3`. Configurable per bill.
   - If `execution_deadline` is already in the past when arming, the bill goes straight to `EXECUTING` (UI: "Due now") and pays at market.
 - At arming, write one timer onto the bill document: `timers.autosettleAt` (a UTC instant computed in the account time zone) = `execution_deadline @ DEADLINE_AUTOSETTLE_CUTOFF` (14:00). If the bill is still `WATCHING` or `PAUSED`, lock a short quote and move it to `EXECUTING`. The activity log records `AUTOSETTLE`. The ticket's deadline meter already says the bill pays at market that day if the target is not hit.
-- The worker **sweeper** runs every second. It queries `{ 'timers.autosettleAt': { $lte: clock.now() }, 'timers.autosettleFiredAt': null, state: { $in: ['WATCHING', 'PAUSED'] } }`, then adds a BullMQ job with the deterministic ID `deadline.autosettle:{billId}`. The job marks `autosettleFiredAt` when it completes. If the quote cannot be locked, the bill stays `WATCHING` and the sweeper retries.
+- The worker **sweeper** runs every second. It queries `{ 'timers.autosettleAt': { $lte: clock.now() }, 'timers.autosettleFiredAt': null, state: { $in: ['WATCHING', 'PAUSED'] } }`, then adds a BullMQ job with the deterministic ID `deadline.autosettle.{billId}`. The job marks `autosettleFiredAt` when it completes. If the quote cannot be locked, the bill stays `WATCHING` and the sweeper retries.
 - Jobs are idempotent and state-guarded. Because timers are data, restarts need no special handling: any timer that became due while the worker was down is picked up by the first sweep.
 
 ---
