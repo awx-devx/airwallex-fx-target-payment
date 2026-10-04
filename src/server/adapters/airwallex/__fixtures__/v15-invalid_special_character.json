@@ -1,0 +1,71 @@
+{
+  "kind": "transfer",
+  "body": {
+    "amount_beneficiary_receives": "2",
+    "amount_payer_pays": "2.27",
+    "beneficiary": {
+      "address": {
+        "city": "Berlin",
+        "country_code": "DE",
+        "postcode": "10115",
+        "street_address": "••••reet"
+      },
+      "bank_details": {
+        "account_currency": "EUR",
+        "account_name": "••••GmbH",
+        "bank_country_code": "DE",
+        "bank_name": "Commerzbank",
+        "iban": "••••8354"
+      },
+      "entity_type": "COMPANY",
+      "type": "BANK_ACCOUNT"
+    },
+    "beneficiary_id": "970a1353-f784-4df8-b244-2105915822b4",
+    "conversion": {
+      "currency_pair": "EURUSD",
+      "rate": "1.133176"
+    },
+    "created_at": "2026-10-04T18:23:41+0000",
+    "fee_amount": "0",
+    "fee_currency": "USD",
+    "fee_paid_by": "PAYER",
+    "funding": {
+      "status": "FUNDED"
+    },
+    "id": "74b6deae-2990-444e-ae11-871e9174e3df",
+    "metadata": {
+      "app": "fx-target-payment",
+      "bill_id": "smoke-v15-invalid_special_character"
+    },
+    "payer": {
+      "additional_info": {
+        "business_incorporation_date": "2026-03-01",
+        "business_registration_number": "123456789",
+        "business_registration_type": "COMPANY"
+      },
+      "address": {
+        "city": "Los Angeles",
+        "country_code": "US",
+        "postcode": "90001",
+        "state": "CA",
+        "street_address": "••••eens"
+      },
+      "company_name": "Sandbox Business",
+      "entity_type": "COMPANY"
+    },
+    "reason": "bill_payment",
+    "reference": "smoke-v15-invalid_special_character",
+    "remarks": "",
+    "request_id": "tr:smoke-v15-invalid_special_character:52302",
+    "short_reference_id": "P261004-RL2EFRN",
+    "source_amount": "2.27",
+    "source_currency": "USD",
+    "status": "SCHEDULED",
+    "swift_charge_option": "SHARED",
+    "transfer_amount": "2",
+    "transfer_currency": "EUR",
+    "transfer_date": "2026-10-04",
+    "transfer_method": "LOCAL",
+    "updated_at": "2026-10-04T18:23:42+0000"
+  }
+}

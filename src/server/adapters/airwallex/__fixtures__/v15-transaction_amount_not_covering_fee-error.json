@@ -1,0 +1,30 @@
+{
+  "body": {
+    "status": 400,
+    "code": "validation_failed",
+    "message": "The request failed our schema validation. Refer to the errors object for erroneous fields, codes and parameters.",
+    "details": {
+      "errors": [
+        {
+          "code": "018",
+          "params": {
+            "length_max": "50",
+            "length_min": "10"
+          },
+          "source": "request_id"
+        }
+      ]
+    },
+    "fieldErrors": [
+      {
+        "path": "request_id",
+        "code": "018",
+        "message": "10–50 characters",
+        "params": {
+          "length_max": "50",
+          "length_min": "10"
+        }
+      }
+    ]
+  }
+}

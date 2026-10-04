@@ -1,0 +1,22 @@
+{
+  "body": {
+    "status": 400,
+    "code": "validation_failed",
+    "message": "field [entity_type] is required",
+    "details": {
+      "errors": [
+        {
+          "code": "001",
+          "source": "entity_type"
+        }
+      ]
+    },
+    "fieldErrors": [
+      {
+        "path": "entity_type",
+        "code": "001",
+        "message": "Required"
+      }
+    ]
+  }
+}

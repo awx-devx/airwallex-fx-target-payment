@@ -70,6 +70,10 @@ describe('generateSnapshot', () => {
       if (bank.iban) expect(isValidIban(bank.iban)).toBe(true);
       if (bank.ifsc) expect(isValidIfsc(bank.ifsc)).toBe(true);
       if (bank.routingNumber) expect(isValidAba(bank.routingNumber)).toBe(true);
+      if (bank.currency === 'INR') expect(bank.ifsc).toBe('HDFC0000001');
+      if (bank.currency === 'JPY') expect(bank.bic).toBe('BOTKJPJT');
+      if (bank.currency === 'SGD') expect(bank.bic).toBe('DBSSSGSG');
+      if (bank.currency === 'GBP') expect(bank.sortCode).toBe('200000');
       if (bank.accountNumber)
         expect(isValidLuhn(bank.accountNumber)).toBe(true);
     }

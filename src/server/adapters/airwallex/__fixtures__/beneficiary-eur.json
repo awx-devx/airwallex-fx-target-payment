@@ -1,0 +1,29 @@
+{
+  "kind": "beneficiary",
+  "currency": "EUR",
+  "body": {
+    "beneficiary": {
+      "address": {
+        "city": "Berlin",
+        "country_code": "DE",
+        "postcode": "10115",
+        "street_address": "••••reet"
+      },
+      "bank_details": {
+        "account_currency": "EUR",
+        "account_name": "••••GmbH",
+        "bank_country_code": "DE",
+        "bank_name": "Commerzbank",
+        "iban": "••••8354"
+      },
+      "entity_type": "COMPANY",
+      "type": "BANK_ACCOUNT"
+    },
+    "id": "970a1353-f784-4df8-b244-2105915822b4",
+    "nickname": "Example EUR GmbH",
+    "payer_entity_type": "COMPANY",
+    "transfer_methods": [
+      "LOCAL"
+    ]
+  }
+}

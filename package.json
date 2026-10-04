@@ -14,6 +14,8 @@
     "test": "vitest run",
     "worker": "node --env-file=.env --import tsx src/worker/index.ts",
     "db:indexes": "node --env-file=.env --import tsx scripts/db-indexes.ts",
+    "airwallex:smoke": "node --env-file=.env --import tsx scripts/airwallex-smoke.ts",
+    "seed:beneficiaries": "node --env-file=.env --import tsx scripts/seed-beneficiaries.ts",
     "test:visual": "playwright test",
     "test:e2e": "playwright test --config playwright.e2e.config.ts"
   },

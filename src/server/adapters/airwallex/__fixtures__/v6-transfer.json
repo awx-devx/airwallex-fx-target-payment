@@ -1,0 +1,71 @@
+{
+  "kind": "transfer",
+  "body": {
+    "amount_beneficiary_receives": "10.0",
+    "amount_payer_pays": "11.43",
+    "beneficiary": {
+      "address": {
+        "city": "Berlin",
+        "country_code": "DE",
+        "postcode": "10115",
+        "street_address": "••••reet"
+      },
+      "bank_details": {
+        "account_currency": "EUR",
+        "account_name": "••••GmbH",
+        "bank_country_code": "DE",
+        "bank_name": "Commerzbank",
+        "iban": "••••8354"
+      },
+      "entity_type": "COMPANY",
+      "type": "BANK_ACCOUNT"
+    },
+    "beneficiary_id": "970a1353-f784-4df8-b244-2105915822b4",
+    "conversion": {
+      "currency_pair": "EURUSD",
+      "rate": "1.143038"
+    },
+    "created_at": "2026-10-04T18:22:11+0000",
+    "fee_amount": "0",
+    "fee_currency": "USD",
+    "fee_paid_by": "PAYER",
+    "funding": {
+      "status": "SCHEDULED"
+    },
+    "id": "6e90baba-57e5-474b-b222-5c55cbdda0e3",
+    "lock_rate_on_create": false,
+    "metadata": {
+      "app": "fx-target-payment",
+      "bill_id": "smoke-v6"
+    },
+    "payer": {
+      "additional_info": {
+        "business_incorporation_date": "2026-03-01",
+        "business_registration_number": "123456789",
+        "business_registration_type": "COMPANY"
+      },
+      "address": {
+        "city": "Los Angeles",
+        "country_code": "US",
+        "postcode": "90001",
+        "state": "CA",
+        "street_address": "••••eens"
+      },
+      "company_name": "Sandbox Business",
+      "entity_type": "COMPANY"
+    },
+    "reason": "bill_payment",
+    "reference": "smoke-v6",
+    "remarks": "",
+    "request_id": "tr:smoke-v6:52302",
+    "short_reference_id": "P261004-M5N6JHO",
+    "source_currency": "USD",
+    "status": "SCHEDULED",
+    "swift_charge_option": "SHARED",
+    "transfer_amount": "10.0",
+    "transfer_currency": "EUR",
+    "transfer_date": "2026-10-19",
+    "transfer_method": "LOCAL",
+    "updated_at": "2026-10-04T18:22:11+0000"
+  }
+}

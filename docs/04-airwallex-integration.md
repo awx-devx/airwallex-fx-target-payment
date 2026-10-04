@@ -112,7 +112,7 @@ Store `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `buy_amount`, `sell_amo
 - The cutoff always locks a `MIN_1` quote first and sends `quote_id`. Some accounts return `quote_id_required` if it is omitted.
 - Store `id`, `short_reference_id`, `status`, `funding.status`, `conversion.rate`, `source_amount`, `amount_payer_pays`, `amount_beneficiary_receives`, `fee_amount`, `fee_currency`, `fee_paid_by`, `dispatch_date`, `failure` and `updated_at`. Fee and amounts are **tentative until `SCHEDULED`**.
 
-**Validation at arming:** `POST /transfers/validate` with the same body (no `quote_id`, no `request_id`) runs when the user arms the bill. `validation_failed` field errors, account/method limits and beneficiary problems show up in review, not at trigger time ([13 §4.4](./13-airwallex-contracts.md#44-validation-at-arming)).
+**Validation at arming:** `POST /transfers/validate` with the same body as create, without `quote_id`, runs when the user arms the bill. The sandbox rejected a body that omitted `request_id` (field code 001) on 2026-10-04, so the call sends one. `validation_failed` field errors, account/method limits and beneficiary problems show up in review, not at trigger time ([13 §4.4](./13-airwallex-contracts.md#44-validation-at-arming)).
 
 **Pre-flight (executor):**
 1. `GET /balances/current`: require `available_amount(H) ≥ quote.sell_amount + fee_est`. Otherwise the bill stays `WATCHING` with `insufficientBalance` and the UI shows a top-up prompt. The worker retries until the cutoff.

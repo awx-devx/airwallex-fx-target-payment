@@ -1,8 +1,8 @@
 import type { Rng } from '@/mocks/generators/rng';
 
 /**
- * DEMO-ONLY: fictional account numbers in a valid format. Bank ids are
- * placeholders until B2.2 records the sandbox allowlist (V12).
+ * DEMO-ONLY: fictional account numbers in a valid format. Bank ids come from
+ * the V12 allowlist on the corridor (`routingValue`, `bic`, `bankCode`).
  * PROD: the vendor's own bank details, created through Airwallex.
  */
 
@@ -112,6 +112,7 @@ export function generateBank(
     bankCode?: string;
     bic?: string;
     bbanLength?: number;
+    routingValue?: string;
   },
 ): BankDetails {
   const base = {
@@ -137,7 +138,7 @@ export function generateBank(
     const suffix = digits(rng, 6);
     return {
       ...base,
-      ifsc: `${input.bankCode ?? 'HDFC'}0${suffix}`,
+      ifsc: input.routingValue ?? `${input.bankCode ?? 'HDFC'}0${suffix}`,
       accountNumber: accountWithLuhn(rng, 12),
     };
   }
@@ -162,11 +163,13 @@ export function generateBank(
       bankCode: input.bankCode ?? '0005',
       branchCode: digits(rng, 3),
       accountNumber: accountWithLuhn(rng, 7),
+      ...(input.bic ? { bic: input.bic } : {}),
     };
   }
   return {
     ...base,
     bankCode: input.bankCode ?? digits(rng, 4),
     accountNumber: accountWithLuhn(rng, 10),
+    ...(input.bic ? { bic: input.bic } : {}),
   };
 }

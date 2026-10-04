@@ -1,0 +1,8 @@
+{
+  "body": {
+    "status": 400,
+    "code": "quote_expired",
+    "message": "The quote_id you provided for the currency conversion has expired. Please provide a valid quote ID or remove this field and try again.",
+    "details": {}
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "kind": "transfer",
+  "body": {
+    "amount_beneficiary_receives": "1000.0",
+    "amount_payer_pays": "10.5",
+    "beneficiary": {
+      "address": {
+        "city": "Mumbai",
+        "country_code": "IN",
+        "postcode": "400001",
+        "state": "IN-MH",
+        "street_address": "••••reet"
+      },
+      "bank_details": {
+        "account_currency": "INR",
+        "account_name": "•••• Ltd",
+        "account_number": "••••4312",
+        "account_routing_type1": "bank_code",
+        "account_routing_value1": "••••0001",
+        "bank_country_code": "IN",
+        "bank_name": "HDFC BANK"
+      },
+      "entity_type": "COMPANY",
+      "type": "BANK_ACCOUNT"
+    },
+    "beneficiary_id": "26272334-4874-40a2-b611-b652aec59965",
+    "conversion": {
+      "currency_pair": "USDINR",
+      "rate": "95.281403"
+    },
+    "created_at": "2026-10-04T18:22:09+0000",
+    "fee_amount": "0",
+    "fee_currency": "USD",
+    "fee_paid_by": "PAYER",
+    "funding": {
+      "status": "FUNDED"
+    },
+    "id": "4b6443d6-624a-45a4-98d5-21828ec9c66d",
+    "metadata": {
+      "app": "fx-target-payment",
+      "bill_id": "smoke-v9"
+    },
+    "payer": {
+      "additional_info": {
+        "business_incorporation_date": "2026-03-01",
+        "business_registration_number": "123456789",
+        "business_registration_type": "COMPANY"
+      },
+      "address": {
+        "city": "Los Angeles",
+        "country_code": "US",
+        "postcode": "90001",
+        "state": "CA",
+        "street_address": "••••eens"
+      },
+      "company_name": "Sandbox Business",
+      "entity_type": "COMPANY"
+    },
+    "reason": "bill_payment",
+    "reference": "smoke-v9",
+    "remarks": "",
+    "request_id": "tr:smoke-v9:52302",
+    "short_reference_id": "P261004-H6PPTZM",
+    "source_amount": "10.5",
+    "source_currency": "USD",
+    "status": "SCHEDULED",
+    "swift_charge_option": "SHARED",
+    "transfer_amount": "1000.0",
+    "transfer_currency": "INR",
+    "transfer_date": "2026-10-04",
+    "transfer_method": "LOCAL",
+    "updated_at": "2026-10-04T18:22:10+0000"
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "kind": "account",
+  "body": {
+    "account_details": {
+      "attachments": {
+        "additional_files": []
+      },
+      "business_details": {
+        "account_usage": {
+          "estimated_monthly_revenue": {
+            "amount": "81441",
+            "currency": "USD"
+          },
+          "product_reference": []
+        },
+        "as_trustee": null,
+        "attachments": {
+          "business_documents": []
+        },
+        "business_address": {
+          "country_code": "US",
+          "postcode": "90001"
+        },
+        "business_identifiers": [
+          {
+            "country_code": "US",
+            "number": "••••6789",
+            "type": "EIN"
+          }
+        ],
+        "business_name": "Sandbox Business",
+        "business_name_english": "Sandbox Business",
+        "business_name_trading": null,
+        "business_start_date": "2026-03-01",
+        "business_structure": "COMPANY",
+        "contact_number": null,
+        "description_of_goods_or_services": "Ecommerce and Financial Services",
+        "explanation_for_high_risk_countries_exposure": null,
+        "exports_goods_or_services": null,
+        "fax_number": null,
+        "has_governing_document": null,
+        "has_member_holding_public_office": null,
+        "has_nominee_shareholders": null,
+        "has_prior_financial_institution_refusal": null,
+        "has_ringgit_borrowing": null,
+        "industry_category_code": "ICCV3_1004XX",
+        "no_shareholders_with_over_25percent": null,
+        "operating_country": [],
+        "registration_address": {
+          "country_code": "US",
+          "postcode": "90001"
+        },
+        "registration_address_english": {
+          "address_line1": "••••eens",
+          "country_code": "US",
+          "postcode": "90001",
+          "state": "CA",
+          "suburb": "Los Angeles"
+        },
+        "state_of_incorporation": null,
+        "url": "••••r.io",
+        "urls": [
+          "••••r.io"
+        ]
+      },
+      "business_person_details": [
+        {
+          "attachments": {
+            "business_person_documents": []
+          },
+          "date_of_birth": "1968-12-14",
+          "email": "••••.com",
+          "first_name_english": "Van",
+          "identifications": {
+            "primary": {
+              "identification_type": "TAX_ID",
+              "issuing_country_code": "US",
+              "tax_id": {
+                "number": "••••6789",
+                "type": "ITIN"
+              }
+            }
+          },
+          "job_title": "CEO",
+          "last_name_english": "H",
+          "nationality": "US",
+          "person_id": "cd6b1404-ea0c-4f68-87ac-7f3a1b765594",
+          "phone_number": "••••7777",
+          "residential_address": {
+            "country_code": "US",
+            "postcode": "90001"
+          },
+          "roles": [
+            "BENEFICIAL_OWNER",
+            "CONTROLLING_PERSON",
+            "AUTHORISED_PERSON"
+          ]
+        }
+      ],
+      "store_details": {
+        "cross_border_transaction_percent": "80.0",
+        "employee_size": "0",
+        "estimated_transaction_volume": {
+          "average_amount_per_transaction": "10000.0",
+          "currency": "HKD",
+          "max_amount_per_transaction": "10000.0",
+          "monthly_transaction_amount": "500000.0"
+        },
+        "financial_statements": [],
+        "fulfillment_days": "20",
+        "industry_code": "ICCV3_1009XX",
+        "mcc": "5499",
+        "operating_models": [
+          "ONLINE_CHECKOUT",
+          "INVOICES_OR_CUSTOM_ORDER_LINKS"
+        ],
+        "payment_distribution": [
+          {
+            "payment_type": "CARDS",
+            "percentage": "50.0"
+          },
+          {
+            "payment_type": "OTHER",
+            "percentage": "50.0"
+          }
+        ],
+        "selling_to_country_codes": [],
+        "shipping_from_country_codes": [],
+        "store_description": "Store description.",
+        "store_name": "Sandbox Business",
+        "store_photos": [],
+        "store_websites": [
+          {
+            "url": "••••0529"
+          }
+        ]
+      },
+      "trustee_details": null,
+      "individual_details": null,
+      "legal_entity_id": "le_asaitctLOPqYUcC9xLmp3A",
+      "legal_entity_identifier": null,
+      "legal_entity_type": "BUSINESS"
+    },
+    "created_at": "2026-08-20T23:06:34+0000",
+    "customer_agreements": {
+      "agreed_to_data_usage": true,
+      "agreed_to_terms_and_conditions": true,
+      "opt_in_for_marketing": false,
+      "terms_and_conditions": {
+        "device_data": {},
+        "service_agreement_type": "FULL"
+      }
+    },
+    "id": "acct_K5WbUHaZPX-rYCsTusLElQ",
+    "nickname": "acct_K5WbUHaZPX-rYCsTusLElQ",
+    "primary_contact": {
+      "attachments": {
+        "identity_files": []
+      },
+      "email": "••••.com",
+      "mobile": "••••7777"
+    },
+    "status": "ACTIVE",
+    "view_type": "COMPLETE"
+  }
+}

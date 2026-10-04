@@ -203,6 +203,20 @@ Trade-offs of Layer B:
 | V16 | `beneficiaries/verify_account` in sandbox for EUR (SEPA) and GBP (UK): which results come back, including for generator bank details | `BeneficiaryCard` verification badges ([13 §5.4](./13-airwallex-contracts.md#54-bank-search-validate-verify)) |
 | V17 | SWIFT transfer with `swift_charge_option: PAYER` vs `SHARED`: does `fee_amount` / `amount_payer_pays` change, and is it known at create time? | D-18 cost display |
 
+Sandbox run on 2026-10-04. The full table is [verification-results.md](./verification-results.md). The gate (V1, V2, V4, V5, V8, V9) passed.
+
+- V4 locked a `MIN_1` quote and created a EUR transfer whose conversion rate matched. V5 returned `quote_expired` after `valid_to_at`. V9 did the same for INR.
+- V3 `POST /fx/conversions/create` accepted a conversion. The product path stays the single transfer in D-03.
+- V6 created a future-dated transfer with `lock_rate_on_create=false`, fee 0, and cancel succeeded. V7 accepted `quote_id` together with `transfer_date`. D-04 stays out of scope.
+- V8 reached `PAID` through `PROCESSING → SENT → PAID`. Webhook delivery was not checked: no webhook secret and no tunnel.
+- V10 sent 24 rate calls at about 8/s and got 200 for all of them.
+- V12 accepted EUR, GBP, JPY, SGD, and INR beneficiaries. The bank ids are on the corridors in `src/mocks/generators/corridors.ts`. V13 is blocked until `AIRWALLEX_GLOBAL_ACCOUNT_ID` is set.
+- V14: `transfers/validate` rejected `100.50` KES (field code 042, too many decimals) and accepted `100`. A body without `request_id` was rejected first (field code 001).
+- V15: `POST /simulation/transfers/{id}/transition` with `next_status: FAILED` returned 500 `operation_failed`, including after a `PROCESSING` step. The failure object was not returned. Three creates were rejected because the `request_id` was 54 characters or longer (field code 018); 47-character ids were accepted. Bill ids in this app stay shorter than that.
+- V16: EUR `verify_account` returned `VERIFIED`. GBP, on a real Barclays sort code with a fictional account number, returned `INVALID`.
+- V17: on a 20 EUR SWIFT transfer, `PAYER` was fee 25 / payer pays 47.66 and `SHARED` was fee 15 / payer pays 37.66, both known at create.
+- `GET /account` returned a US business whose registration address is Los Angeles, CA, and no timezone field.
+
 ---
 
 ## 8. Sources

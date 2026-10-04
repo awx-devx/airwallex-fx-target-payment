@@ -1,0 +1,32 @@
+{
+  "kind": "beneficiary",
+  "currency": "INR",
+  "body": {
+    "beneficiary": {
+      "address": {
+        "city": "Mumbai",
+        "country_code": "IN",
+        "postcode": "400001",
+        "state": "IN-MH",
+        "street_address": "••••reet"
+      },
+      "bank_details": {
+        "account_currency": "INR",
+        "account_name": "•••• Ltd",
+        "account_number": "••••4312",
+        "account_routing_type1": "bank_code",
+        "account_routing_value1": "••••0001",
+        "bank_country_code": "IN",
+        "bank_name": "HDFC BANK"
+      },
+      "entity_type": "COMPANY",
+      "type": "BANK_ACCOUNT"
+    },
+    "id": "26272334-4874-40a2-b611-b652aec59965",
+    "nickname": "Example INR Pvt Ltd",
+    "payer_entity_type": "COMPANY",
+    "transfer_methods": [
+      "LOCAL"
+    ]
+  }
+}

@@ -2,7 +2,8 @@ import type { TransferMethod } from '@/contracts/airwallex';
 
 /**
  * Corridors the generator can build bank details for.
- * Bank identifiers are format examples, replaced after V12.
+ * Bank ids below were accepted by the sandbox on 2026-10-04 (V12) where noted.
+ * Other corridors are format-valid and have not been submitted.
  */
 export interface Corridor {
   currency: string;
@@ -14,6 +15,8 @@ export interface Corridor {
   legalSuffix: string;
   kind: 'iban' | 'gb' | 'ifsc' | 'bsb' | 'aba' | 'jp' | 'routing';
   bankCode?: string;
+  /** Exact routing id the sandbox accepted. Used as the IFSC when `kind` is `ifsc`. */
+  routingValue?: string;
   bic?: string;
   bbanLength?: number;
 }
@@ -28,6 +31,7 @@ export const CORRIDORS: readonly Corridor[] = [
     unitMax: '40000',
     legalSuffix: 'GmbH',
     kind: 'iban',
+    // V12: a mod-97 IBAN with this bank code and BIC. The LOCAL schema has no routing field.
     bankCode: '37040044',
     bic: 'COBADEFFXXX',
     bbanLength: 18,
@@ -41,6 +45,7 @@ export const CORRIDORS: readonly Corridor[] = [
     unitMax: '20000',
     legalSuffix: 'Ltd',
     kind: 'gb',
+    // V12: Barclays Bank PLC, from supported_financial_institutions.
     bankCode: '200000',
   },
   {
@@ -52,7 +57,9 @@ export const CORRIDORS: readonly Corridor[] = [
     unitMax: '2000000',
     legalSuffix: 'K.K.',
     kind: 'jp',
+    // V12: SWIFT BOTKJPJT (MUFG head office). 0005 is the LOCAL bank code from the same directory.
     bankCode: '0005',
+    bic: 'BOTKJPJT',
   },
   {
     currency: 'SGD',
@@ -63,7 +70,9 @@ export const CORRIDORS: readonly Corridor[] = [
     unitMax: '15000',
     legalSuffix: 'Pte Ltd',
     kind: 'routing',
+    // V12: the LOCAL schema requires SWIFT DBSSSGSG (DBS/POSB). 7171 is not that directory id.
     bankCode: '7171',
+    bic: 'DBSSSGSG',
   },
   {
     currency: 'AUD',
@@ -85,7 +94,9 @@ export const CORRIDORS: readonly Corridor[] = [
     unitMax: '800000',
     legalSuffix: 'Pvt Ltd',
     kind: 'ifsc',
+    // V12: directory IFSC, sent as account_routing_type1 bank_code.
     bankCode: 'HDFC',
+    routingValue: 'HDFC0000001',
   },
   {
     currency: 'CHF',

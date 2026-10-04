@@ -1,0 +1,55 @@
+{
+  "kind": "allowlist",
+  "body": [
+    {
+      "currency": "EUR",
+      "country": "DE",
+      "method": "LOCAL",
+      "id": "38dce533-4fdc-4f15-a0ab-b0667a42b8ab",
+      "requestId": "bf:seed:EUR",
+      "routingValue": "37040044",
+      "swift": "COBADEFFXXX",
+      "bankName": "Example EUR GmbH"
+    },
+    {
+      "currency": "GBP",
+      "country": "GB",
+      "method": "LOCAL",
+      "id": "6b50cf5b-5596-4a20-aa73-d84c592eee04",
+      "requestId": "bf:seed:GBP",
+      "routingValue": "200000",
+      "swift": "",
+      "bankName": "Barclays Bank PLC"
+    },
+    {
+      "currency": "JPY",
+      "country": "JP",
+      "method": "SWIFT",
+      "id": "b41e3dae-5117-4a75-ae91-7926673a9553",
+      "requestId": "bf:seed:JPY",
+      "routingValue": "0005",
+      "swift": "BOTKJPJT",
+      "bankName": "MUFG BANK, LTD. HEAD OFFICE"
+    },
+    {
+      "currency": "SGD",
+      "country": "SG",
+      "method": "LOCAL",
+      "id": "56cb80b1-d493-4f1d-b5ac-2975853439bc",
+      "requestId": "bf:seed:SGD",
+      "routingValue": "7171",
+      "swift": "DBSSSGSG",
+      "bankName": "DBS Bank/POSB"
+    },
+    {
+      "currency": "INR",
+      "country": "IN",
+      "method": "LOCAL",
+      "id": "089d95f7-6003-4a8d-8ccb-3a86fa51d05a",
+      "requestId": "bf:seed:INR",
+      "routingValue": "HDFC0000001",
+      "swift": "",
+      "bankName": "HDFC BANK"
+    }
+  ]
+}

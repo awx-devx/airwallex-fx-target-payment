@@ -102,6 +102,7 @@ function pushInvoice(input: {
           bankCode: input.corridor.bankCode,
           bic: input.corridor.bic,
           bbanLength: input.corridor.bbanLength,
+          routingValue: input.corridor.routingValue,
         });
   const invoice = generateInvoice({
     rng: input.rng,

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AirwallexError, toApiError } from '@/server/adapters/airwallex/errors';
 import { airwallexErrorFromBody } from '@/server/adapters/airwallex/errors';
@@ -259,5 +261,24 @@ describe('error mapping', () => {
         }),
       ),
     ).toThrow(/not an ApiError/);
+  });
+
+  it('maps the redacted sandbox fixtures from the B2 smoke', () => {
+    const load = (name: string): unknown => {
+      const parsed: unknown = JSON.parse(
+        readFileSync(path.resolve(import.meta.dirname, '__fixtures__', name), 'utf8'),
+      );
+      if (typeof parsed !== 'object' || parsed === null || !('body' in parsed)) {
+        throw new Error(`${name} has no body`);
+      }
+      return parsed.body;
+    };
+    expect(mapCurrentRate(load('v2-rates-current.json'), 'EUR').price).toBe('1.133176');
+    const locked = mapQuote(load('v4-quote.json'));
+    expect(locked.airwallexQuoteId).toBe('b41a6a84-fa5e-3417-876b-897b99e191cd');
+    expect(locked.price).toBe('1.133');
+    const created = mapTransfer(load('v4-transfer.json'), 'TARGET');
+    expect(created.transferId).toBe('32fc234b-aa05-42dc-8996-4fbdaa99ed0d');
+    expect(created.status).toBe('SCHEDULED');
   });
 });

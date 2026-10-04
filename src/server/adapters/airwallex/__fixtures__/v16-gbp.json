@@ -1,0 +1,8 @@
+{
+  "kind": "verification",
+  "currency": "GBP",
+  "body": {
+    "code": "INVALID",
+    "message": "This account is invalid."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "verification",
+  "currency": "EUR",
+  "body": {
+    "code": "VERIFIED",
+    "details": {
+      "account_name_match_result": "NOT_MATCHED"
+    },
+    "message": "This is a valid account. Refer to the details object for verification details."
+  }
+}

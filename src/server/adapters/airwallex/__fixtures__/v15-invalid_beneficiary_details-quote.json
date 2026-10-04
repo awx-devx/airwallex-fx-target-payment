@@ -1,0 +1,36 @@
+{
+  "kind": "quote",
+  "buyCurrency": "EUR",
+  "sellCurrency": "USD",
+  "body": {
+    "awx_rate": "1.128661",
+    "buy_amount": "2.00",
+    "buy_currency": "EUR",
+    "client_rate": "1.133176",
+    "conversion_date": "2026-10-04",
+    "currency_pair": "EURUSD",
+    "dealt_currency": "EUR",
+    "mid_rate": "1.12526",
+    "quote_id": "d6593540-4279-3bb3-acc6-2e65dabb2e1c",
+    "rate_details": [
+      {
+        "buy_amount": "2.00",
+        "level": "AWX",
+        "rate": "1.128661",
+        "sell_amount": "2.26"
+      },
+      {
+        "buy_amount": "2.00",
+        "level": "CLIENT",
+        "rate": "1.133176",
+        "sell_amount": "2.27"
+      }
+    ],
+    "sell_amount": "2.27",
+    "sell_currency": "USD",
+    "usage": "MULTI_USE",
+    "valid_from_at": "2026-10-04T18:23:01+0000",
+    "valid_to_at": "2026-10-04T18:24:01+0000",
+    "validity": "MIN_1"
+  }
+}
