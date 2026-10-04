@@ -27,6 +27,7 @@ export const QUEUE_CONFIG = {
   },
   notify: { concurrency: 4, attempts: 5 },
   reconcile: { concurrency: 1 },
+  candles: { concurrency: 1 },
 } as const;
 
 export const QUEUE_NAMES = [
@@ -38,6 +39,7 @@ export const QUEUE_NAMES = [
   'webhook',
   'notify',
   'reconcile',
+  'candles',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
@@ -78,6 +80,7 @@ export const executionPayload = z.object({
 export const webhookPayload = z.object({ eventId: z.string().min(1) });
 export const notifyPayload = z.object({ notificationId: z.string().min(1) });
 export const reconcilePayload = z.object({});
+export const candlesPayload = z.object({});
 
 export const PAYLOADS = {
   extraction: extractionPayload,
@@ -88,6 +91,7 @@ export const PAYLOADS = {
   webhook: webhookPayload,
   notify: notifyPayload,
   reconcile: reconcilePayload,
+  candles: candlesPayload,
 } as const;
 
 export type ExtractionPayload = z.infer<typeof extractionPayload>;
@@ -98,6 +102,7 @@ export type ExecutionPayload = z.infer<typeof executionPayload>;
 export type WebhookPayload = z.infer<typeof webhookPayload>;
 export type NotifyPayload = z.infer<typeof notifyPayload>;
 export type ReconcilePayload = z.infer<typeof reconcilePayload>;
+export type CandlesPayload = z.infer<typeof candlesPayload>;
 
 export function bullConnection(url: string) {
   return { url, maxRetriesPerRequest: null as null };

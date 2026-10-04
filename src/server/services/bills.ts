@@ -8,7 +8,7 @@ import type { Env } from '@/server/env';
 import { Redis } from 'ioredis';
 import { fromDecimal128, toDecimal128 } from '@/server/db/decimal';
 import { Bill, User } from '@/server/db/models';
-import { billDetail, listBills, type BillListQuery } from '@/server/db/repositories/bills';
+import { billDetail, listBills, type BillListQuery, type BillReadContext } from '@/server/db/repositories/bills';
 import {
   accountDate,
   defaultLeadDays,
@@ -48,15 +48,29 @@ export function listBillSummaries(
   query: BillListQuery,
   demoMode: boolean,
   today: string,
+  read?: BillReadContext,
 ): Promise<BillSummary[]> {
-  return listBills(query, demoMode, today);
+  return listBills(query, demoMode, today, read);
 }
 
-export async function getBill(id: string, demoMode: boolean, today: string): Promise<BillDetail> {
+export async function getBill(
+  id: string,
+  demoMode: boolean,
+  today: string,
+  read?: BillReadContext,
+): Promise<BillDetail> {
   if (!mongoose.isValidObjectId(id)) throw notFound();
-  const detail = await billDetail(id, demoMode, today);
+  const detail = await billDetail(id, demoMode, today, read);
   if (!detail) throw notFound();
   return detail;
+}
+
+export function billReadContext(env: Env, clock: Clock = new SystemClock()): BillReadContext {
+  return {
+    nowMs: clock.now().getTime(),
+    pollIntervalMs: env.POLL_INTERVAL_MS,
+    historySource: env.HISTORY_SOURCE,
+  };
 }
 
 export async function patchBill(id: string, body: PatchBillBody, ctx: BillContext): Promise<BillDetail> {
@@ -101,7 +115,7 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
     { returnDocument: 'after' },
   );
   if (!updated) throw new ServiceError('INVALID_STATE', 'Bill changed concurrently', 409);
-  return getBill(id, ctx.demoMode, accountDate(ctx.clock.now(), ctx.accountTz));
+  return getBill(id, ctx.demoMode, accountDate(ctx.clock.now(), ctx.accountTz), billReadContext(ctx.env, ctx.clock));
 }
 
 export async function putStrategy(
@@ -151,6 +165,7 @@ export async function putStrategy(
     auditType: 'STRATEGY_UPDATED',
     payload: { mode: strategy.mode, targetPrice, consecutiveHits },
     demoMode: ctx.demoMode,
+    read: billReadContext(ctx.env, ctx.clock),
     publisher: ctx.publisher,
     today: accountDate(ctx.clock.now(), ctx.accountTz),
     patch: {
@@ -191,6 +206,7 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
     auditType: 'ARMED',
     payload: { pastDeadline: past, executionDeadline: schedule.executionDeadline },
     demoMode: ctx.demoMode,
+    read: billReadContext(ctx.env, ctx.clock),
     publisher: ctx.publisher,
     today: accountDate(ctx.clock.now(), ctx.accountTz),
     patch: {
@@ -234,6 +250,7 @@ function simpleTransition(
     actor: 'user',
     auditType,
     demoMode: ctx.demoMode,
+    read: billReadContext(ctx.env, ctx.clock),
     publisher: ctx.publisher,
     today: accountDate(ctx.clock.now(), ctx.accountTz),
   });

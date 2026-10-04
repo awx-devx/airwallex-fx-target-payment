@@ -259,6 +259,8 @@ A single stream at `/api/stream` carries all events. Clients filter by `billId`.
 | `demo.sim` | `{ billId, simId, phase: 'RAMPING'\|'TRIGGERED'\|'EXECUTING'\|'SETTLING'\|'DONE'\|'ABORTED', etaSec? }` | Demo mode only: Simulate run progress |
 | `extraction.progress` | `{ billId, documentId, filename, stage: 'working'\|'searching'\|'solving', status: 'PENDING'\|'RUNNING'\|'DONE'\|'FAILED' }` | Upload queued a file, or the extraction job moved to the next reader |
 
+A heartbeat comment (`: ping`) goes out every 15 seconds. If a client's stream is already full, the next event is dropped so one slow reader cannot stall the process.
+
 ## 7. Security (demo-appropriate)
 
 - Airwallex credentials stay server-side only (`AIRWALLEX_CLIENT_ID`, `AIRWALLEX_API_KEY`). Use a **scoped** key with only these scopes: FX rates/quotes/conversions, transfers, beneficiaries, balances, and files (plus spend if the stretch goal is taken).
@@ -345,6 +347,7 @@ MongoDB has no built-in job queue or cross-process push. Without Redis we would 
 | `webhook` | webhook route | 4 | `webhook.{eventId}` | 10, exp 5 s |
 | `notify` | services | 4 | `notify.{notificationId}` | 5 |
 | `reconcile` | repeatable job, every 60 s | 1 | repeatable | — |
+| `candles` | repeatable job, every 60 s | 1 | repeatable | — |
 
 BullMQ rejects a custom `jobId` that contains `:`. The separator is `.`. A `:` inside an id segment is stored as `_`.
 

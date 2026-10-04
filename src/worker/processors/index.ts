@@ -1,5 +1,6 @@
 import type { Processor } from 'bullmq';
 import type { QueueName } from '@/server/queue';
+import { processCandles } from '@/worker/processors/candles';
 import { processDeadline } from '@/worker/processors/deadline';
 import { processExecution } from '@/worker/processors/execution';
 import { processExtraction } from '@/worker/processors/extraction';
@@ -20,4 +21,5 @@ export const defaultProcessors: ProcessorMap = {
   webhook: processWebhook,
   notify: processNotify,
   reconcile: processReconcile,
+  candles: processCandles,
 };

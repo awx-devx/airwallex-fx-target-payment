@@ -285,7 +285,7 @@ interface ChartOverlays {
 | `POST` | `/api/bills/:id/pause` / `resume` | |
 | `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
-| `GET` | `/api/bills/:id/chart?range=1D` | `ChartSeriesPoint[]` + `ChartOverlays` + reference history |
+| `GET` | `/api/bills/:id/chart?range=1D` | `ChartSeriesPoint[]` + `ChartOverlays` + reference history. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
 | `GET` | `/api/bills/:id/events` | Activity log |
 | `GET` | `/api/balances` | Proxy of Airwallex balances (cached 30 s) |
 | `POST` | `/api/bills/:id/validate-transfer` | `transfers/validate` dry run (also run by `arm`); returns `FieldError[]` |

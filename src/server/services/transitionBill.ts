@@ -2,7 +2,7 @@ import type { BillEventType } from '@/contracts/events';
 import type { AppEvent } from '@/contracts/sse';
 import type { Clock } from '@/server/adapters/clock';
 import { Bill, BillEvent } from '@/server/db/models';
-import { billDetail } from '@/server/db/repositories/bills';
+import { billDetail, type BillReadContext } from '@/server/db/repositories/bills';
 import { formatUtcDate } from '@/server/domain/deadline';
 import { transition, type TransitionEvent } from '@/server/domain/stateMachine';
 import { getLogger } from '@/server/logging/logger';
@@ -23,6 +23,7 @@ export async function applyTransition(input: {
   patch?: Record<string, unknown>;
   demoMode: boolean;
   today?: string;
+  read?: BillReadContext;
   publisher?: EventPublisher;
 }): Promise<NonNullable<Awaited<ReturnType<typeof billDetail>>>> {
   if (!mongoose.isValidObjectId(input.billId)) throw notFound();
@@ -51,7 +52,7 @@ export async function applyTransition(input: {
   } catch (error) {
     getLogger().warn({ err: error, billId: input.billId }, 'bill event was not stored');
   }
-  const detail = await billDetail(input.billId, input.demoMode, input.today ?? formatUtcDate(at));
+  const detail = await billDetail(input.billId, input.demoMode, input.today ?? formatUtcDate(at), input.read);
   if (!detail) throw notFound();
   if (input.publisher) {
     try {

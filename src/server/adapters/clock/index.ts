@@ -4,6 +4,14 @@ export interface Clock {
   now(): Date;
 }
 
+export function instant(ms: number): Date {
+  return new Date(ms);
+}
+
+export function parseInstant(iso: string): Date {
+  return new Date(iso);
+}
+
 export class SystemClock implements Clock {
   constructor(private readonly readRealMs: () => number = Date.now) {}
 

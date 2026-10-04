@@ -1,5 +1,6 @@
 import type { Clock } from '@/server/adapters/clock';
 import { closeExtractionBudget } from '@/server/adapters/extraction/budget';
+import { createRateSource } from '@/server/adapters/rates';
 import { connectMongo, disconnectMongo } from '@/server/db/connection';
 import type { Env } from '@/server/env';
 import type { AppLogger } from '@/server/logging/logger';
@@ -53,6 +54,7 @@ export async function startWorker(options: {
   const env = options.env;
   const logger = options.logger;
   await connectMongo(env.MONGODB_URI);
+  const rateSource = await createRateSource(env);
 
   const prefix = options.queuePrefix ?? 'bull';
   const lockRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
@@ -87,6 +89,9 @@ export async function startWorker(options: {
         data: {},
       },
     );
+    const candles = queues.get('candles');
+    if (!candles) throw new Error('candles queue is missing');
+    await candles.upsertJobScheduler('candles', { every: 60_000 }, { name: 'candles', data: {} });
   }
 
   const deadlineQueue = queues.get('deadline');
@@ -129,6 +134,9 @@ export async function startWorker(options: {
       signal: pollerAbort.signal,
       intervalMs: options.pollIntervalMs ?? env.POLL_INTERVAL_MS,
       logger,
+      env,
+      clock: options.clock,
+      source: rateSource,
       onPoll: options.onPoll,
     });
     void writeHeartbeat();

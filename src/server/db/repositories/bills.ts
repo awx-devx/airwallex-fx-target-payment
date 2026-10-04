@@ -18,10 +18,17 @@ export interface BillListQuery {
   quote?: string;
 }
 
+export interface BillReadContext {
+  nowMs?: number;
+  pollIntervalMs?: number;
+  historySource?: 'frankfurter' | 'none' | 'simulated';
+}
+
 export async function listBills(
   query: BillListQuery,
   demoMode: boolean,
   today: string,
+  read?: BillReadContext,
 ): Promise<BillSummary[]> {
   const filter: Record<string, string> = {};
   if (query.state) filter.state = query.state;
@@ -29,10 +36,15 @@ export async function listBills(
   if (query.quote) filter.homeCurrency = query.quote;
   const docs = await Bill.find(filter).sort({ createdAt: -1 }).lean();
   const beneficiaries = await loadBeneficiaries(docs.map((doc) => doc.beneficiaryId).filter(Boolean));
-  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode, today));
+  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode, today, read));
 }
 
-export async function billDetail(id: string, demoMode: boolean, today: string): Promise<BillDetail | null> {
+export async function billDetail(
+  id: string,
+  demoMode: boolean,
+  today: string,
+  read?: BillReadContext,
+): Promise<BillDetail | null> {
   const doc = await Bill.findById(id).lean();
   if (!doc) return null;
   const bill = asBill(doc);
@@ -41,7 +53,7 @@ export async function billDetail(id: string, demoMode: boolean, today: string): 
     BillDocument.find({ billId: doc._id }).sort({ createdAt: 1 }).lean(),
     BillEventModel.find({ billId: doc._id }).sort({ ts: -1 }).lean(),
   ]);
-  const summary = toSummary(bill, beneficiaries, demoMode, today);
+  const summary = toSummary(bill, beneficiaries, demoMode, today, read);
   return billDetailSchema.parse({
     ...summary,
     documents: documents.map((document) => ({
@@ -62,6 +74,7 @@ function toSummary(
   beneficiaries: Map<string, BeneficiarySummary>,
   demoMode: boolean,
   today: string,
+  read?: BillReadContext,
 ): BillSummary {
   const precision = homePrecision(bill.homeCurrency);
   const fee = bill.strategy?.feeEstimate ?? '0';
@@ -77,7 +90,7 @@ function toSummary(
     transferMethod: bill.transferMethod,
     transferReason: bill.transferReason,
     reference: bill.reference || bill.invoiceNumber,
-    flags: flagsFor(bill, today),
+    flags: flagsFor(bill, today, read),
     ...(bill.entryPrice ? { entryPrice: bill.entryPrice } : {}),
     ...(bill.strategy ? { targetPrice: bill.strategy.targetPrice, strategyMode: bill.strategy.mode } : {}),
     ...(bill.strategy?.maxCost ? { maxCost: bill.strategy.maxCost } : {}),
@@ -104,12 +117,12 @@ function toSummary(
   });
 }
 
-function flagsFor(bill: LoadedBill, today: string): BillSummary['flags'] {
+function flagsFor(bill: LoadedBill, today: string, read?: BillReadContext): BillSummary['flags'] {
   const price = bill.lastPrice ?? bill.entryPrice;
   const usdEquivalent = price
     ? estimatedCost(bill.billAmount, price, bill.strategy?.feeEstimate ?? '0', homePrecision(bill.homeCurrency))
     : undefined;
-  return checkBill({
+  const flags = checkBill({
     billCurrency: bill.billCurrency,
     homeCurrency: bill.homeCurrency,
     amount: bill.billAmount,
@@ -117,6 +130,16 @@ function flagsFor(bill: LoadedBill, today: string): BillSummary['flags'] {
     today,
     ...(usdEquivalent ? { usdEquivalent } : {}),
   }).flags;
+  if (read?.historySource === 'none') flags.noReferenceHistory = true;
+  if (
+    read?.nowMs !== undefined &&
+    read.pollIntervalMs &&
+    (bill.state === 'WATCHING' || bill.state === 'PAUSED') &&
+    (!bill.lastTickAt || read.nowMs - Date.parse(bill.lastTickAt) > 2 * read.pollIntervalMs)
+  ) {
+    flags.stale = true;
+  }
+  return flags;
 }
 
 function extractionView(value: unknown): { extraction?: BillDetail['documents'][number]['extraction'] } {

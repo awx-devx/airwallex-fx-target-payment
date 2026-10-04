@@ -76,6 +76,11 @@ export async function resetEventHub(): Promise<void> {
   hub = undefined;
 }
 
+/** A non-positive desired size means the client is behind. Drop the event. */
+export function dropForBackpressure(desiredSize: number | null): boolean {
+  return desiredSize !== null && desiredSize <= 0;
+}
+
 export function openEventStream(options: {
   hub: EventHub;
   signal: AbortSignal;
@@ -94,6 +99,7 @@ export function openEventStream(options: {
         }
       };
       const unsubscribe = options.hub.listen((event) => {
+        if (dropForBackpressure(controller.desiredSize)) return;
         send(formatSseEvent(event));
       });
       const heartbeat = setInterval(() => {
