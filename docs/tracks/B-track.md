@@ -10,7 +10,20 @@
 - Background work runs through BullMQ with deterministic `jobId`s. Nothing time-based depends on BullMQ delayed jobs; timers live in MongoDB and the sweeper enqueues them.
 - Every Airwallex `POST` create carries a deterministic `request_id`.
 - `decimal.js` for all money and rates. Round to currency precision at the edges.
-- Each external dependency has a `mock` adapter; CI runs without credentials.
+- Each external dependency has a `mock` adapter. `pnpm test` does not need credentials, Docker, or a database the user started.
+- **Do not set up hosting.** No Docker, Compose, Caddy, Dockerfiles, image builds, or deploy scripts. The user deploys by hand. [10](../10-deployment.md) is not a task on this track.
+
+## Environment
+
+Tests start their own databases (see Test strategy). Ask the user, and wait, only at the rows below. Do not invent values, and do not install MongoDB or Redis to unblock a row.
+
+| Before | Ask for | If they defer |
+| --- | --- | --- |
+| B2.1 (first sandbox call) | `AIRWALLEX_CLIENT_ID`, `AIRWALLEX_API_KEY` in `.env` | Stop. B0–B1 and the later service tests do not need them. |
+| B2.2, V13 only | `AIRWALLEX_GLOBAL_ACCOUNT_ID` (a sandbox Global Account in USD) | Record V13 as blocked in `docs/verification-results.md` and continue. |
+| B2.3 | `AIRWALLEX_WEBHOOK_SECRET`, and the public base URL of a tunnel the user has already started | Skip the live delivery check. Signature unit tests still run with a fixture secret. |
+| B4.2b (`pnpm test:extraction` against Claude) | `ANTHROPIC_API_KEY` | Land the pipeline on the `mock` extractor and leave the benchmark unchecked. |
+| B9.5, B9.6 sandbox timing check, B10.3 soak | The Airwallex values above, plus `MONGODB_URI` and `REDIS_URL` for a MongoDB replica set and Redis the user is already running | Run the same path with `PAYMENTS_GATEWAY=mock` against the in-memory servers. |
 
 Estimates are for one engineer.
 
@@ -20,9 +33,9 @@ Estimates are for one engineer.
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| B0.1 | `docker-compose.yml` (MongoDB 7 single-node replica set `rs0` + Redis 7), `.env.example` (see [02 §8](../02-architecture.md#8-environment-variables)), env validation with zod at boot | `pnpm infra:up` works; `rs.status().ok = 1`; missing env fails fast |
-| B0.2 | Mongoose connection singleton (safe for Next.js hot reload), `Decimal128` ↔ string `toJSON` plugin, all models in [03 §4](../03-domain-model.md#4-data-model-mongodb--mongoose) incl. the `rate_ticks` time-series collection; `pnpm db:indexes` runs `syncIndexes()` | Collections + indexes exist; partial unique indexes verified by a test |
-| B0.3 | Worker entry (`pnpm worker`): BullMQ queues/workers per [02 §9.2](../02-architecture.md#92-queues-srcserverqueue), sweeper loop, graceful shutdown (drain workers, close Redis/Mongo) | Worker starts and stops cleanly; jobs survive a restart |
+| B0.1 | `.env.example` (see [02 §8](../02-architecture.md#8-environment-variables)) and zod env validation at boot. Test harness: `mongodb-memory-server` in replica-set mode and `redis-memory-server`, started and stopped by Vitest. No Docker. | A service test boots both, runs the execution-create transaction, and runs a BullMQ job. The real process fails fast when a required variable is missing. Tests inject the memory URIs and do not read the user's `.env`. |
+| B0.2 | Mongoose connection singleton (safe for Next.js hot reload), `Decimal128` ↔ string `toJSON` plugin, all models in [03 §4](../03-domain-model.md#4-data-model-mongodb--mongoose) incl. the `rate_ticks` time-series collection; `pnpm db:indexes` runs `syncIndexes()` | The index sync runs against the memory replica set; partial unique indexes are verified by a test |
+| B0.3 | Worker entry (`pnpm worker`): BullMQ queues/workers per [02 §9.2](../02-architecture.md#92-queues-srcserverqueue), sweeper loop, Redis leader lock for the poller and sweeper, graceful shutdown (drain workers, close Redis/Mongo) | Against the memory Redis: the worker starts and stops cleanly, a second worker does not take the lock, and a job remains after the worker process restarts |
 | B0.4 | Event bus: `publish(event)` → Redis `PUBLISH app_events`; the SSE route (`/api/stream`) holds one shared subscriber connection per process and fans out | An event published in the worker shows up in the browser |
 | B0.5 | Structured logging (pino) with redaction; request IDs | Logs are JSON with `trace_id` for Airwallex calls |
 | B0.6 | `Clock` adapter (`system` \| `warp`) injected everywhere time is read | No direct `new Date()` in domain/services (lint rule) |
@@ -43,6 +56,8 @@ Estimates are for one engineer.
 
 ## B2 — Sandbox verification (gate) · ~1 day
 
+Ask for the Airwallex values in the Environment table before B2.1. Do not call the sandbox until they are in `.env`.
+
 | ID | Task |
 | --- | --- |
 | B2.1 | `pnpm airwallex:smoke`: scripted checks **V1–V10 and V14–V17** (V12/V13 run in B2.2) from [01 §7](../01-feasibility-airwallex.md#7-verification-checklist-run-in-sandbox-during-b1b2); prints a pass/fail table, writes `docs/verification-results.md`, and records redacted raw responses to `src/server/adapters/airwallex/__fixtures__/` (mapper tests and C0.3 fixtures use these, not the docs examples) |
@@ -58,7 +73,7 @@ Estimates are for one engineer.
 | --- | --- |
 | B3.1 | `rateMath.ts`: price, cost, savings, distance, max-cost ↔ target conversion, rounding; property-based tests |
 | B3.2 | `stateMachine.ts`: states/events per [03 §1](../03-domain-model.md#1-bill-lifecycle-state-machine), guards, invariants; exhaustive transition table tests |
-| B3.3 | `deadline.ts`: execution deadline (business days, account tz), window open/cutoff instants; DST tests for `Australia/Melbourne`, `Europe/London`, `America/Los_Angeles` |
+| B3.3 | `deadline.ts`: execution deadline (business days, account tz) and the cutoff instant; DST tests for `Australia/Melbourne`, `Europe/London`, `America/Los_Angeles` |
 | B3.4 | `trigger.ts`: threshold, confirmation ticks, freshness, cooldown, re-arm improvement |
 | B3.5 | Repositories (Mongoose, `lean()` reads mapped to contracts) + `transition()` service: conditional `findOneAndUpdate` with `version`, event append, publish; the transactional helper for execution-create |
 | B3.6 | REST routes for bills CRUD, strategy, arm/pause/resume/cancel, events, balances (per [03 §6](../03-domain-model.md#6-internal-rest-api)), validating with the contracts |
@@ -69,7 +84,7 @@ Estimates are for one engineer.
 | --- | --- |
 | B4.1 | `POST /api/uploads`: multipart, many files, stored under `storage/` (local disk for the demo; S3-compatible adapter optional); creates `DRAFT` bills |
 | B4.2 | Extraction pipeline per [12](../12-bill-extraction.md): preflight + SHA-256 cache, deterministic readers (e-invoice XML, EPC/Swiss QR, text layer), `anthropic` extractor (PDF `document` block, JSON-schema structured output, Haiku → Sonnet escalation), merge, validators, evidence → boxes. Plus the `mock` extractor (generator truth by file hash, [11 §4](../11-test-data-and-seeding.md#4-invoice-rendering)) and the optional `ollama` adapter |
-| B4.2b | Benchmark with `pnpm test:extraction` ([12 §5](../12-bill-extraction.md#5-benchmark-and-gates)) across Haiku-only / escalation / Sonnet-only; tune the prompt until the gates pass; record the chosen default in D-15 |
+| B4.2b | Benchmark with `pnpm test:extraction` ([12 §5](../12-bill-extraction.md#5-benchmark-and-gates)) across Haiku-only / escalation / Sonnet-only; tune the prompt until the gates pass; record the chosen default in D-15. Ask for `ANTHROPIC_API_KEY` first (Environment table). |
 | B4.3 | BullMQ `extraction` queue (concurrency 4, `jobId: extract:{documentId}`); progress events over SSE |
 | B4.4 | Validation: currency payable (static capability table overridden by `supported_currencies`), payout precision, FX amount limits ($1–$5M default), IDR/VND quota, due date, duplicate invoice detection (vendor + invoice # + amount). On arm: `transfers/validate` dry run → `FieldError[]` ([13 §4.4](../13-airwallex-contracts.md#44-validation-at-arming)) |
 | B4.5 | Beneficiary resolution: match existing (name / IBAN / account number), or create through the Airwallex API: form-schema proxy (cached 24 h), bank search proxy, `beneficiaries/validate`, create, then `verify_account` where supported (SEPA/UK/VN); store only masked fields + verification result ([13 §5](../13-airwallex-contracts.md#5-beneficiaries)) |
@@ -130,10 +145,10 @@ Estimates are for one engineer.
 | B9.1 | Contract conformance: every route returns zod-validated payloads identical to the mock `DataSource` |
 | B9.2 | Demo endpoints ([08 §1](../08-demo-plan.md#1-demo-mode-building-blocks)): clock, market, scenario, transfer advance (via the simulation API), reset |
 | B9.3 | Scenario scripts: `target-hit` (= Simulate on demo bill 1), `stay-watching`, `deadline-pay`, `insufficient-balance` |
-| B9.6 | Simulate button backend ([08 §1.1](../08-demo-plan.md#11-simulate-button)): `/api/demo/bills/:id/simulate` + `/stop`, `RoutingRateSource`, the worker `demoSim` loop (scripted 1 s ticks into the normal execute path, transfer advance + immediate status read), the simulated-tick quote-check exception, `demo.sim` SSE events. Test: a sandbox run reaches `PAID` in < 40 s, and a second click while running returns `INVALID_STATE` |
+| B9.6 | Simulate button backend ([08 §1.1](../08-demo-plan.md#11-simulate-button)): `/api/demo/bills/:id/simulate` + `/stop`, `RoutingRateSource`, the worker `demoSim` loop (scripted 1 s ticks into the normal execute path, transfer advance + immediate status read), the simulated-tick quote-check exception, `demo.sim` SSE events. Automated test uses the in-memory servers and `PAYMENTS_GATEWAY=mock`, and a second click while running returns `INVALID_STATE`. The sandbox timing check (`PAID` in < 40 s) waits for the Environment-table values. |
 | B9.7 | Test-data generator ([11](../11-test-data-and-seeding.md)): `pnpm gen:invoices`, `pnpm seed:generate` (profiles `mixed`, `lifecycle`, `deadline`, `corridors`, `extraction`, `upload`, `stress`, `e2e`), pooled beneficiaries, states reached through services, funding check, `seed:reset --generated`, `POST /api/demo/generate`, "Add sample invoices" in the upload modal, `/dev/market` Test data panel. Test: the same seed run twice creates nothing new; `lifecycle` shows every state with real sandbox IDs |
 | B9.4 | `pnpm seed:demo`: 3 invoice PDFs → bills (runs real extraction or uses a cached extraction for determinism) |
-| B9.5 | End-to-end run with the UI on `api` + sandbox; fix contract drift |
+| B9.5 | End-to-end run with the UI on `api`. The default run is `PAYMENTS_GATEWAY=mock` on the in-memory servers. A sandbox run waits for the Environment-table values. Fix contract drift either way. |
 
 ## B10 — Hardening & demo readiness · ~1.5 days
 
@@ -141,10 +156,9 @@ Estimates are for one engineer.
 | --- | --- |
 | B10.1 | Idempotency/race tests: double-execute, a quote expiring before create, webhook before the create response, worker restart mid-execution |
 | B10.2 | Observability: `/api/health` (Mongo, Redis, worker heartbeat, Airwallex token, feed freshness), queue depths and failed jobs per queue, a minimal ops page in `/dev/market` |
-| B10.3 | Rate-limit soak (V10) at the target bill count; tune the poll interval |
-| B10.4 | Security pass: scoped key, secrets never in the client bundle, `/dev` and `/api/demo` disabled when not in demo, webhook IP allowlist (if hosted) |
+| B10.3 | Rate-limit soak (V10) at the target bill count; tune the poll interval. Ask before calling the sandbox (Environment table). |
+| B10.4 | Security pass: scoped key, secrets never in the client bundle, `/dev` and `/api/demo` disabled when not in demo |
 | B10.5 | Rehearsal checklist from [08 §4](../08-demo-plan.md#4-rehearsal-checklist); fallback to the mock gateway verified |
-| B10.6 | Deployment per [10](../10-deployment.md): Dockerfile (web + worker targets), production Compose, Caddyfile, `redis.conf`, CI image build + SSH deploy, Redis leader lock for the poller/sweeper, graceful SIGTERM handling, health endpoint, backups; run the [pre-demo checklist](../10-deployment.md#12-pre-demo-checklist) |
 
 ---
 
@@ -153,6 +167,6 @@ Estimates are for one engineer.
 | Layer | Tool | Scope |
 | --- | --- | --- |
 | Domain unit | Vitest (+ fast-check) | rate math, state machine, deadline/tz, trigger |
-| Service | Vitest + `mongodb-memory-server` (replica-set mode) + a Redis test container | transitions under concurrency, partial unique indexes, jobs, sweeper, webhook processing |
+| Service | Vitest + `mongodb-memory-server` (replica-set mode) + `redis-memory-server` | transitions under concurrency, partial unique indexes, BullMQ jobs, sweeper, webhook processing. The test process starts and stops both. No Docker, and no MongoDB or Redis the user installed. |
 | Adapter contract | Vitest, `AIRWALLEX_E2E=1` | real sandbox calls ([04 §5](../04-airwallex-integration.md#5-contract-tests)) |
 | E2E | Playwright | demo scenarios on mocks (CI) and on sandbox (manual/nightly) |
