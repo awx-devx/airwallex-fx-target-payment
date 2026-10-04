@@ -65,6 +65,20 @@ export const envSchema = z.object({
       .default('America/Los_Angeles'),
   ),
   AIRWALLEX_GLOBAL_ACCOUNT_ID: optionalText(),
+  SPEND_SYNC: z.preprocess(
+    blankToUndefined,
+    z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+  ),
+  FILES_UPLOAD: z.preprocess(
+    blankToUndefined,
+    z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+  ),
 
   MONGODB_URI: requiredText('MONGODB_URI'),
   REDIS_URL: requiredText('REDIS_URL'),

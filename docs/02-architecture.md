@@ -280,6 +280,8 @@ AIRWALLEX_API_VERSION=2026-08-21
 AIRWALLEX_WEBHOOK_SECRET=
 AIRWALLEX_ACCOUNT_TZ=America/Los_Angeles  # AWX US entity; must match onboarding entity (Q-01)
 AIRWALLEX_GLOBAL_ACCOUNT_ID=              # sandbox Global Account in H, for deposit simulation (V13)
+SPEND_SYNC=false                          # spend bills stretch (04 §2.9)
+FILES_UPLOAD=false                        # files host, only for spend attachments (04 §2.8)
 
 # App
 MONGODB_URI=mongodb://localhost:27017/fxtarget?replicaSet=rs0&directConnection=true

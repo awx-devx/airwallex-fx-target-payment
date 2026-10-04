@@ -32,6 +32,8 @@ describe('parseEnv', () => {
     expect(env.QUOTE_VALIDITY_TARGET).toBe('MIN_1');
     expect(env.DEMO_MODE).toBe(true);
     expect(env.AIRWALLEX_CLIENT_ID).toBeUndefined();
+    expect(env.SPEND_SYNC).toBe(false);
+    expect(env.FILES_UPLOAD).toBe(false);
     expect(env.MONGODB_URI).toBe(required.MONGODB_URI);
   });
 });

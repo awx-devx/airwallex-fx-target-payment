@@ -107,8 +107,8 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Generated vendors, bank accounts and invoices; mock extractor returns truth by file hash | `DEMO-ONLY` | `src/mocks/generators`, `scripts/generate`, mock `BillExtractor` | Real vendor onboarding and live extraction |
 | Uploads on a local Docker volume | `DEMO-ONLY` | uploads storage adapter | Encrypted object storage with retention rules |
 | Single server, one worker (single point of failure) | `DEMO-ONLY` | `docs/10` | Multi-instance web, managed Redis, `DEADLINE_SAFETY_NET=airwallex` |
-| Transfer status advanced by the simulation endpoint | `SANDBOX` | `src/mocks/mock-data-source.ts`, `simulation.ts`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
-| Pre-funded wallet topped up by deposit simulation | `SANDBOX` | `/api/demo/scenario`, seed scripts | Real funding; low-balance alerts before the deadline day |
+| Transfer status advanced by the simulation endpoint | `SANDBOX` | `src/mocks/mock-data-source.ts`, `src/server/adapters/airwallex/endpoints/simulation.ts`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
+| Pre-funded wallet topped up by deposit simulation | `SANDBOX` | `src/server/adapters/airwallex/endpoints/simulation.ts`, `/api/demo/scenario`, seed scripts | Real funding; low-balance alerts before the deadline day |
 | Sandbox FX pricing is simulated, so quote rates may not track the market | `SANDBOX` | quote adapter, receipt, `QUOTE_LOCKED` event | Real quotes; show the trigger rate and the quote rate side by side |
 | Simulate button: per-bill scripted price path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `worker/demoSim.ts`, `RoutingRateSource` | Removed; triggers only from real ticks |
 | Simulated trigger compares the simulated price to the target, then pays on the normal execute path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, strategy engine (simulated ticks only) | Always require `p_quote ≤ p_target`; the same job still locks the quote and creates the transfer |

@@ -26,6 +26,7 @@
     "decimal.js": "^10.6.0",
     "ioredis": "^6.0.0",
     "lightweight-charts": "^5.2.1",
+    "lossless-json": "^4.3.1",
     "lucide-react": "^1.49.0",
     "mongoose": "^9.10.4",
     "motion": "^13.4.6",

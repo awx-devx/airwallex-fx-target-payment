@@ -334,6 +334,7 @@ The allowlist above is the **sandbox** webhook IP list from Airwallex's ["Listen
   - `NODE_ENV=production`
   - `DEMO_MODE=true` on the demo host only. It enables `/dev/*` and `/api/demo/*`, so pair it with Caddy `basic_auth` when the host is public.
   - `AIRWALLEX_ENV=sandbox` for the demo. Switching to production also requires production API keys, the production webhook secret, the production IP allowlist, and `DEMO_MODE=false`.
+  - `SPEND_SYNC` and `FILES_UPLOAD` stay `false` unless those stretch goals are turned on.
   - `NEXT_PUBLIC_*` values are baked in at **build time**, so rebuild the web image when they change.
 - Airwallex: use a **scoped** API key and, if possible, restrict it to the server's static IP in the Airwallex web app (see Airwallex's "API key best practices").
 - Rotate `REDIS_PASSWORD`, the Mongo user password and the Airwallex key after the demo if the host was shared widely.
