@@ -1,4 +1,5 @@
 import type { Clock } from '@/server/adapters/clock';
+import { closeExtractionBudget } from '@/server/adapters/extraction/budget';
 import { connectMongo, disconnectMongo } from '@/server/db/connection';
 import type { Env } from '@/server/env';
 import type { AppLogger } from '@/server/logging/logger';
@@ -21,6 +22,7 @@ import {
 } from '@/worker/leader';
 import { startPoller } from '@/worker/poller';
 import { defaultProcessors, type ProcessorMap } from '@/worker/processors';
+import { closeEventPublisher } from '@/server/services/bills';
 import { startSweeper } from '@/worker/sweeper';
 import type { Processor, Queue, Worker } from 'bullmq';
 
@@ -157,6 +159,8 @@ export async function startWorker(options: {
       await Promise.all(workers.map((worker) => worker.close()));
       await Promise.all([...queues.values()].map((queue) => queue.close()));
       await lockRedis.quit();
+      await closeEventPublisher();
+      await closeExtractionBudget();
       if (options.closeMongo !== false) await disconnectMongo();
     },
   };
