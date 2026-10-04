@@ -146,6 +146,15 @@ export const envSchema = z.object({
   EXTRACTION_MODEL: text('claude-haiku-4-5'),
   EXTRACTION_MODEL_STRONG: text('claude-sonnet-5'),
   EXTRACTION_MAX_PAGES: intWithDefault(3, 1),
+  EXTRACTION_MAX_CALLS: intWithDefault(20, 0),
+  EXTRACTION_WINDOW_SEC: intWithDefault(3600, 1),
+  EXTRACTION_ESCALATE: z.preprocess(
+    blankToUndefined,
+    z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
+  ),
   OLLAMA_URL: optionalText(),
   OLLAMA_MODEL: optionalText(),
 });

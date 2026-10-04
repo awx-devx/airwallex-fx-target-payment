@@ -257,6 +257,7 @@ A single stream at `/api/stream` carries all events. Clients filter by `billId`.
 | `notification` | `Notification` | Something should be toasted |
 | `clock` | `{ now, warp }` | Demo mode only |
 | `demo.sim` | `{ billId, simId, phase: 'RAMPING'\|'TRIGGERED'\|'EXECUTING'\|'SETTLING'\|'DONE'\|'ABORTED', etaSec? }` | Demo mode only: Simulate run progress |
+| `extraction.progress` | `{ billId, documentId, filename, stage: 'working'\|'searching'\|'solving', status: 'PENDING'\|'RUNNING'\|'DONE'\|'FAILED' }` | Upload queued a file, or the extraction job moved to the next reader |
 
 ## 7. Security (demo-appropriate)
 
@@ -310,6 +311,9 @@ ANTHROPIC_API_KEY=                        # worker only
 EXTRACTION_MODEL=claude-haiku-4-5
 EXTRACTION_MODEL_STRONG=claude-sonnet-5   # escalation for scans / low confidence
 EXTRACTION_MAX_PAGES=3
+EXTRACTION_ESCALATE=true                  # Haiku → Sonnet when a field is weak or the file is a scan
+EXTRACTION_MAX_CALLS=20                   # Anthropic calls per window; 0 disables the cap
+EXTRACTION_WINDOW_SEC=3600
 OLLAMA_URL=                               # optional local adapter
 OLLAMA_MODEL=
 ```
@@ -326,6 +330,7 @@ MongoDB has no built-in job queue or cross-process push. Without Redis we would 
 | Exactly-one execution job per bill attempt | BullMQ deterministic `jobId` (a duplicate `add` is a no-op) |
 | Realtime fan-out to all SSE connections (and multiple web instances) | Redis pub/sub channel `app_events` |
 | Shared Airwallex rate limiter across worker concurrency | Token bucket in Redis (`INCR` + `PEXPIRE`), or BullMQ's queue-level `limiter` |
+| Anthropic extraction spend cap | Fixed window `extract:calls:{window}` (`INCR` + `EXPIRE`). Default 20 calls per hour. A full window refuses the call. The Airwallex limiter waits; this one does not |
 | Airwallex token cache shared across processes (optional) | Redis key `awx:token` with TTL = `expires_at − 60 s` |
 
 ### 9.2 Queues (`src/server/queue`)

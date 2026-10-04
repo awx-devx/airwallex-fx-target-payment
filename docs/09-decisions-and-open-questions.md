@@ -33,6 +33,8 @@ Status values: **Proposed** (default, open for objection), **Accepted**, **Super
 | D-24 | Airwallex response bodies are parsed with **`lossless-json`** | Accepted | Amounts arrive as JSON numbers. `JSON.parse` rounds past ~15 significant digits, so numbers are kept as decimal strings before `decimal.js`. Specified in [13 §1](./13-airwallex-contracts.md#1-wire-conventions). |
 | D-25 | Deadline instants use **`date-fns-tz`** | Accepted | [02 §2](./02-architecture.md#2-stack-defaults-see-09) already named it beside `date-fns`. The cutoff is a wall-clock time in `AIRWALLEX_ACCOUNT_TZ`, including across DST. |
 | D-26 | Domain property tests use **`fast-check`** | Accepted | B3.1 asks for property tests of the rate math. It is a dev dependency. |
+| D-27 | Extraction readers use **pdfjs-dist**, **@napi-rs/canvas**, **zxing-wasm**, and **fast-xml-parser** | Accepted | [12 §2](./12-bill-extraction.md) names them: pdf.js for the text layer and embedded XML, canvas for page renders, zxing for EPC and Swiss QR, and fast-xml-parser for Factur-X and UBL. Claude is called with `fetch`, so there is no Anthropic SDK. |
+| D-28 | Anthropic extraction is capped at **20 calls per hour** in a Redis window | Accepted | A page sent as a document block costs a few thousand input tokens. The cap is shared by the web process and the worker (`EXTRACTION_MAX_CALLS`, `EXTRACTION_WINDOW_SEC`). A full window refuses the upload and the call. `0` turns the cap off for a benchmark. SHA-256 cache hits, `mock`, and `ollama` do not count. Spec: [12 §2.3](./12-bill-extraction.md#23-claude). |
 
 ## Open questions
 

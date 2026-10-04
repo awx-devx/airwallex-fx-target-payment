@@ -1,7 +1,7 @@
 import { patchBillBodySchema } from '@/contracts/api';
 import { getEnv } from '@/server/env';
 import { failureResponse, json, parseBody } from '@/server/http/respond';
-import { billContext, getBill, patchBill } from '@/server/services/bills';
+import { billContext, getBill, patchBill, todayFor } from '@/server/services/bills';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +11,8 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { id } = await context.params;
-    return json(await getBill(id, getEnv().DEMO_MODE));
+    const env = getEnv();
+    return json(await getBill(id, env.DEMO_MODE, todayFor(env)));
   } catch (error) {
     return failureResponse(error);
   }

@@ -5,6 +5,7 @@ import {
   isoDateTimeSchema,
 } from '@/contracts/airwallex';
 import { billSummarySchema, pairSchema } from '@/contracts/bill';
+import { extractionStageSchema, extractionStatusSchema } from '@/contracts/extraction';
 
 export const RATE_SOURCES = ['AIRWALLEX', 'SIMULATED', 'REFERENCE'] as const;
 export const rateSourceSchema = z.enum(RATE_SOURCES);
@@ -67,6 +68,14 @@ export const appEventSchema = z.discriminatedUnion('type', [
     simId: z.string().min(1),
     phase: simPhaseSchema,
     etaSec: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal('extraction.progress'),
+    billId: z.string().min(1),
+    documentId: z.string().min(1),
+    filename: z.string().min(1),
+    stage: extractionStageSchema,
+    status: extractionStatusSchema,
   }),
 ]);
 export type AppEvent = z.infer<typeof appEventSchema>;

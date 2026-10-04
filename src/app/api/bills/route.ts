@@ -2,7 +2,7 @@ import { listBillsQuerySchema } from '@/contracts/api';
 import { getEnv } from '@/server/env';
 import { failureResponse, json } from '@/server/http/respond';
 import { ServiceError } from '@/server/services/errors';
-import { listBillSummaries } from '@/server/services/bills';
+import { listBillSummaries, todayFor } from '@/server/services/bills';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +17,8 @@ export async function GET(request: Request): Promise<Response> {
     if (!parsed.success) {
       throw new ServiceError('VALIDATION_FAILED', parsed.error.issues[0]?.message ?? 'Invalid query', 400);
     }
-    return json(await listBillSummaries(parsed.data, getEnv().DEMO_MODE));
+    const env = getEnv();
+    return json(await listBillSummaries(parsed.data, env.DEMO_MODE, todayFor(env)));
   } catch (error) {
     return failureResponse(error);
   }

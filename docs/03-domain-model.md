@@ -217,7 +217,7 @@ Secondary index `{ 'meta.base': 1, 'meta.quote': 1, ts: 1 }`. Chart candles come
 
 ## 5. Contracts (shared FE/BE)
 
-These live in `src/contracts`. They are defined **before** the UI kit is built, so fixtures and components share one shape. Every type that carries Airwallex data (quotes, transfers, fees, beneficiaries, balances, currencies, errors) is specified field by field in [13 Airwallex → Contracts & UI](./13-airwallex-contracts.md), including enums, status maps and error codes.
+These live in `src/contracts`. They are defined **before** the UI kit is built, so fixtures and components share one shape. `ExtractedBill` is `src/contracts/extraction.ts` ([12 §3](./12-bill-extraction.md#3-contract)). Extraction progress is the `extraction.progress` SSE event ([02 §6](./02-architecture.md#6-realtime-events-sse)). Every type that carries Airwallex data (quotes, transfers, fees, beneficiaries, balances, currencies, errors) is specified field by field in [13 Airwallex → Contracts & UI](./13-airwallex-contracts.md), including enums, status maps and error codes.
 
 ```ts
 type Ccy = string; // ISO 4217, validated against currencies table
@@ -275,7 +275,7 @@ interface ChartOverlays {
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/uploads` | Multipart, many files → creates `DRAFT` bills + starts extraction |
+| `POST` | `/api/uploads` | Multipart, many files → creates `DRAFT` bills + starts extraction. Returns `429` `RATE_LIMITED` when the uncached files would exceed the Anthropic window, and writes nothing |
 | `GET` | `/api/bills` | List `BillSummary[]` (filters: state, pair) |
 | `GET` | `/api/bills/:id` | Bill detail (summary + documents + strategy + beneficiary) |
 | `PATCH` | `/api/bills/:id` | Edit reviewed fields (DRAFT/READY/FAILED only) |

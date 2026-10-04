@@ -63,8 +63,10 @@ flowchart TD
   - Never guess: return `null` with a reason instead of inventing a value.
   - For every field, return `evidence`: a verbatim snippet copied from the document, plus the page number.
   - Classify the document (`invoice`, `credit_note`, `receipt`, `statement`, `quote`, `other`). Anything other than an invoice is flagged.
+  - Currency is an ISO 4217 code. Vendor and bank country are ISO 3166-1 alpha-2 (`DE`, not `Germany`). The validator maps an English country name to that code.
 - **Why `evidence` instead of Claude citations:** citations can't be combined with structured outputs (the API rejects the combination), and LLMs are poor at producing pixel coordinates. We ask for verbatim snippets and locate them ourselves (§2.5).
 - **Runtime:** runs in the worker's `extraction` queue (concurrency 4), 60 s timeout, retries `429`/`5xx`/`overloaded` with backoff. Token usage is logged per document.
+- **Spend cap** (D-28): `EXTRACTION_MAX_CALLS` Anthropic HTTP calls per `EXTRACTION_WINDOW_SEC` (default 20 per hour), counted in Redis at `extract:calls:{window}` and shared by the web process and the worker. Each Haiku call and each Sonnet escalation counts as one. A SHA-256 cache hit, `BILL_EXTRACTOR=mock`, and `ollama` do not. `POST /api/uploads` returns `429` `RATE_LIMITED` and writes no bills when the uncached files would not fit. A first call that finds the window empty fails the document and is not retried. An escalation that finds it empty keeps the Haiku result. If Redis cannot record the call, Claude is not called. `EXTRACTION_MAX_CALLS=0` turns the cap off.
 
 ### 2.4 Merge and validate
 - Deterministic values override LLM values. When they disagree (e.g. the QR IBAN ≠ the LLM's IBAN), keep the deterministic value, set the field to `medium`, and add the reason "document shows two different IBANs".
@@ -73,6 +75,7 @@ flowchart TD
 | Check | Rule |
 | --- | --- |
 | Currency | ISO 4217, payable per `src/contracts/currencies.ts`, **≠ home currency** |
+| Country | ISO 3166-1 alpha-2; an English name such as Germany is stored as `DE` |
 | Amount | > 0, valid precision for the currency, equal to subtotal + tax (± 1 minor unit) when all three are present, equal to the QR amount when present |
 | Dates | Issue ≤ due; due not more than 1 year out; a past due date is flagged "overdue" (arming goes straight to the deadline window) |
 | Bank details | IBAN mod-97, BIC format, IFSC/sort code/BSB formats per corridor; account holder name similar to the vendor name |
@@ -141,6 +144,8 @@ EXTRACTION_MODEL=claude-haiku-4-5
 EXTRACTION_MODEL_STRONG=claude-sonnet-5
 EXTRACTION_MAX_PAGES=3
 EXTRACTION_ESCALATE=true
+EXTRACTION_MAX_CALLS=20                 # 0 disables the cap
+EXTRACTION_WINDOW_SEC=3600
 OLLAMA_URL=http://localhost:11434        # ollama adapter only
 OLLAMA_MODEL=                            # a vision model that supports JSON-schema format
 ```
@@ -151,7 +156,7 @@ The key is server-side only (worker). The demo deployment needs outbound HTTPS t
 
 ## 5. Benchmark and gates
 
-`pnpm test:extraction --seed 7` runs the `extraction` profile from [11](./11-test-data-and-seeding.md) (every template × variant with truth files) and prints per-field accuracy, escalation rate, latency (p50/p95) and tokens per document, broken down by extractor and model.
+`pnpm test:extraction` calls Claude on one known invoice when `ANTHROPIC_API_KEY` is set and prints the field comparison, latency, and tokens. That call counts against the spend cap. The full `extraction` profile (every template × variant, `--seed 7`) is produced by the invoice generator (B9.7). Until those files exist, the gates below stay unchecked. A full profile run needs `EXTRACTION_MAX_CALLS` raised or set to `0`. Without the key, the command exits without calling the API.
 
 | Gate (default config) | Target |
 | --- | --- |

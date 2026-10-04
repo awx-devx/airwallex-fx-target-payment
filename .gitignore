@@ -25,6 +25,7 @@
 # generated test data and uploads
 /generated
 /uploads
+/storage
 /scripts/spike/out
 
 # misc

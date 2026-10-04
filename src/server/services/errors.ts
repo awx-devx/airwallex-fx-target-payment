@@ -1,10 +1,11 @@
-import type { ApiErrorCode } from '@/contracts/airwallex';
+import type { ApiErrorCode, FieldError } from '@/contracts/airwallex';
 
 export class ServiceError extends Error {
   constructor(
     readonly code: ApiErrorCode,
     message: string,
     readonly status: number,
+    readonly fieldErrors?: FieldError[],
   ) {
     super(message);
     this.name = 'ServiceError';

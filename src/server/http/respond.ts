@@ -1,4 +1,5 @@
-import { errorEnvelopeSchema, type ApiErrorCode } from '@/contracts/airwallex';
+import { errorEnvelopeSchema, type ApiErrorCode, type FieldError } from '@/contracts/airwallex';
+import { AirwallexError, toApiError } from '@/server/adapters/airwallex/errors';
 import { ServiceError } from '@/server/services/errors';
 import { InvalidStateError } from '@/server/domain/stateMachine';
 import type { z } from 'zod';
@@ -7,14 +8,32 @@ export function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
 }
 
-export function errorResponse(code: ApiErrorCode, message: string, status: number): Response {
-  const body = errorEnvelopeSchema.parse({ error: { code, message } });
+export function errorResponse(
+  code: ApiErrorCode,
+  message: string,
+  status: number,
+  fieldErrors?: FieldError[],
+): Response {
+  const body = errorEnvelopeSchema.parse({
+    error: {
+      code,
+      message,
+      ...(fieldErrors && fieldErrors.length > 0 ? { fieldErrors } : {}),
+    },
+  });
   return json(body, status);
 }
 
 export function failureResponse(error: unknown): Response {
-  if (error instanceof ServiceError) return errorResponse(error.code, error.message, error.status);
+  if (error instanceof ServiceError) {
+    return errorResponse(error.code, error.message, error.status, error.fieldErrors);
+  }
   if (error instanceof InvalidStateError) return errorResponse('INVALID_STATE', error.message, 409);
+  if (error instanceof AirwallexError) {
+    const api = toApiError(error);
+    const status = error.status >= 400 && error.status < 600 ? error.status : 502;
+    return json({ error: api }, status);
+  }
   throw error;
 }
 

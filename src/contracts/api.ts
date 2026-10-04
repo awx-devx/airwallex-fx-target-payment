@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   decimalStringSchema,
+  currencyCodeSchema,
   entityTypeSchema,
   fieldErrorSchema,
   isoDateSchema,
@@ -11,6 +12,7 @@ import {
 import { billSummarySchema, strategyModeSchema } from '@/contracts/bill';
 import { chartRangeSchema } from '@/contracts/chart';
 import { billEventSchema } from '@/contracts/events';
+import { extractedBillSchema, extractionStatusSchema } from '@/contracts/extraction';
 
 export const billDocumentSchema = z.object({
   id: z.string().min(1),
@@ -18,6 +20,13 @@ export const billDocumentSchema = z.object({
   mime: z.string().min(1),
   size: z.number().int().nonnegative(),
   sha256: z.string().min(1),
+  extraction: z
+    .object({
+      status: extractionStatusSchema,
+      result: extractedBillSchema.optional(),
+      error: z.string().optional(),
+    })
+    .optional(),
 });
 export type BillDocument = z.infer<typeof billDocumentSchema>;
 
@@ -94,4 +103,22 @@ export type BeneficiarySchemaBody = z.infer<typeof beneficiarySchemaBodySchema>;
 
 export const validateTransferResponseSchema = z.object({
   fieldErrors: z.array(fieldErrorSchema),
+});
+
+export const resolveBeneficiaryBodySchema = z.object({
+  name: z.string().min(1),
+  entityType: entityTypeSchema,
+  bankCountry: z.string().length(2),
+  accountCurrency: currencyCodeSchema,
+  transferMethod: transferMethodSchema,
+  iban: z.string().min(1).optional(),
+  accountNumber: z.string().min(1).optional(),
+  bic: z.string().min(1).optional(),
+  localBankCode: z.string().min(1).optional(),
+  routingType: z.string().min(1).optional(),
+});
+export type ResolveBeneficiaryBody = z.infer<typeof resolveBeneficiaryBodySchema>;
+
+export const quotaQuerySchema = z.object({
+  type: z.enum(['ID_OUTBOUND', 'VN_OUTBOUND']),
 });

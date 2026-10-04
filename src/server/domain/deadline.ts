@@ -1,5 +1,5 @@
 import type { TransferMethod } from '@/contracts/airwallex';
-import { fromZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const CUTOFF = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -63,6 +63,11 @@ export function utcDateOnly(isoDate: string): Date {
 
 export function formatUtcDate(instant: Date): string {
   return instant.toISOString().slice(0, 10);
+}
+
+/** Calendar date of `instant` in an IANA zone, `YYYY-MM-DD`. */
+export function accountDate(instant: Date, timeZone: string): string {
+  return formatInTimeZone(instant, timeZone, 'yyyy-MM-dd');
 }
 
 interface Civil {

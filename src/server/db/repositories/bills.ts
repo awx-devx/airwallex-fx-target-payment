@@ -8,6 +8,8 @@ import { allowedActions } from '@/contracts/permissions';
 import { fromDecimal128 } from '@/server/db/decimal';
 import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel } from '@/server/db/models';
 import { formatUtcDate } from '@/server/domain/deadline';
+import { extractedBillSchema, extractionStatusSchema } from '@/contracts/extraction';
+import { checkBill } from '@/server/domain/billChecks';
 import { distanceBps, estimatedCost, homePrecision, savings, savingsPercent } from '@/server/domain/rateMath';
 
 export interface BillListQuery {
@@ -16,17 +18,21 @@ export interface BillListQuery {
   quote?: string;
 }
 
-export async function listBills(query: BillListQuery, demoMode: boolean): Promise<BillSummary[]> {
+export async function listBills(
+  query: BillListQuery,
+  demoMode: boolean,
+  today: string,
+): Promise<BillSummary[]> {
   const filter: Record<string, string> = {};
   if (query.state) filter.state = query.state;
   if (query.base) filter.billCurrency = query.base;
   if (query.quote) filter.homeCurrency = query.quote;
   const docs = await Bill.find(filter).sort({ createdAt: -1 }).lean();
   const beneficiaries = await loadBeneficiaries(docs.map((doc) => doc.beneficiaryId).filter(Boolean));
-  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode));
+  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode, today));
 }
 
-export async function billDetail(id: string, demoMode: boolean): Promise<BillDetail | null> {
+export async function billDetail(id: string, demoMode: boolean, today: string): Promise<BillDetail | null> {
   const doc = await Bill.findById(id).lean();
   if (!doc) return null;
   const bill = asBill(doc);
@@ -35,7 +41,7 @@ export async function billDetail(id: string, demoMode: boolean): Promise<BillDet
     BillDocument.find({ billId: doc._id }).sort({ createdAt: 1 }).lean(),
     BillEventModel.find({ billId: doc._id }).sort({ ts: -1 }).lean(),
   ]);
-  const summary = toSummary(bill, beneficiaries, demoMode);
+  const summary = toSummary(bill, beneficiaries, demoMode, today);
   return billDetailSchema.parse({
     ...summary,
     documents: documents.map((document) => ({
@@ -44,6 +50,7 @@ export async function billDetail(id: string, demoMode: boolean): Promise<BillDet
       mime: document.mime,
       size: document.size,
       sha256: document.sha256,
+      ...extractionView(document.extraction),
     })),
     ...(bill.strategy ? { strategy: bill.strategy } : {}),
     events: events.map(toEvent),
@@ -54,6 +61,7 @@ function toSummary(
   bill: LoadedBill,
   beneficiaries: Map<string, BeneficiarySummary>,
   demoMode: boolean,
+  today: string,
 ): BillSummary {
   const precision = homePrecision(bill.homeCurrency);
   const fee = bill.strategy?.feeEstimate ?? '0';
@@ -69,7 +77,7 @@ function toSummary(
     transferMethod: bill.transferMethod,
     transferReason: bill.transferReason,
     reference: bill.reference || bill.invoiceNumber,
-    flags: {},
+    flags: flagsFor(bill, today),
     ...(bill.entryPrice ? { entryPrice: bill.entryPrice } : {}),
     ...(bill.strategy ? { targetPrice: bill.strategy.targetPrice, strategyMode: bill.strategy.mode } : {}),
     ...(bill.strategy?.maxCost ? { maxCost: bill.strategy.maxCost } : {}),
@@ -94,6 +102,36 @@ function toSummary(
       { demoMode },
     ),
   });
+}
+
+function flagsFor(bill: LoadedBill, today: string): BillSummary['flags'] {
+  const price = bill.lastPrice ?? bill.entryPrice;
+  const usdEquivalent = price
+    ? estimatedCost(bill.billAmount, price, bill.strategy?.feeEstimate ?? '0', homePrecision(bill.homeCurrency))
+    : undefined;
+  return checkBill({
+    billCurrency: bill.billCurrency,
+    homeCurrency: bill.homeCurrency,
+    amount: bill.billAmount,
+    dueDate: bill.dueDate,
+    today,
+    ...(usdEquivalent ? { usdEquivalent } : {}),
+  }).flags;
+}
+
+function extractionView(value: unknown): { extraction?: BillDetail['documents'][number]['extraction'] } {
+  if (!value || typeof value !== 'object') return {};
+  const record = value as { status?: unknown; result?: unknown; error?: unknown };
+  const status = extractionStatusSchema.safeParse(record.status);
+  if (!status.success) return {};
+  const result = extractedBillSchema.safeParse(record.result);
+  return {
+    extraction: {
+      status: status.data,
+      ...(result.success ? { result: result.data } : {}),
+      ...(typeof record.error === 'string' ? { error: record.error } : {}),
+    },
+  };
 }
 
 function toEvent(doc: {

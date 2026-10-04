@@ -10,6 +10,7 @@ import { fromDecimal128, toDecimal128 } from '@/server/db/decimal';
 import { Bill, User } from '@/server/db/models';
 import { billDetail, listBills, type BillListQuery } from '@/server/db/repositories/bills';
 import {
+  accountDate,
   defaultLeadDays,
   executionSchedule,
   formatUtcDate,
@@ -19,7 +20,9 @@ import { targetPriceFromMaxCost } from '@/server/domain/rateMath';
 import { REARM_IMPROVE_BPS, evaluateTrigger } from '@/server/domain/trigger';
 import mongoose from 'mongoose';
 import { invalid, notFound, ServiceError } from '@/server/services/errors';
+import { conversionSkipDates } from '@/server/services/reference';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
+import { assertTransferValid } from '@/server/services/transferValidation';
 
 const DEMO_EMAIL = 'demo@example.com';
 const EDITABLE = new Set(['DRAFT', 'READY', 'FAILED']);
@@ -28,7 +31,9 @@ export interface BillContext {
   clock: Clock;
   accountTz: string;
   cutoff: string;
+  env: Env;
   demoMode: boolean;
+  paymentsGateway: Env['PAYMENTS_GATEWAY'];
   pollIntervalMs: number;
   defaults: {
     bufferBps: number;
@@ -39,13 +44,17 @@ export interface BillContext {
   publisher?: EventPublisher;
 }
 
-export function listBillSummaries(query: BillListQuery, demoMode: boolean): Promise<BillSummary[]> {
-  return listBills(query, demoMode);
+export function listBillSummaries(
+  query: BillListQuery,
+  demoMode: boolean,
+  today: string,
+): Promise<BillSummary[]> {
+  return listBills(query, demoMode, today);
 }
 
-export async function getBill(id: string, demoMode: boolean): Promise<BillDetail> {
+export async function getBill(id: string, demoMode: boolean, today: string): Promise<BillDetail> {
   if (!mongoose.isValidObjectId(id)) throw notFound();
-  const detail = await billDetail(id, demoMode);
+  const detail = await billDetail(id, demoMode, today);
   if (!detail) throw notFound();
   return detail;
 }
@@ -63,6 +72,7 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
       ? executionSchedule({
           dueDate,
           leadDays,
+          skip: await conversionSkipDates(ctx, bill.billCurrency, bill.homeCurrency),
           cutoff: bill.strategy?.autosettleCutoff ?? ctx.cutoff,
           timeZone: ctx.accountTz,
         })
@@ -91,7 +101,7 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
     { returnDocument: 'after' },
   );
   if (!updated) throw new ServiceError('INVALID_STATE', 'Bill changed concurrently', 409);
-  return getBill(id, ctx.demoMode);
+  return getBill(id, ctx.demoMode, accountDate(ctx.clock.now(), ctx.accountTz));
 }
 
 export async function putStrategy(
@@ -142,6 +152,7 @@ export async function putStrategy(
     payload: { mode: strategy.mode, targetPrice, consecutiveHits },
     demoMode: ctx.demoMode,
     publisher: ctx.publisher,
+    today: accountDate(ctx.clock.now(), ctx.accountTz),
     patch: {
       strategy: {
         ...strategy,
@@ -160,10 +171,13 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
   if (!bill.beneficiaryId) throw invalid('Resolve a beneficiary before arming');
   if (!bill.strategy) throw invalid('Set a strategy before arming');
   if (!bill.last) throw invalid('A rate is required to capture the entry');
+  await assertTransferValid(ctx, bill, body);
   const leadDays = defaultLeadDays(body.transferMethod);
+  const skip = await conversionSkipDates(ctx, bill.billCurrency, bill.homeCurrency);
   const schedule = executionSchedule({
     dueDate: formatUtcDate(bill.dueDate),
     leadDays,
+    skip,
     cutoff: bill.strategy.autosettleCutoff,
     timeZone: ctx.accountTz,
   });
@@ -178,6 +192,7 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
     payload: { pastDeadline: past, executionDeadline: schedule.executionDeadline },
     demoMode: ctx.demoMode,
     publisher: ctx.publisher,
+    today: accountDate(ctx.clock.now(), ctx.accountTz),
     patch: {
       transferMethod: body.transferMethod,
       transferReason: body.transferReason,
@@ -220,6 +235,7 @@ function simpleTransition(
     auditType,
     demoMode: ctx.demoMode,
     publisher: ctx.publisher,
+    today: accountDate(ctx.clock.now(), ctx.accountTz),
   });
 }
 
@@ -280,12 +296,18 @@ export async function closeEventPublisher(): Promise<void> {
   if (redis) await redis.quit();
 }
 
+export function todayFor(env: Env, clock: Clock = new SystemClock()): string {
+  return accountDate(clock.now(), env.AIRWALLEX_ACCOUNT_TZ);
+}
+
 export function billContext(env: Env, clock: Clock = new SystemClock()): BillContext {
   return {
     clock,
     accountTz: env.AIRWALLEX_ACCOUNT_TZ,
     cutoff: env.DEADLINE_AUTOSETTLE_CUTOFF,
+    env,
     demoMode: env.DEMO_MODE,
+    paymentsGateway: env.PAYMENTS_GATEWAY,
     pollIntervalMs: env.POLL_INTERVAL_MS,
     defaults: {
       bufferBps: env.TRIGGER_BUFFER_BPS,

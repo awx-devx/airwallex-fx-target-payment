@@ -34,6 +34,8 @@ describe('parseEnv', () => {
     expect(env.AIRWALLEX_CLIENT_ID).toBeUndefined();
     expect(env.SPEND_SYNC).toBe(false);
     expect(env.FILES_UPLOAD).toBe(false);
+    expect(env.EXTRACTION_MAX_CALLS).toBe(20);
+    expect(env.EXTRACTION_WINDOW_SEC).toBe(3600);
     expect(env.MONGODB_URI).toBe(required.MONGODB_URI);
   });
 });
