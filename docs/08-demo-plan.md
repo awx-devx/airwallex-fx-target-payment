@@ -103,6 +103,7 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Jump to deadline pays that bill immediately | `DEMO-ONLY` | `src/mocks/mock-data-source.ts` `jumpToDeadline` | The sweeper pays from the stored cutoff |
 | `/dev/*` and `/api/demo/*` routes | `DEMO-ONLY` | `src/app/dev`, `src/app/api/demo` | Not deployed (`DEMO_MODE=false`) |
 | Standing instruction is a single checkbox at arming | `DEMO-ONLY` | `ArmConfirm`, `arm` service | A formal payment mandate with limits, stored with an audit trail |
+| Standing instruction is attributed to one demo user | `DEMO-ONLY` | `src/server/services/bills.ts` `demoUserId` | The authenticated user id |
 | Seeded bills use cached extraction results | `DEMO-ONLY` | `scripts/seed-demo` | Live extraction; human review is always required |
 | Generated vendors, bank accounts and invoices; mock extractor returns truth by file hash | `DEMO-ONLY` | `src/mocks/generators`, `scripts/generate`, mock `BillExtractor` | Real vendor onboarding and live extraction |
 | Uploads on a local Docker volume | `DEMO-ONLY` | uploads storage adapter | Encrypted object storage with retention rules |
