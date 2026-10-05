@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AirwallexClient } from '@/server/adapters/airwallex/client';
-import { createTransfer } from '@/server/adapters/airwallex/endpoints/transfers';
+import { createScheduledTransfer, createTransfer } from '@/server/adapters/airwallex/endpoints/transfers';
 import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import {
   jsonNumber,
@@ -218,6 +218,40 @@ describe('AirwallexClient', () => {
       call.url.pathname.endsWith('/transfers/create'),
     );
     expect(String(create?.init.body)).toContain('"request_id":"tr:bill-1:1"');
+  });
+
+  it('schedules an unlocked transfer for the safety net', async () => {
+    const created = {
+      id: 't-scheduled',
+      short_reference_id: 'P260101-NET',
+      request_id: 'sn:bill-1',
+      status: 'SCHEDULED',
+      transfer_method: 'LOCAL',
+      source_amount: '10.00',
+      source_currency: 'USD',
+      transfer_amount: '8.00',
+      transfer_currency: 'EUR',
+      conversion: { rate: '1.25', currency_pair: 'EURUSD' },
+      updated_at: '2026-01-01T00:00:00+0000',
+    };
+    const { client, calls } = harness(() => json(200, JSON.stringify(created)));
+    const execution = await createScheduledTransfer(client, {
+      billId: 'bill-1',
+      beneficiaryId: 'ben-1',
+      transferCurrency: 'EUR',
+      transferAmount: '8.00',
+      sourceCurrency: 'USD',
+      transferMethod: 'LOCAL',
+      reason: 'bill_payment',
+      reference: 'INV-1',
+      transferDate: '2026-10-19',
+    });
+    expect(execution.transferId).toBe('t-scheduled');
+    const body = String(calls.find((call) => call.url.pathname.endsWith('/transfers/create'))?.init.body);
+    expect(body).toContain('"request_id":"sn:bill-1"');
+    expect(body).toContain('"transfer_date":"2026-10-19"');
+    expect(body).toContain('"lock_rate_on_create":false');
+    expect(body).not.toContain('quote_id');
   });
 
   it('keeps amounts that JSON.parse would round', async () => {

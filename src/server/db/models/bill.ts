@@ -119,6 +119,12 @@ const billSchema = new Schema(
     recentEvents: { type: [recentEventSchema], default: [] },
     displayInverted: { type: Boolean, required: true, default: false },
     insufficientBalance: { type: Boolean, default: false },
+    safetyNet: {
+      type: new Schema(
+        { transferId: { type: String, required: true } },
+        { _id: false },
+      ),
+    },
     colorTag: { type: String },
     seedKey: { type: String },
     generated: { type: Boolean },

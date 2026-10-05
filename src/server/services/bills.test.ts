@@ -6,6 +6,7 @@ import { POST as arm } from '@/app/api/bills/[id]/arm/route';
 import { GET as balances } from '@/app/api/balances/route';
 import { getEnv } from '@/server/env';
 import { bootDb, shutdownDb, watchingBillInput } from '@/server/test/harness';
+import { closeWorkQueues } from '@/server/queue/work';
 import { armBill, billContext, cancelBill, closeEventPublisher, putStrategy } from '@/server/services/bills';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -14,6 +15,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await closeWorkQueues();
   await closeEventPublisher();
   await shutdownDb();
 });

@@ -34,13 +34,26 @@ export async function sweepOnce(options: {
         options.logger.warn({ billId, lateMs }, 'CATCH_UP');
       }
     }
-    const data = deadlinePayload.parse({ billId });
-    await options.deadlineQueue.add('deadline.autosettle', data, {
-      jobId: jobIds.deadlineAutosettle(billId),
-    });
-    enqueued += 1;
+    if (await enqueueDeadline(options.deadlineQueue, billId)) enqueued += 1;
   }
   return enqueued;
+}
+
+async function enqueueDeadline(queue: Queue, billId: string): Promise<boolean> {
+  const jobId = jobIds.deadlineAutosettle(billId);
+  const existing = await queue.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state !== 'completed' && state !== 'failed') return false;
+    await existing.remove();
+  }
+  try {
+    await queue.add('deadline.autosettle', deadlinePayload.parse({ billId }), { jobId });
+    return true;
+  } catch (error) {
+    if (error instanceof Error && /already (?:exists|waiting)/i.test(error.message)) return false;
+    throw error;
+  }
 }
 
 export function startSweeper(options: {

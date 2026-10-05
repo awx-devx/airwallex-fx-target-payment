@@ -148,6 +148,8 @@ Status rank for monotonic updates: `SCHEDULED(1) = OVERDUE(1) < PROCESSING(2) < 
 
 `POST /transfers/{id}/cancel` is used for user cancellation (before `SENT`) and by the Layer B safety net.
 
+Layer B (`DEADLINE_SAFETY_NET=airwallex`) creates that scheduled transfer at arming: the same `POST /transfers/create` body, plus `transfer_date` (the execution deadline) and `lock_rate_on_create: false`, and no `quote_id`. Its `request_id` is `sn:{billId}`, so it never collides with `tr:{billId}:{attempt}`. A duplicate `request_id` loads the existing transfer. The cutoff, a target hit, and pay now cancel it before they enqueue execution.
+
 ### 2.5 Convert-and-hold (optional path)
 
 `POST /fx/conversions/create` with `request_id`, `buy_currency`, `buy_amount`, `sell_currency`, `quote_id`. This is only offered for currencies marked **Pure Conversion ✔** (e.g. EUR, GBP, JPY, SGD, AUD). Pay later with a same-currency transfer (`source_currency = transfer_currency = F`) on or before the execution deadline. Webhooks: `conversion.*`. See [09 D-04](./09-decisions-and-open-questions.md).

@@ -13,6 +13,11 @@ function attemptNo(attempt: number): void {
   }
 }
 
+/** Layer B scheduled transfer. Distinct from `tr:{billId}:{attempt}` so it cannot collide with the quote payment. */
+export function safetyNetRequestId(billId: string): string {
+  return bounded(`sn:${billId}`);
+}
+
 /** Transfer create. `attempt` increments only after a terminal failure. */
 export function transferRequestId(billId: string, attempt: number): string {
   attemptNo(attempt);

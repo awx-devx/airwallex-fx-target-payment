@@ -3,13 +3,13 @@ import type { BillSummary } from '@/contracts/bill';
 import type { QuoteValidity } from '@/contracts/airwallex';
 import { D, decimalString } from '@/contracts/money';
 import { currentBalances } from '@/server/adapters/balances';
-import { SystemClock, type Clock } from '@/server/adapters/clock';
+import { parseInstant, SystemClock, type Clock } from '@/server/adapters/clock';
 import { quoteLock } from '@/server/adapters/quotes';
 import { publish } from '@/server/events/bus';
 import type { Env } from '@/server/env';
 import { Redis } from 'ioredis';
 import { fromDecimal128, toDecimal128 } from '@/server/db/decimal';
-import { Bill, User } from '@/server/db/models';
+import { Beneficiary, Bill, User } from '@/server/db/models';
 import { billDetail, listBills, type BillListQuery, type BillReadContext } from '@/server/db/repositories/bills';
 import {
   accountDate,
@@ -24,6 +24,8 @@ import mongoose from 'mongoose';
 import { invalid, notFound, ServiceError } from '@/server/services/errors';
 import { conversionSkipDates } from '@/server/services/reference';
 import { enqueueStrategy } from '@/server/queue/work';
+import { notePastDeadlinePayment } from '@/server/services/deadline';
+import { safetyNetGateway, type SafetyNetGateway } from '@/server/services/safetyNet';
 import { payBillNow } from '@/server/services/strategy';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
 import { assertTransferValid } from '@/server/services/transferValidation';
@@ -46,6 +48,7 @@ export interface BillContext {
     quoteValidityDeadline: QuoteValidity;
   };
   publisher?: EventPublisher;
+  safetyNet?: SafetyNetGateway | null;
 }
 
 export function listBillSummaries(
@@ -110,7 +113,9 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
           ? {
               executionDeadline: utcDateOnly(schedule.executionDeadline),
               'timers.autosettleAt': schedule.autosettleAt,
-              'timers.autosettleFiredAt': null,
+              ...(schedule.autosettleAt.getTime() > ctx.clock.now().getTime()
+                ? { 'timers.autosettleFiredAt': null }
+                : {}),
             }
           : {}),
       },
@@ -208,8 +213,36 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
     timeZone: ctx.accountTz,
   });
   const past = schedule.autosettleAt.getTime() <= ctx.clock.now().getTime();
+  const locked = past
+    ? await quoteLock(ctx.env, ctx.clock).lock({
+        buy: bill.billCurrency,
+        sell: bill.homeCurrency,
+        buyAmount: moneyOf(bill.billAmount),
+        validity: 'MIN_1',
+      })
+    : undefined;
+  if (locked && parseInstant(locked.validToAt).getTime() <= ctx.clock.now().getTime()) {
+    throw new ServiceError('QUOTE_EXPIRED', 'Quote expired before the transfer was created', 409);
+  }
+  const gateway = ctx.safetyNet !== undefined ? ctx.safetyNet : safetyNetGateway(ctx.env);
+  let safetyNetTransferId: string | undefined;
+  if (!past && gateway) {
+    const beneficiary = await Beneficiary.findById(bill.beneficiaryId);
+    if (!beneficiary) throw invalid('Resolve a beneficiary before arming');
+    safetyNetTransferId = await gateway.schedule({
+      billId: id,
+      beneficiaryId: beneficiary.airwallexBeneficiaryId,
+      transferCurrency: bill.billCurrency,
+      transferAmount: moneyOf(bill.billAmount),
+      sourceCurrency: bill.homeCurrency,
+      transferMethod: body.transferMethod,
+      reason: body.transferReason,
+      reference: body.reference,
+      transferDate: schedule.executionDeadline,
+    });
+  }
   const userId = await demoUserId();
-  return applyTransition({
+  const detail = await applyTransition({
     billId: id,
     event: past ? 'ARM_PAST_DEADLINE' : 'ARM',
     clock: ctx.clock,
@@ -229,11 +262,23 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
       entry: { price: bill.last.price, at: ctx.clock.now() },
       standingInstruction: { at: ctx.clock.now(), by: userId },
       'timers.autosettleAt': schedule.autosettleAt,
-      'timers.autosettleFiredAt': null,
+      'timers.autosettleFiredAt': past ? ctx.clock.now() : null,
+      ...(safetyNetTransferId ? { safetyNet: { transferId: safetyNetTransferId } } : {}),
       'trigger.consecutiveHits': 0,
       displayInverted: D(moneyOf(bill.last.price)).lt('0.01'),
     },
   });
+  if (!past || !locked) return detail;
+  await notePastDeadlinePayment({
+    env: ctx.env,
+    clock: ctx.clock,
+    billId: id,
+    buy: bill.billCurrency,
+    sell: bill.homeCurrency,
+    quote: locked,
+    publisher: ctx.publisher,
+  });
+  return getBill(id, ctx.demoMode, accountDate(ctx.clock.now(), ctx.accountTz), billReadContext(ctx.env, ctx.clock));
 }
 
 export function pauseBill(id: string, ctx: BillContext): Promise<BillDetail> {

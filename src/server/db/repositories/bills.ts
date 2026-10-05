@@ -95,6 +95,7 @@ function toSummary(
     ...(bill.strategy ? { targetPrice: bill.strategy.targetPrice, strategyMode: bill.strategy.mode } : {}),
     ...(bill.strategy?.maxCost ? { maxCost: bill.strategy.maxCost } : {}),
     ...(bill.lastPrice ? { lastPrice: bill.lastPrice, lastTickAt: bill.lastTickAt } : {}),
+    ...(bill.safetyNetTransferId ? { safetyNetTransferId: bill.safetyNetTransferId } : {}),
   };
   if (bill.entryPrice && bill.lastPrice) {
     summary.savings = savings(bill.billAmount, bill.entryPrice, bill.lastPrice, precision);
@@ -252,6 +253,7 @@ interface LoadedBill {
   lastTickAt?: string;
   lastSource?: RateSourceKind;
   insufficientBalance?: boolean;
+  safetyNetTransferId?: string;
   strategy?: StrategyDetail;
 }
 
@@ -274,6 +276,7 @@ function asBill(doc: {
   entry?: { price: { toString(): string } } | null;
   last?: { price: { toString(): string }; at: Date; source: RateSourceKind } | null;
   insufficientBalance?: boolean | null;
+  safetyNet?: { transferId?: string | null } | null;
   strategy?: {
     mode: StrategyDetail['mode'];
     targetPrice: { toString(): string };
@@ -320,6 +323,7 @@ function asBill(doc: {
       ? { lastPrice: money(doc.last.price), lastTickAt: doc.last.at.toISOString(), lastSource: doc.last.source }
       : {}),
     ...(doc.insufficientBalance ? { insufficientBalance: true } : {}),
+    ...(doc.safetyNet?.transferId ? { safetyNetTransferId: doc.safetyNet.transferId } : {}),
     ...(strategy ? { strategy } : {}),
   };
 }

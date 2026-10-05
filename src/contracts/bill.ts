@@ -87,6 +87,7 @@ export const billSummarySchema = z.object({
   reference: z.string().min(1),
   beneficiary: beneficiarySummarySchema.optional(),
   execution: executionSummarySchema.optional(),
+  safetyNetTransferId: z.string().min(1).optional(),
   flags: billFlagsSchema,
   allowedActions: z.array(billActionSchema),
 });

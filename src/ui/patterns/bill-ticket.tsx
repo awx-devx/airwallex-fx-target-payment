@@ -174,6 +174,9 @@ function Details({ bill }: { bill: BillSummary }) {
           { label: 'Method', value: bill.transferMethod },
           { label: 'Execute by', value: formatUtcDate(bill.executionDeadline, 'day') },
           { label: 'Due', value: formatUtcDate(bill.dueDate, 'day') },
+          ...(bill.safetyNetTransferId
+            ? [{ label: 'Safety net', value: bill.safetyNetTransferId }]
+            : []),
         ]}
       />
       <BeneficiaryCard beneficiary={bill.beneficiary} missing={bill.beneficiary ? [] : ['Bank details']} />

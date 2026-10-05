@@ -117,7 +117,8 @@ A ready tick enqueues `trigger.{billId}.{tickId}`. That job locks `quoteValidity
   - Default `lead_days`: the chosen transfer method's `flight_time.max` from the beneficiary form schema + 1 business day ([13 §5.3](./13-airwallex-contracts.md#53-method-lead-days-and-limits)), falling back to `LOCAL = 1`, `SWIFT = 3`. Configurable per bill.
   - If `execution_deadline` is already in the past when arming, the bill goes straight to `EXECUTING` (UI: "Due now") and pays at market.
 - At arming, write one timer onto the bill document: `timers.autosettleAt` (a UTC instant computed in the account time zone) = `execution_deadline @ DEADLINE_AUTOSETTLE_CUTOFF` (14:00). If the bill is still `WATCHING` or `PAUSED`, lock a short quote and move it to `EXECUTING`. The activity log records `AUTOSETTLE`. The ticket's deadline meter already says the bill pays at market that day if the target is not hit.
-- The worker **sweeper** runs every second. It queries `{ 'timers.autosettleAt': { $lte: clock.now() }, 'timers.autosettleFiredAt': null, state: { $in: ['WATCHING', 'PAUSED'] } }`, then adds a BullMQ job with the deterministic ID `deadline.autosettle.{billId}`. The job marks `autosettleFiredAt` when it completes. If the quote cannot be locked, the bill stays `WATCHING` and the sweeper retries.
+- The worker **sweeper** runs every second. It queries `{ 'timers.autosettleAt': { $lte: clock.now() }, 'timers.autosettleFiredAt': null, state: { $in: ['WATCHING', 'PAUSED'] } }`, then adds a BullMQ job with the deterministic ID `deadline.autosettle.{billId}`. The job locks a `MIN_1` quote, records `AUTOSETTLE`, moves the bill to `EXECUTING`, and enqueues execution with mode `DEADLINE`. It sets `autosettleFiredAt` only after that succeeds. If the quote cannot be locked, the bill stays `WATCHING` or `PAUSED` and the sweeper retries. A due-date or lead-day edit recomputes `autosettleAt`, and clears `autosettleFiredAt` when the new cutoff is still in the future.
+- With `DEADLINE_SAFETY_NET=airwallex`, arming also creates a future-dated transfer (`transfer_date` = the execution deadline, `lock_rate_on_create=false`, `request_id` = `sn:{billId}`). Its id is `safetyNetTransferId` on the bill. Target hit, pay now, and the cutoff cancel it before they execute. The default `none` does not call Airwallex.
 - Jobs are idempotent and state-guarded. Because timers are data, restarts need no special handling: any timer that became due while the worker was down is picked up by the first sweep.
 
 ---
@@ -250,6 +251,7 @@ interface BillSummary {
   reference: string;                       // shown to the vendor; defaults to the invoice number
   beneficiary?: BeneficiarySummary;        // incl. account verification (13 §5.4)
   execution?: ExecutionSummary;
+  safetyNetTransferId?: string;            // Layer B scheduled transfer, only when the flag is on
   flags: { stale?: boolean; insufficientBalance?: boolean; noReferenceHistory?: boolean;
            overdue?: boolean; awxApproval?: boolean; amountLimit?: boolean; routeUnsupported?: boolean; nameMismatch?: boolean };
   allowedActions: BillAction[];            // from the bill state; see below

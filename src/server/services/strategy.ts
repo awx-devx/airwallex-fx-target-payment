@@ -20,6 +20,7 @@ import {
 import type { Env } from '@/server/env';
 import { enqueueExecution, enqueueQuoteRetry, enqueueStrategy } from '@/server/queue/work';
 import { ServiceError, invalid, notFound } from '@/server/services/errors';
+import { releaseSafetyNet, type SafetyNetGateway } from '@/server/services/safetyNet';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
 
 type ExecutionMode = 'TARGET' | 'MANUAL';
@@ -33,6 +34,7 @@ export interface StrategyDeps {
   publisher?: EventPublisher;
   demoMode: boolean;
   read?: BillReadContext;
+  safetyNet?: SafetyNetGateway | null;
 }
 
 interface PriceTick {
@@ -66,6 +68,7 @@ interface OpenBill {
     at: Date;
     source: RateSourceKind;
   } | null;
+  safetyNet?: { transferId?: string } | null;
 }
 
 /** Count a tick. A ready watching bill gets one strategy job for that tick. */
@@ -237,6 +240,7 @@ async function commit(
   price: string,
   simulated: boolean,
 ): Promise<BillDetail> {
+  await releaseSafetyNet(deps.env, bill.safetyNet?.transferId, deps.safetyNet);
   const detail = await applyTransition({
     billId: String(bill._id),
     event: 'TRIGGER',

@@ -10,7 +10,7 @@ import {
   isDuplicateRequest,
 } from '@/server/adapters/airwallex/errors';
 import { mapTransfer } from '@/server/adapters/airwallex/mappers';
-import { transferRequestId } from '@/server/adapters/airwallex/requestIds';
+import { safetyNetRequestId, transferRequestId } from '@/server/adapters/airwallex/requestIds';
 
 const APP = 'fx-target-payment';
 
@@ -60,6 +60,46 @@ export async function createTransfer(
     const id = duplicateResourceId(error);
     if (!id) throw error;
     return getTransfer(client, id, input.mode);
+  }
+}
+
+/**
+ * Future-dated transfer for the Layer B safety net. No quote: the rate stays
+ * unlocked until the transfer date.
+ * https://www.airwallex.com/docs/api#/Payouts/Transfers/
+ */
+export async function createScheduledTransfer(
+  client: AirwallexClient,
+  input: Omit<CreateTransferInput, 'attempt' | 'quoteId' | 'mode'> & { transferDate: string },
+): Promise<ExecutionSummary> {
+  const requestId = safetyNetRequestId(input.billId);
+  const body: Record<string, unknown> = {
+    request_id: requestId,
+    beneficiary_id: input.beneficiaryId,
+    transfer_currency: input.transferCurrency,
+    transfer_amount: input.transferAmount,
+    source_currency: input.sourceCurrency,
+    transfer_method: input.transferMethod,
+    transfer_date: input.transferDate,
+    lock_rate_on_create: false,
+    reason: input.reason,
+    reference: input.reference,
+    fee_paid_by: 'PAYER',
+    metadata: { bill_id: input.billId, app: APP },
+  };
+  if (input.transferMethod === 'SWIFT') body.swift_charge_option = 'PAYER';
+  try {
+    const payload = await client.request({
+      method: 'POST',
+      path: '/transfers/create',
+      body,
+    });
+    return mapTransfer(payload, 'DEADLINE');
+  } catch (error) {
+    if (!(error instanceof AirwallexError) || !isDuplicateRequest(error)) throw error;
+    const id = duplicateResourceId(error);
+    if (!id) throw error;
+    return getTransfer(client, id, 'DEADLINE');
   }
 }
 
