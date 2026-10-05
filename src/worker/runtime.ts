@@ -24,11 +24,27 @@ import {
 import { startPoller } from '@/worker/poller';
 import { defaultProcessors, type ProcessorMap } from '@/worker/processors';
 import { closeWorkQueues } from '@/server/queue/work';
+import { closeBalanceCache } from '@/server/services/balanceCache';
 import { closeEventPublisher } from '@/server/services/bills';
 import { startSweeper } from '@/worker/sweeper';
 import type { Processor, Queue, Worker } from 'bullmq';
 
 const SWEEPER_MS = 1_000;
+
+async function enqueueBootReconcile(queue: Queue): Promise<void> {
+  const existing = await queue.getJob('reconcile.boot');
+  if (existing) {
+    const state = await existing.getState();
+    if (state !== 'completed' && state !== 'failed') return;
+    await existing.remove();
+  }
+  try {
+    await queue.add('reconcile', {}, { jobId: 'reconcile.boot' });
+  } catch (error) {
+    if (error instanceof Error && /already exists/i.test(error.message)) return;
+    throw error;
+  }
+}
 
 export type WorkerHandle = {
   stop: () => Promise<void>;
@@ -93,6 +109,7 @@ export async function startWorker(options: {
     const candles = queues.get('candles');
     if (!candles) throw new Error('candles queue is missing');
     await candles.upsertJobScheduler('candles', { every: 60_000 }, { name: 'candles', data: {} });
+    await enqueueBootReconcile(reconcile);
   }
 
   const deadlineQueue = queues.get('deadline');
@@ -170,6 +187,7 @@ export async function startWorker(options: {
       await lockRedis.quit();
       await closeEventPublisher();
       await closeExtractionBudget();
+      await closeBalanceCache();
       await closeWorkQueues();
       if (options.closeMongo !== false) await disconnectMongo();
     },

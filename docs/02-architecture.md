@@ -370,7 +370,7 @@ Bill.findOneAndUpdate(
 
 - A `version` field provides optimistic concurrency. Mongoose's `optimisticConcurrency: true` is enabled on the `Bill` schema for `save()` paths as well.
 - The full audit event is also inserted into `bill_events`. If that insert fails, the transition still stands and the event is retried from a BullMQ job; the activity log is eventually consistent.
-- **Multi-document transactions** (a replica set is required) are used in one place, where two documents must change together: execution create, the execution document together with the bill moving to `EXECUTING` from `WATCHING` or `PAUSED`.
+- **Multi-document transactions** (a replica set is required) are used where the execution document and the bill must change together. `createExecution` claims `WATCHING` or `PAUSED` → `EXECUTING`. The executor inserts the execution, calls `transfers/create`, then stores the transfer and moves `EXECUTING` → `IN_FLIGHT` in one transaction. A quote that expires, or a short balance on a target or pay-now, releases the bill back to `WATCHING` before a transfer exists.
 - Duplicate-execution guard: a **partial unique index** on `executions { billId: 1 }` where `{ active: true }`. Executions set `active: false` when they reach `FAILED`/`CANCELLED`.
 
 ### 9.4 Money in MongoDB

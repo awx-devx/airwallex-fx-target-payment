@@ -48,6 +48,10 @@ export async function enqueueQuoteRetry(url: string, billId: string): Promise<vo
   await addJob('quote-retry', url, 'quote-retry', { billId }, jobIds.quoteRetry(billId), true);
 }
 
+export async function enqueueWebhook(url: string, eventId: string): Promise<void> {
+  await addJob('webhook', url, 'webhook', { eventId }, jobIds.webhook(eventId), false);
+}
+
 export async function enqueueExecution(
   url: string,
   billId: string,
@@ -60,6 +64,6 @@ export async function enqueueExecution(
     'execution',
     { billId, attempt, mode },
     jobIds.execute(billId, attempt),
-    false,
+    true,
   );
 }

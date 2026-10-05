@@ -115,8 +115,8 @@ Store `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `buy_amount`, `sell_amo
 **Validation at arming:** `POST /transfers/validate` with the same body as create, without `quote_id`, runs when the user arms the bill. The sandbox rejected a body that omitted `request_id` (field code 001) on 2026-10-04, so the call sends one. `validation_failed` field errors, account/method limits and beneficiary problems show up in review, not at trigger time ([13 §4.4](./13-airwallex-contracts.md#44-validation-at-arming)).
 
 **Pre-flight (executor):**
-1. `GET /balances/current`: require `available_amount(H) ≥ quote.sell_amount + fee_est`. Otherwise the bill stays `WATCHING` with `insufficientBalance` and the UI shows a top-up prompt. The worker retries until the cutoff.
-2. Optional: `POST /transfers/validate` again if the beneficiary changed since arming.
+1. `GET /balances/current`: require `available_amount(H) ≥ quote.sell_amount + fee_est`. A short balance on a target hit or pay now returns the bill to `WATCHING` with `insufficientBalance`. A short balance at the cutoff keeps the bill `EXECUTING` and retries the same `request_id`.
+2. `POST /transfers/validate` runs again on the Airwallex gateway before create. The mock gateway skips it.
 
 **Error handling** (full table with UI treatment: [13 §2.1](./13-airwallex-contracts.md#21-error-codes--our-codes--ui)):
 | Error | Action |

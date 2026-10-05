@@ -25,6 +25,8 @@ import { invalid, notFound, ServiceError } from '@/server/services/errors';
 import { conversionSkipDates } from '@/server/services/reference';
 import { enqueueStrategy } from '@/server/queue/work';
 import { notePastDeadlinePayment } from '@/server/services/deadline';
+import { cancelInFlightTransfer } from '@/server/services/execution';
+import { transferGateway } from '@/server/adapters/transfers';
 import { safetyNetGateway, type SafetyNetGateway } from '@/server/services/safetyNet';
 import { payBillNow } from '@/server/services/strategy';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
@@ -289,7 +291,19 @@ export function resumeBill(id: string, ctx: BillContext): Promise<BillDetail> {
   return simpleTransition(id, ctx, 'RESUME', 'RESUMED');
 }
 
-export function cancelBill(id: string, ctx: BillContext): Promise<BillDetail> {
+export async function cancelBill(id: string, ctx: BillContext): Promise<BillDetail> {
+  const bill = await Bill.findById(id);
+  if (bill?.state === 'IN_FLIGHT') {
+    await cancelInFlightTransfer({
+      env: ctx.env,
+      clock: ctx.clock,
+      gateway: transferGateway(ctx.env, ctx.clock),
+      publisher: ctx.publisher,
+      demoMode: ctx.demoMode,
+      billId: id,
+    });
+    return getBill(id, ctx.demoMode, accountDate(ctx.clock.now(), ctx.accountTz), billReadContext(ctx.env, ctx.clock));
+  }
   return simpleTransition(id, ctx, 'CANCEL', 'CANCELLED');
 }
 

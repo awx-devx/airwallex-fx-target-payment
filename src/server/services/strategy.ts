@@ -19,6 +19,7 @@ import {
 } from '@/server/domain/trigger';
 import type { Env } from '@/server/env';
 import { enqueueExecution, enqueueQuoteRetry, enqueueStrategy } from '@/server/queue/work';
+import { nextTransferAttempt } from '@/server/services/execution';
 import { ServiceError, invalid, notFound } from '@/server/services/errors';
 import { releaseSafetyNet, type SafetyNetGateway } from '@/server/services/safetyNet';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
@@ -259,7 +260,12 @@ async function commit(
     publisher: deps.publisher,
     patch: { insufficientBalance: false },
   });
-  await enqueueExecution(deps.env.REDIS_URL, String(bill._id), 1, mode);
+  await enqueueExecution(
+    deps.env.REDIS_URL,
+    String(bill._id),
+    await nextTransferAttempt(String(bill._id)),
+    mode,
+  );
   return detail;
 }
 
@@ -335,7 +341,7 @@ async function ensureExecution(env: Env, billId: string, fallback: ExecutionMode
       : quote?.purpose === 'DEADLINE' || quote?.purpose === 'AUTOSETTLE'
         ? 'DEADLINE'
         : fallback;
-  await enqueueExecution(env.REDIS_URL, billId, 1, mode);
+  await enqueueExecution(env.REDIS_URL, billId, await nextTransferAttempt(billId), mode);
 }
 
 async function tickFor(tickId: string, bill: OpenBill): Promise<PriceTick | null> {

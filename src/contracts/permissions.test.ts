@@ -72,6 +72,15 @@ describe('allowedActions', () => {
     expect(allowedActions(bill('IN_FLIGHT', 'verified'), { demoMode: true })).toEqual([
       'ADVANCE_TRANSFER',
     ]);
+    expect(
+      allowedActions(
+        { ...bill('IN_FLIGHT', 'verified'), execution: { status: 'PROCESSING' } },
+        { demoMode: true },
+      ),
+    ).toEqual(['CANCEL', 'ADVANCE_TRANSFER']);
+    expect(
+      allowedActions({ ...bill('IN_FLIGHT', 'verified'), execution: { status: 'SENT' } }),
+    ).not.toContain('CANCEL');
     expect(allowedActions(bill('WATCHING', 'verified'))).not.toContain('SIMULATE');
   });
 });

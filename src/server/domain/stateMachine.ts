@@ -17,10 +17,13 @@ export const TRANSITION_EVENTS = [
   'DEADLINE',
   'TRANSFER_CREATED',
   'CREATE_FAILED',
+  'RELEASE',
   'PAID',
   'PAYOUT_FAILED',
+  'LATE_FAILURE',
   'REARM',
   'CANCEL',
+  'CANCEL_TRANSFER',
   'SET_STRATEGY',
 ] as const;
 export type TransitionEvent = (typeof TRANSITION_EVENTS)[number];
@@ -42,10 +45,13 @@ const TABLE: Record<TransitionEvent, Rule> = {
   DEADLINE: { from: EXECUTING_FROM, to: 'EXECUTING' },
   TRANSFER_CREATED: { from: ['EXECUTING'], to: 'IN_FLIGHT' },
   CREATE_FAILED: { from: ['EXECUTING'], to: 'FAILED' },
+  RELEASE: { from: ['EXECUTING'], to: 'WATCHING' },
   PAID: { from: ['IN_FLIGHT'], to: 'PAID' },
   PAYOUT_FAILED: { from: ['IN_FLIGHT'], to: 'FAILED' },
+  LATE_FAILURE: { from: ['PAID'], to: 'FAILED' },
   REARM: { from: ['FAILED'], to: 'READY' },
   CANCEL: { from: ['DRAFT', 'READY', 'WATCHING', 'PAUSED'], to: 'CANCELLED' },
+  CANCEL_TRANSFER: { from: ['IN_FLIGHT'], to: 'CANCELLED' },
   SET_STRATEGY: { from: ['READY', 'WATCHING', 'PAUSED'], to: 'SAME' },
 };
 

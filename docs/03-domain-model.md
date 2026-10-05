@@ -15,8 +15,11 @@ stateDiagram-v2
   PAUSED --> EXECUTING: cutoff still pays
   EXECUTING --> IN_FLIGHT: transfer created (SCHEDULED/PROCESSING)
   EXECUTING --> FAILED: create failed (non-retryable)
+  EXECUTING --> WATCHING: quote expired or balance short before the transfer exists
   IN_FLIGHT --> PAID: payout.transfer.paid (+ grace window)
-  IN_FLIGHT --> FAILED: payout.transfer.failed / cancelled
+  IN_FLIGHT --> FAILED: payout.transfer.failed / overdue auto-cancel
+  IN_FLIGHT --> CANCELLED: user cancels before SENT
+  PAID --> FAILED: late failure inside 72h
   FAILED --> READY: user re-arms / edits
   DRAFT --> CANCELLED
   READY --> CANCELLED

@@ -6,6 +6,7 @@ import { fromDecimal128, toDecimal128 } from '@/server/db/decimal';
 import { Bill, BillEvent, Quote } from '@/server/db/models';
 import type { Env } from '@/server/env';
 import { enqueueExecution } from '@/server/queue/work';
+import { nextTransferAttempt } from '@/server/services/execution';
 import { notificationFor } from '@/server/services/notify';
 import { releaseSafetyNet, type SafetyNetGateway } from '@/server/services/safetyNet';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
@@ -59,7 +60,7 @@ export async function runDeadlineJob(input: DeadlineDeps & { billId: string }): 
     publisher: input.publisher,
     patch: { 'timers.autosettleFiredAt': input.clock.now(), insufficientBalance: false },
   });
-  await enqueueExecution(input.env.REDIS_URL, input.billId, 1, 'DEADLINE');
+  await enqueueExecution(input.env.REDIS_URL, input.billId, await nextTransferAttempt(input.billId), 'DEADLINE');
 }
 
 /** The cutoff was already past at arming. The bill is in EXECUTING; record the payment and enqueue it. */
@@ -84,13 +85,13 @@ export async function notePastDeadlinePayment(input: {
   await BillEvent.create({ billId: input.billId, ...audit });
   const notification = notificationFor({ billId: input.billId, auditType: 'AUTOSETTLE', at, payload: audit.payload });
   if (notification && input.publisher) await input.publisher.publish(notification);
-  await enqueueExecution(input.env.REDIS_URL, input.billId, 1, 'DEADLINE');
+  await enqueueExecution(input.env.REDIS_URL, input.billId, await nextTransferAttempt(input.billId), 'DEADLINE');
 }
 
 async function requeueDeadline(env: Env, billId: string): Promise<void> {
   const quote = await Quote.findOne({ billId }).sort({ validFromAt: -1 }).lean();
   if (quote?.purpose !== 'DEADLINE' && quote?.purpose !== 'AUTOSETTLE') return;
-  await enqueueExecution(env.REDIS_URL, billId, 1, 'DEADLINE');
+  await enqueueExecution(env.REDIS_URL, billId, await nextTransferAttempt(billId), 'DEADLINE');
 }
 
 async function storeQuote(

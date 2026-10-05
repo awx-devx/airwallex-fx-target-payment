@@ -17,6 +17,8 @@ const executionSchema = new Schema(
     attempt: { type: Number, required: true },
     requestId: { type: String, required: true },
     active: { type: Boolean, required: true },
+    cancelRequested: { type: Boolean, default: false },
+    invalidQuoteCount: { type: Number, default: 0 },
     airwallexTransferId: { type: String },
     shortReferenceId: { type: String },
     transferStatus: { type: String, enum: TRANSFER_STATUSES },

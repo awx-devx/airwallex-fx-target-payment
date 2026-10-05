@@ -5,24 +5,27 @@ import { MockPaymentsGateway } from '@/server/adapters/mock/gateway';
 import { getEnv, type Env } from '@/server/env';
 import { createLogger } from '@/server/logging/logger';
 import { failureResponse, json } from '@/server/http/respond';
+import { balanceEpoch } from '@/server/services/balanceCache';
 import { readBalances, type BalanceSource } from '@/server/services/balances';
 import { ServiceError } from '@/server/services/errors';
 import type { BalanceSummary } from '@/contracts/airwallex';
 
 export const runtime = 'nodejs';
 
-let cache: { at: number; rows: BalanceSummary[] } | null = null;
+let cache: { at: number; epoch: string; rows: BalanceSummary[] } | null = null;
 
 export async function GET(): Promise<Response> {
   try {
     const env = getEnv();
     const clock = new SystemClock();
+    const epoch = await balanceEpoch(env.REDIS_URL);
+    const fresh = cache?.epoch === epoch ? cache : null;
     const result = await readBalances({
       source: gatewayFor(env),
       clock,
-      cache,
+      cache: fresh,
     });
-    cache = result.cache;
+    cache = { ...result.cache, epoch };
     return json(result.rows);
   } catch (error) {
     return failureResponse(error);

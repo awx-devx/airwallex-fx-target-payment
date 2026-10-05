@@ -1,4 +1,10 @@
-import type { BeneficiarySummary, TransferMethod, TransferReason } from '@/contracts/airwallex';
+import {
+  executionSummarySchema,
+  type BeneficiarySummary,
+  type ExecutionSummary,
+  type TransferMethod,
+  type TransferReason,
+} from '@/contracts/airwallex';
 import { billDetailSchema, type BillDetail, type StrategyDetail } from '@/contracts/api';
 import { billSummarySchema, type BillState, type BillSummary } from '@/contracts/bill';
 import type { BillEvent } from '@/contracts/events';
@@ -6,7 +12,7 @@ import type { RateSourceKind } from '@/contracts/sse';
 import { decimalString } from '@/contracts/money';
 import { allowedActions } from '@/contracts/permissions';
 import { fromDecimal128 } from '@/server/db/decimal';
-import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel } from '@/server/db/models';
+import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel, Execution } from '@/server/db/models';
 import { formatUtcDate } from '@/server/domain/deadline';
 import { extractedBillSchema, extractionStatusSchema } from '@/contracts/extraction';
 import { checkBill } from '@/server/domain/billChecks';
@@ -36,7 +42,8 @@ export async function listBills(
   if (query.quote) filter.homeCurrency = query.quote;
   const docs = await Bill.find(filter).sort({ createdAt: -1 }).lean();
   const beneficiaries = await loadBeneficiaries(docs.map((doc) => doc.beneficiaryId).filter(Boolean));
-  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode, today, read));
+  const executions = await loadExecutions(docs.map((doc) => String(doc._id)));
+  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode, today, read, executions.get(String(doc._id))));
 }
 
 export async function billDetail(
@@ -53,7 +60,8 @@ export async function billDetail(
     BillDocument.find({ billId: doc._id }).sort({ createdAt: 1 }).lean(),
     BillEventModel.find({ billId: doc._id }).sort({ ts: -1 }).lean(),
   ]);
-  const summary = toSummary(bill, beneficiaries, demoMode, today, read);
+  const executions = await loadExecutions([bill.id]);
+  const summary = toSummary(bill, beneficiaries, demoMode, today, read, executions.get(bill.id));
   return billDetailSchema.parse({
     ...summary,
     documents: documents.map((document) => ({
@@ -75,6 +83,7 @@ function toSummary(
   demoMode: boolean,
   today: string,
   read?: BillReadContext,
+  execution?: ExecutionSummary,
 ): BillSummary {
   const precision = homePrecision(bill.homeCurrency);
   const fee = bill.strategy?.feeEstimate ?? '0';
@@ -90,7 +99,8 @@ function toSummary(
     transferMethod: bill.transferMethod,
     transferReason: bill.transferReason,
     reference: bill.reference || bill.invoiceNumber,
-    flags: flagsFor(bill, today, read),
+    flags: flagsFor(bill, today, read, execution),
+    ...(execution ? { execution } : {}),
     ...(bill.entryPrice ? { entryPrice: bill.entryPrice } : {}),
     ...(bill.strategy ? { targetPrice: bill.strategy.targetPrice, strategyMode: bill.strategy.mode } : {}),
     ...(bill.strategy?.maxCost ? { maxCost: bill.strategy.maxCost } : {}),
@@ -112,13 +122,23 @@ function toSummary(
   return billSummarySchema.parse({
     ...summary,
     allowedActions: allowedActions(
-      { state: summary.state, flags: summary.flags, beneficiary },
+      {
+        state: summary.state,
+        flags: summary.flags,
+        beneficiary,
+        ...(execution ? { execution } : {}),
+      },
       { demoMode },
     ),
   });
 }
 
-function flagsFor(bill: LoadedBill, today: string, read?: BillReadContext): BillSummary['flags'] {
+function flagsFor(
+  bill: LoadedBill,
+  today: string,
+  read?: BillReadContext,
+  execution?: ExecutionSummary,
+): BillSummary['flags'] {
   const price = bill.lastPrice ?? bill.entryPrice;
   const usdEquivalent = price
     ? estimatedCost(bill.billAmount, price, bill.strategy?.feeEstimate ?? '0', homePrecision(bill.homeCurrency))
@@ -132,6 +152,10 @@ function flagsFor(bill: LoadedBill, today: string, read?: BillReadContext): Bill
     ...(usdEquivalent ? { usdEquivalent } : {}),
   }).flags;
   if (bill.insufficientBalance) flags.insufficientBalance = true;
+  if (execution?.status === 'OVERDUE') flags.overdue = true;
+  if (execution && (execution.status === 'IN_APPROVAL' || execution.status.startsWith('APPROVAL_'))) {
+    flags.awxApproval = true;
+  }
   if (read?.historySource === 'none') flags.noReferenceHistory = true;
   if (
     read?.nowMs !== undefined &&
@@ -179,6 +203,23 @@ function toEvent(doc: {
     actor: doc.actor,
     ...(payload ? { payload } : {}),
   };
+}
+
+async function loadExecutions(ids: string[]): Promise<Map<string, ExecutionSummary>> {
+  const map = new Map<string, ExecutionSummary>();
+  if (ids.length === 0) return map;
+  const docs = await Execution.find({ billId: { $in: ids }, airwallexTransferId: { $exists: true } })
+    .sort({ active: -1 })
+    .lean();
+  for (const doc of docs) {
+    const key = String(doc.billId);
+    if (map.has(key)) continue;
+    const raw = doc.raw;
+    if (!raw || typeof raw !== 'object' || !('summary' in raw)) continue;
+    const parsed = executionSummarySchema.safeParse((raw as { summary?: unknown }).summary);
+    if (parsed.success) map.set(key, parsed.data);
+  }
+  return map;
 }
 
 async function loadBeneficiaries(

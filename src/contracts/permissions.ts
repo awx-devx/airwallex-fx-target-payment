@@ -1,3 +1,4 @@
+import type { TransferStatus } from '@/contracts/airwallex';
 import type { BillAction, BillState, BillSummary } from '@/contracts/bill';
 import { BILL_ACTIONS } from '@/contracts/bill';
 
@@ -16,7 +17,9 @@ export interface PermissionOptions {
  * The server and the mock data source both call this before changing state.
  */
 export function allowedActions(
-  bill: Pick<BillSummary, 'state' | 'flags' | 'beneficiary'>,
+  bill: Pick<BillSummary, 'state' | 'flags' | 'beneficiary'> & {
+    execution?: { status: TransferStatus };
+  },
   options?: PermissionOptions,
 ): BillAction[] {
   const actions = new Set<BillAction>(actionsForState(bill));
@@ -29,7 +32,9 @@ export function allowedActions(
 }
 
 function actionsForState(
-  bill: Pick<BillSummary, 'state' | 'beneficiary'>,
+  bill: Pick<BillSummary, 'state' | 'beneficiary'> & {
+    execution?: { status: TransferStatus };
+  },
 ): BillAction[] {
   const blockedAccount = bill.beneficiary?.verification?.code === 'INVALID';
   switch (bill.state) {
@@ -50,15 +55,20 @@ function actionsForState(
     case 'FAILED':
       return ['EDIT', 'RESOLVE_BENEFICIARY', 'REARM'];
     case 'EXECUTING':
-    case 'IN_FLIGHT':
     case 'PAID':
     case 'CANCELLED':
       return [];
+    case 'IN_FLIGHT':
+      return bill.execution && canCancel(bill.execution.status) ? ['CANCEL'] : [];
     default: {
       const never: never = bill.state;
       return never;
     }
   }
+}
+
+function canCancel(status: TransferStatus): boolean {
+  return status !== 'SENT' && status !== 'PAID' && status !== 'FAILED' && status !== 'CANCELLED';
 }
 
 function demoActions(state: BillState, simulationRunning: boolean): BillAction[] {

@@ -19,8 +19,11 @@ const LEGAL: Array<[BillState, TransitionEvent, BillState]> = [
   ['PAUSED', 'DEADLINE', 'EXECUTING'],
   ['EXECUTING', 'TRANSFER_CREATED', 'IN_FLIGHT'],
   ['EXECUTING', 'CREATE_FAILED', 'FAILED'],
+  ['EXECUTING', 'RELEASE', 'WATCHING'],
   ['IN_FLIGHT', 'PAID', 'PAID'],
   ['IN_FLIGHT', 'PAYOUT_FAILED', 'FAILED'],
+  ['IN_FLIGHT', 'CANCEL_TRANSFER', 'CANCELLED'],
+  ['PAID', 'LATE_FAILURE', 'FAILED'],
   ['FAILED', 'REARM', 'READY'],
   ['DRAFT', 'CANCEL', 'CANCELLED'],
   ['READY', 'CANCEL', 'CANCELLED'],
@@ -45,10 +48,14 @@ describe('bill state machine', () => {
     }
   });
 
-  it('gives paid and cancelled no way out', () => {
+  it('gives cancelled no way out, and paid only a late failure', () => {
     for (const event of TRANSITION_EVENTS) {
-      expect(() => transition('PAID', event)).toThrow(InvalidStateError);
       expect(() => transition('CANCELLED', event)).toThrow(InvalidStateError);
+      if (event === 'LATE_FAILURE') {
+        expect(transition('PAID', event).to).toBe('FAILED');
+      } else {
+        expect(() => transition('PAID', event)).toThrow(InvalidStateError);
+      }
     }
   });
 
