@@ -1,10 +1,10 @@
 'use client';
 
-import { Inbox } from 'lucide-react';
 import { useState } from 'react';
 import type { Showcase } from '@/ui/showcase/types';
 import { Banner } from '@/ui/primitives/banner';
 import { Button } from '@/ui/primitives/button';
+import { EmptyChartMark } from '@/ui/primitives/empty-mark';
 import { EmptyState } from '@/ui/primitives/empty-state';
 import { ToastCard, useToasts, type ToastTone } from '@/ui/primitives/toast';
 import { Cell } from '@/ui/primitives/showcase/frame';
@@ -114,7 +114,7 @@ export const feedbackShowcases: Showcase[] = [
         render: () => (
           <Cell label="empty">
             <EmptyState
-              icon={<Inbox strokeWidth={1.5} className="size-8" />}
+              icon={<EmptyChartMark />}
               title="No bills yet"
               body="Upload a foreign-currency invoice to open a position."
               action={<Button size="sm">Upload invoice</Button>}

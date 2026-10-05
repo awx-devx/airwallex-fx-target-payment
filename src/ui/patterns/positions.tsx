@@ -4,7 +4,7 @@ import type { BillEvent } from '@/contracts/events';
 import type { BillAction, BillSummary } from '@/contracts/bill';
 import { D } from '@/contracts/money';
 import { MoreHorizontal } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { memo, useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { cx } from '@/ui/primitives/cx';
 import { EmptyState } from '@/ui/primitives/empty-state';
@@ -273,7 +273,7 @@ function RowMenu({
   );
 }
 
-function PositionRow({
+const PositionRow = memo(function PositionRow({
   bill,
   selected,
   hovered,
@@ -331,7 +331,7 @@ function PositionRow({
       </Td>
     </tr>
   );
-}
+});
 
 export function PositionsPanel({
   bills,

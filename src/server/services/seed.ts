@@ -9,6 +9,7 @@ import { routingRateSource } from '@/server/adapters/rates';
 import { transferGateway } from '@/server/adapters/transfers';
 import { toDecimal128 } from '@/server/db/decimal';
 import {
+  Beneficiary,
   Bill,
   BillDocument,
   BillEvent,
@@ -209,6 +210,73 @@ export async function seedDemo(input: {
       amount: bill.amount,
     })),
   };
+}
+
+const SAMPLE_BILLS = [
+  { vendorName: 'Acme GmbH', currency: 'EUR', amount: '2500.00' },
+  { vendorName: 'Northwind Ltd', currency: 'GBP', amount: '1800.00' },
+  { vendorName: 'Sakura Trading', currency: 'JPY', amount: '320000' },
+  { vendorName: 'Harbour Supplies', currency: 'SGD', amount: '9600.00' },
+  { vendorName: 'Bharat Textiles', currency: 'INR', amount: '185000.00' },
+] as const;
+
+/**
+ * DEMO-ONLY: sample invoices are inserted as ready bills, not extracted from a file.
+ * PROD: only uploaded documents are extracted and reviewed.
+ */
+export async function createSampleBills(input: {
+  env: Env;
+  clock: Clock;
+  count: number;
+}): Promise<string[]> {
+  if (!input.env.DEMO_MODE) throw notFound('Demo mode is off');
+  const count = Math.min(SAMPLE_BILLS.length, Math.max(1, input.count));
+  const today = accountDate(input.clock.now(), input.env.AIRWALLEX_ACCOUNT_TZ);
+  const stamp = input.clock.now().getTime().toString(36);
+  const ids: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const sample = SAMPLE_BILLS[index];
+    if (!sample) continue;
+    const invoiceNumber = `SAMPLE-${stamp}-${index + 1}`;
+    const id = await insertDraft(input.env, {
+      seedKey: `sample:${stamp}:${index + 1}`,
+      generated: true,
+      vendorName: sample.vendorName,
+      invoiceNumber,
+      currency: sample.currency,
+      amount: sample.amount,
+      dueDate: addDays(today, 14),
+      issueDate: today,
+      transferMethod: 'LOCAL',
+      transferReason: 'bill_payment',
+    });
+    await review(input.env, input.clock, id);
+    const anchor = DEMO_ANCHORS.find((pair) => pair.base === sample.currency)?.price ?? '1';
+    const target = significantPrice(new Decimal(anchor).mul('0.99'));
+    await Bill.updateOne(
+      { _id: id },
+      {
+        $set: {
+          last: {
+            price: toDecimal128(anchor),
+            at: input.clock.now(),
+            source: 'SIMULATED',
+          },
+        },
+      },
+    );
+    const beneficiary = await Beneficiary.findOne({ accountCurrency: sample.currency });
+    if (beneficiary) {
+      await Bill.updateOne({ _id: id }, { $set: { beneficiaryId: beneficiary._id } });
+    }
+    await putStrategy(
+      id,
+      { mode: 'TARGET_RATE', targetPrice: target },
+      billContext(input.env, input.clock),
+    );
+    ids.push(id);
+  }
+  return ids;
 }
 
 export async function resetGenerated(): Promise<number> {

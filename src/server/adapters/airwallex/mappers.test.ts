@@ -162,6 +162,14 @@ describe('other mappers', () => {
           total_amount: '3.00',
           account_type: 'yield',
         },
+        {
+          currency: 'HRK',
+          available_amount: '0.00',
+          pending_amount: '0',
+          reserved_amount: '0',
+          total_amount: '0.00',
+          account_type: 'cash',
+        },
       ],
       '2026-01-01T00:00:00.000Z',
     );

@@ -19,6 +19,7 @@ import {
   type QuoteSummary,
 } from '@/contracts/airwallex';
 import { failureCategory } from '@/contracts/airwallex-errors';
+import { isCurrencyCode } from '@/contracts/currencies';
 import { D, significantPrice } from '@/contracts/money';
 import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import { toIsoUtc } from '@/server/adapters/airwallex/time';
@@ -234,11 +235,15 @@ export function mapBalances(payload: unknown, asOf: string): BalanceSummary[] {
     if (!isRecord(row)) bad('balance row is not an object');
     const accountType = optionalString(row, 'account_type');
     if (accountType !== undefined && accountType !== 'cash') continue;
+    const currency = requiredString(row, 'currency');
+    // Sandbox wallets still include retired codes such as HRK. One unknown
+    // currency must not drop the rest of the wallet.
+    if (!isCurrencyCode(currency)) continue;
     summaries.push(
       parseContract(
         balanceSummarySchema,
         {
-          currency: requiredString(row, 'currency'),
+          currency,
           available: decimalField(row, 'available_amount'),
           pending: decimalField(row, 'pending_amount'),
           reserved: decimalField(row, 'reserved_amount'),

@@ -42,7 +42,10 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
+import { useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { useKitReducedMotion, useTimeFrozen } from '@/ui/motion/freeze';
+import { durTick } from '@/ui/tokens/motion';
 import { cx } from '@/ui/primitives/cx';
 
 export interface FxChartProps {
@@ -113,6 +116,9 @@ export function FxChart(props: FxChartProps) {
     errorMessage = "Couldn't load this chart.",
     subject,
   } = props;
+  const reduced = useReducedMotion();
+  const kitReduced = useKitReducedMotion();
+  const frozen = useTimeFrozen();
   const host = useRef<HTMLDivElement>(null);
   const handle = useRef<Handle | null>(null);
   const previous = useRef<ChartSeriesPoint[]>([]);
@@ -285,14 +291,15 @@ export function FxChart(props: FxChartProps) {
       targetPulse,
       digits,
     });
-    api.overlay.apply(
-      overlayModel({
+    api.overlay.apply({
+      ...overlayModel({
         colors,
         inverted,
         overlays,
         target,
       }),
-    );
+      pulse: api.overlay.model.pulse,
+    });
     const view = visibleWindow(range, overlays.now, first, overlays.dueDate);
     const nextWindow = `${view.from}:${view.to}`;
     if (windowKey.current !== nextWindow) {
@@ -327,9 +334,10 @@ export function FxChart(props: FxChartProps) {
           position: 'atPriceMiddle' as const,
           price: marker.price,
           shape: marker.kind === 'NEAR_MISS' ? ('square' as const) : ('circle' as const),
-          color: markerColor(marker.kind, colors),
+          color:
+            marker.kind === 'TARGET_HIT' && targetPulse ? colors.orange300 : markerColor(marker.kind, colors),
           text: marker.text,
-          size: marker.kind === 'TARGET_HIT' ? 2 : 1,
+          size: marker.kind === 'TARGET_HIT' ? (targetPulse ? 3 : 2) : 1,
         })),
       );
     };
@@ -369,6 +377,27 @@ export function FxChart(props: FxChartProps) {
     targetPulse,
     type,
   ]);
+
+  useEffect(() => {
+    const api = handle.current;
+    if (!api) return;
+    if (!targetPulse || reduced || kitReduced || frozen) {
+      if (api.overlay.model.pulse) api.overlay.apply({ ...api.overlay.model, pulse: 0 });
+      return;
+    }
+    let frame = 0;
+    const started = performance.now();
+    const duration = durTick * 1000;
+    const step = (now: number) => {
+      const current = handle.current;
+      if (!current) return;
+      const progress = Math.min(1, (now - started) / duration);
+      current.overlay.apply({ ...current.overlay.model, pulse: 1 - progress });
+      if (progress < 1) frame = window.requestAnimationFrame(step);
+    };
+    frame = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(frame);
+  }, [frozen, kitReduced, reduced, targetPulse]);
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     const api = handle.current;

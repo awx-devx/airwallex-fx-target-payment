@@ -115,6 +115,13 @@ function StrategyBody({
   onAction?: (action: string) => void;
 }) {
   if (bill.state === 'READY') {
+    if (!bill.allowedActions.includes('ARM')) {
+      return (
+        <p className="text-fg-2">
+          Add the vendor's bank details on the Details tab before this bill can be armed.
+        </p>
+      );
+    }
     return (
       <ArmConfirm
         bill={bill}

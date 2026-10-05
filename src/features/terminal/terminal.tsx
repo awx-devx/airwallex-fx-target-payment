@@ -1,12 +1,20 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { BalanceSummary } from '@/contracts/airwallex';
 import type { BillAction, BillSummary } from '@/contracts/bill';
+import { D } from '@/contracts/money';
 import { CHART_RANGES } from '@/contracts/chart';
 import { DataSourceError } from '@/contracts/data-source';
 import { presentApiError } from '@/features/data/errors';
+import { qk } from '@/features/data/keys';
+import { addSampleBills } from '@/features/data/samples';
 import { demoControls } from '@/features/data/source';
+import { useKitReducedMotion } from '@/ui/motion/freeze';
+import { targetHitTiming } from '@/ui/motion/target-hit';
+import { useReducedMotion } from 'motion/react';
 import {
   useBalances,
   useBill,
@@ -27,7 +35,6 @@ import { PositionsPanel } from '@/ui/patterns/positions';
 import { ShortcutsSheet } from '@/ui/patterns/shortcuts-sheet';
 import { UploadModal, type UploadPhase } from '@/ui/patterns/upload-modal';
 import { FxChart } from '@/ui/chart/fx-chart';
-import { Banner } from '@/ui/primitives/banner';
 import { Button } from '@/ui/primitives/button';
 import { Dialog } from '@/ui/primitives/dialog';
 import { Drawer } from '@/ui/primitives/dialog';
@@ -37,6 +44,12 @@ import type { DropFile } from '@/ui/primitives/file-dropzone';
 import { useToasts } from '@/ui/primitives/toast';
 import { Menu, PanelRight } from 'lucide-react';
 import type { AppEvent } from '@/contracts/sse';
+
+function fundedFirst(rows: readonly BalanceSummary[]): BalanceSummary[] {
+  return [...rows].sort(
+    (a, b) => D(b.available).cmp(D(a.available)) || a.currency.localeCompare(b.currency),
+  );
+}
 
 function useWidth() {
   const [width, setWidth] = useState(1440);
@@ -52,12 +65,17 @@ function useWidth() {
 export function TerminalScreen({ billId }: { billId?: string }) {
   const router = useRouter();
   const width = useWidth();
+  const queryClient = useQueryClient();
   const bills = useBills();
-  const loadError = bills.error instanceof DataSourceError ? presentApiError(bills.error.error) : null;
   const balances = useBalances();
   const { connection, notices, now } = useStream();
   const actions = useBillActions();
   const toasts = useToasts();
+  const quietFeed = useRef<string | null>(null);
+  const quietBills = useRef(false);
+  const quietBalances = useRef(false);
+  const reduced = Boolean(useReducedMotion()) || useKitReducedMotion();
+  const [hitPulse, setHitPulse] = useState(false);
   const [ticketNotice, setTicketNotice] = useState<{ tone: 'error' | 'warn' | 'info'; text: string } | null>(
     null,
   );
@@ -173,17 +191,102 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   }
 
   useEffect(() => {
+    if (!bills.isError) {
+      quietBills.current = false;
+      toasts.dismiss('bills');
+      return;
+    }
+    if (quietBills.current) return;
+    const dismiss = () => {
+      quietBills.current = true;
+    };
+    if (bills.error instanceof DataSourceError) {
+      const presented = presentApiError(bills.error.error);
+      toasts.upsert({
+        key: 'bills',
+        tone: presented.tone === 'warning' ? 'warning' : 'error',
+        title: presented.title,
+        body: presented.body,
+        onDismiss: dismiss,
+      });
+      return;
+    }
+    toasts.upsert({ key: 'bills', tone: 'error', title: "Couldn't load bills", onDismiss: dismiss });
+  }, [bills.error, bills.isError, toasts]);
+
+  useEffect(() => {
+    if (!balances.isError) {
+      quietBalances.current = false;
+      toasts.dismiss('balances');
+      return;
+    }
+    if (quietBalances.current) return;
+    const dismiss = () => {
+      quietBalances.current = true;
+    };
+    if (balances.error instanceof DataSourceError) {
+      const presented = presentApiError(balances.error.error);
+      toasts.upsert({
+        key: 'balances',
+        tone: 'error',
+        title: presented.title,
+        body: presented.body,
+        onDismiss: dismiss,
+      });
+      return;
+    }
+    toasts.upsert({
+      key: 'balances',
+      tone: 'error',
+      title: "Couldn't load balances",
+      onDismiss: dismiss,
+    });
+  }, [balances.error, balances.isError, toasts]);
+
+  useEffect(() => {
+    if (connection === 'live' || connection === 'simulated') {
+      quietFeed.current = null;
+      toasts.dismiss('feed');
+      return;
+    }
+    if (quietFeed.current === connection) return;
+    const offline = connection === 'offline';
+    toasts.upsert({
+      key: 'feed',
+      tone: 'warning',
+      title: offline ? 'Price feed offline' : 'Reconnecting…',
+      body: offline ? 'Refreshing from the server.' : 'Prices may be stale.',
+      onDismiss: () => {
+        quietFeed.current = connection;
+      },
+    });
+  }, [connection, toasts]);
+
+  useEffect(() => {
     if (notices.length <= toasted.current) return;
     const fresh = notices.slice(0, notices.length - toasted.current);
     toasted.current = notices.length;
     const notice = fresh.find((event) => event.type === 'notification');
     if (!notice || notice.type !== 'notification') return;
-    toasts.push({
-      tone: notice.notification.title === 'Target hit' ? 'target-hit' : 'info',
-      title: notice.notification.title,
-      body: notice.notification.body,
-    });
-  }, [notices, toasts]);
+    const title = notice.notification.title;
+    const hit = title === 'Target hit';
+    const timing = targetHitTiming(reduced);
+    const show = () => {
+      toasts.push({
+        tone: hit ? 'target-hit' : 'info',
+        title,
+        body: notice.notification.body,
+        assertive: hit || title === 'Paying at the deadline',
+      });
+    };
+    if (!hit || timing.toastDelayMs === 0) {
+      show();
+      return;
+    }
+    setHitPulse(true);
+    window.setTimeout(() => setHitPulse(false), timing.pulseMs);
+    window.setTimeout(show, timing.toastDelayMs);
+  }, [notices, reduced, toasts]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -262,7 +365,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
     <div className="flex h-full min-h-0 flex-col">
       {width < 1280 ? (
         <AccountStrip
-          balances={balances.data ?? []}
+          balances={fundedFirst(balances.data ?? [])}
           connection={connection}
           now={now}
         />
@@ -310,7 +413,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
             <div className="w-full max-w-[1600px] border-line-1 md:border-x">
         <TopBar
           divider={false}
-          balances={balances.data ?? []}
+          balances={fundedFirst(balances.data ?? [])}
           connection={connection}
           unread={notices.length}
           now={now}
@@ -354,25 +457,13 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         </div>
         <div className="flex min-h-0 flex-1 justify-center md:px-4 xl:px-6">
         <div className="relative flex h-full min-h-0 w-full max-w-[1600px] flex-col border-line-1 md:border-x">
-        {bills.isError ? (
-          <Banner tone="error">
-            {loadError
-              ? [loadError.title, loadError.body].filter(Boolean).join(' · ')
-              : 'Could not load bills'}
-          </Banner>
-        ) : null}
-        {connection === 'delayed' ? (
-          <Banner tone="warn">Reconnecting… prices may be stale.</Banner>
-        ) : connection === 'offline' ? (
-          <Banner tone="warn">Price feed offline. Refreshing from the server.</Banner>
-        ) : null}
         <div className="flex min-h-0 flex-1">
           {showList ? (
             <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-r border-line-1">{list}</aside>
           ) : null}
           <div className={stack ? 'flex min-w-0 flex-1 flex-col overflow-auto' : 'flex min-h-0 min-w-0 flex-1 flex-col'}>
             <div className={stack ? 'h-80 shrink-0' : 'min-h-0 flex-1'}>
-              {!selected && !bills.isLoading ? (
+              {!selected && !bills.isLoading && !bills.isError ? (
                 <EmptyState
                   title="Upload your first bills"
                   body="Or open a sample invoice to walk the arming flow."
@@ -409,6 +500,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                       .catch(showError);
                   }}
                   connection={connection}
+                  targetPulse={hitPulse}
                   notional={{ amount: selected.amount, currency: selected.pair.base }}
                   subject={{ vendor: selected.vendorName, amount: selected.amount, currency: selected.pair.base }}
                   maxCost={selected.maxCost}
@@ -495,10 +587,25 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         trigger={null}
         onSamples={startSamples}
         onReview={() => {
-          ui.setUpload(false);
-          const ready = bills.data?.find((bill) => bill.state === 'READY');
-          if (ready) select(ready.id);
-          toasts.push({ tone: 'success', title: 'Sample bill ready to arm' });
+          const count = Math.max(1, uploadFiles.filter((file) => !file.error).length);
+          void (async () => {
+            try {
+              const ids = await addSampleBills(count);
+              await queryClient.invalidateQueries({ queryKey: qk.bills });
+              ui.setUpload(false);
+              const id = ids[0];
+              if (id) {
+                select(id);
+                ui.setTicketOpen(true);
+              }
+              toasts.push({
+                tone: 'success',
+                title: ids.length === 1 ? 'Sample bill ready to arm' : `${ids.length} sample bills ready to arm`,
+              });
+            } catch (error) {
+              showError(error);
+            }
+          })();
         }}
       />
       <Drawer open={ui.listOpen} onOpenChange={ui.setListOpen} title="Bills" side="right">

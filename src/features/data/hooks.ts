@@ -72,7 +72,9 @@ export function useStream() {
   const client = useQueryClient();
   const speed = useUiStore((state) => state.marketSpeed);
   const api = isApiDataSource();
-  const [connection, setConnection] = useState<FeedConnection>(api ? 'delayed' : 'simulated');
+  // Start live. "Reconnecting" is for a socket that has actually failed, not the
+  // moment before the first EventSource open.
+  const [connection, setConnection] = useState<FeedConnection>(api ? 'live' : 'simulated');
   const [notices, setNotices] = useState<AppEvent[]>([]);
   // Display clock only. The API path uses the browser until the first clock event.
   const [now, setNow] = useState(() =>

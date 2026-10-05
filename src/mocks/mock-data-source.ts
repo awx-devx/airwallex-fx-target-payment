@@ -152,6 +152,27 @@ export class MockDataSource implements DataSource {
     }
   }
 
+  /** DEMO-ONLY: clones the ready fixture. PROD: sample invoices are not a product path. */
+  addSamples(count: number): string[] {
+    const template = this.store.get('bill-ready');
+    if (!template) fail(404, 'NOT_FOUND', 'Sample bill is not loaded');
+    const total = Math.min(5, Math.max(1, count));
+    const ids: string[] = [];
+    for (let index = 0; index < total; index += 1) {
+      const id = `bill-sample-${this.nextId()}`;
+      const detail: BillDetail = {
+        ...structuredClone(template),
+        id,
+        invoiceNumber: `SAMPLE-${id.slice(-4)}`,
+        events: [],
+      };
+      this.refresh(detail);
+      this.store.set(id, detail);
+      ids.push(id);
+    }
+    return ids;
+  }
+
   async listBills(query?: ListBillsQuery): Promise<BillSummary[]> {
     return [...this.store.values()]
       .map((bill) => this.summary(bill))

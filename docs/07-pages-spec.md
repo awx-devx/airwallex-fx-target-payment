@@ -82,8 +82,8 @@ Other pages follow the same split: the upload review's document preview stacks a
 
 ## 2. Upload & review flow (`/upload`, also a modal over the terminal)
 
-1. **Drop** (`UploadModal`): multi-file PDF/PNG/JPG (≤ 20 MB each). Each file gets a row with upload → extraction progress. Files process in parallel (max 4). The user can close the modal; progress continues and a toast appears on completion.
-   - While a file's extraction `status` is `RUNNING`, the row shows a [`ThinkingOrb`](https://libraries.dev/orbs) (`thinking-orbs`, D-21) instead of the generic spinner, since a model is reading the document. The orb's `state` follows the stage the server reports: `working` while queued, `searching` while the deterministic readers run, `solving` while Claude (or the escalation model) reads the document, and it is removed the moment the status becomes `DONE` or `FAILED`. Size 20 inline in the file row, size 64 on the extraction screen itself. `dark`, `speed` 1. Under reduced motion the orb is `paused` and the row falls back to the status text.
+1. **Drop** (`UploadModal`): multi-file PDF/PNG/JPG (≤ 20 MB each). Each file gets a row with upload → extraction progress. Files process in parallel (max 4). The user can close the modal; progress continues and a toast appears on completion. Demo sample buttons insert ready bills (`POST /api/demo/samples`) and open the first ticket. They are not extracted documents.
+   - While a file's extraction `status` is `RUNNING`, the row shows a [`ThinkingOrb`](https://libraries.dev/orbs) (`thinking-orbs`, D-21) instead of the generic spinner, since a model is reading the document. The orb's `state` follows the stage the server reports: `working` while queued, `searching` while the deterministic readers run, `solving` while Claude (or the escalation model) reads the document, and it is removed the moment the status becomes `DONE` or `FAILED`. Size 20 inline in the file row, size 64 on the extraction screen itself. `dark`, `speed` 1. Under reduced motion, and while time is frozen, the orb is `paused` and the row falls back to the status text.
 2. **Review** (`ExtractionReview`), one bill at a time with a stepper (1 of n):
    - Left: document preview with extracted-field highlights (bounding boxes if the extractor returns them).
    - Right: fields for vendor, invoice #, currency, amount, issue date, due date, payment reference (defaults to the invoice #), transfer reason (Airwallex `reason` enum, default "Bill payment"), and bank details. Low-confidence fields are outlined in `--warn`.
@@ -107,7 +107,8 @@ A full-page version of `DemoControlBar` (see [08](./08-demo-plan.md)): per-pair 
 | --- | --- |
 | No bills | Terminal shows `EmptyState` with "Upload your first bills" + a sample-data button (demo) |
 | Feed stale > 2 intervals | `ConnectionIndicator` turns warn; price dims; chart shows the `stale` state; triggers are suspended (server-side) |
-| SSE disconnected | Banner "Reconnecting…"; falls back to polling every 10 s |
+| SSE disconnected | Sticky toast "Reconnecting… prices may be stale."; falls back to polling. A second failure mode ("Price feed offline") replaces that toast. Dismiss keeps it closed until the connection changes. It clears when the stream opens |
+| Bills failed to load | Sticky toast "The server didn't respond", with the server message. It clears when the list loads. A database outage is that toast, not an Airwallex outage |
 | Insufficient balance | `BalancePill` turns red for H; a banner names the shortfall; Pay now is blocked; the worker keeps the bill `WATCHING` and retries until the cutoff. Demo offers "Top up (sandbox)" |
 | Target hit | Informational toast "Target hit · paying", deep link `/bills/:id`. Toasts stack (max 3) |
 | Quote expires before the transfer is created | The bill stays `WATCHING` and the worker retries |

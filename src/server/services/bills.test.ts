@@ -15,6 +15,7 @@ import {
   closeEventPublisher,
   putStrategy,
 } from '@/server/services/bills';
+import { createSampleBills } from '@/server/services/seed';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 beforeAll(async () => {
@@ -158,6 +159,19 @@ describe('bill routes', () => {
     await expect(
       cancelBill(String(bill._id), billContext(getEnv())),
     ).rejects.toThrow(/cannot CANCEL/);
+  });
+
+  it('inserts a sample bill that is ready to arm', async () => {
+    const ids = await createSampleBills({
+      env: getEnv(),
+      clock: new SystemClock(),
+      count: 1,
+    });
+    expect(ids).toHaveLength(1);
+    const bill = await Bill.findById(ids[0]);
+    expect(bill?.state).toBe('READY');
+    expect(bill?.strategy?.mode).toBe('TARGET_RATE');
+    expect(bill?.last?.price).toBeDefined();
   });
 
   it('returns cached mock balances', async () => {

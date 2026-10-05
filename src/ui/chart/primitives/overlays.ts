@@ -32,6 +32,8 @@ export interface OverlayModel {
   dueToday: boolean;
   simulated: readonly TimeSpan[];
   colors: ChartColors;
+  /** 1 at the start of a target hit, decaying to 0. The line glow brightens with it. */
+  pulse?: number;
 }
 
 export class OverlayPrimitive implements ISeriesPrimitive {
@@ -223,10 +225,12 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
     if (model.target === undefined) return;
     const y = this.primitive.y(model.target);
     if (y === null) return;
+    const pulse = model.pulse ?? 0;
     ctx.save();
-    ctx.shadowColor = withAlpha(model.colors.orange, 0.3);
+    // Brighten by alpha only. Width and blur stay put so the pulse is opacity.
+    ctx.shadowColor = withAlpha(model.colors.orange, 0.3 + pulse * 0.45);
     ctx.shadowBlur = 6;
-    ctx.strokeStyle = withAlpha(model.colors.orange, 0.3);
+    ctx.strokeStyle = withAlpha(model.colors.orange, 0.3 + pulse * 0.4);
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(0, y);

@@ -3,7 +3,9 @@
 import type { BillSummary } from '@/contracts/bill';
 import { D, decimalString } from '@/contracts/money';
 import { formatMoney } from '@/ui/format';
-import { useState } from 'react';
+import { memo, useState, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { dur2, easeOut } from '@/ui/tokens/motion';
 import { Button } from '@/ui/primitives/button';
 import { Chip } from '@/ui/primitives/chip';
 import { cx } from '@/ui/primitives/cx';
@@ -40,7 +42,7 @@ const FILTERS: { value: BillFilter; label: string }[] = [
   { value: 'paid', label: 'Paid' },
 ];
 
-export function BillListItem({
+export const BillListItem = memo(function BillListItem({
   bill,
   sparkline,
   now,
@@ -148,6 +150,19 @@ export function BillListItem({
       <CountdownChip until={`${bill.executionDeadline}T21:00:00.000Z`} now={now} kind="deadline" />
       <StateBadge state={bill.state} />
     </button>
+  );
+});
+
+function EnterRow({ children }: { children: ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      transition={{ duration: dur2, ease: easeOut }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -298,18 +313,21 @@ export function BillList({
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          {visible.map((row) => (
-            <BillListItem
-              key={row.bill.id}
-              bill={row.bill}
-              sparkline={row.sparkline}
-              now={now}
-              selected={row.bill.id === selectedId}
-              density={density}
-              layout={layout}
-              onSelect={onSelect}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {visible.map((row) => (
+              <EnterRow key={row.bill.id}>
+                <BillListItem
+                  bill={row.bill}
+                  sparkline={row.sparkline}
+                  now={now}
+                  selected={row.bill.id === selectedId}
+                  density={density}
+                  layout={layout}
+                  onSelect={onSelect}
+                />
+              </EnterRow>
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </section>
@@ -343,18 +361,21 @@ function Grouped({
       {[...groups.entries()].map(([key, list]) => (
         <div key={key}>
           <PairGroupHeader pair={list[0]!.bill.pair} bills={list.map((row) => row.bill)} />
-          {list.map((row) => (
-            <BillListItem
-              key={row.bill.id}
-              bill={row.bill}
-              sparkline={row.sparkline}
-              now={now}
-              selected={row.bill.id === selectedId}
-              density={density}
-              layout={layout}
-              onSelect={onSelect}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {list.map((row) => (
+              <EnterRow key={row.bill.id}>
+                <BillListItem
+                  bill={row.bill}
+                  sparkline={row.sparkline}
+                  now={now}
+                  selected={row.bill.id === selectedId}
+                  density={density}
+                  layout={layout}
+                  onSelect={onSelect}
+                />
+              </EnterRow>
+            ))}
+          </AnimatePresence>
         </div>
       ))}
     </div>
