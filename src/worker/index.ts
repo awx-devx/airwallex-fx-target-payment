@@ -19,7 +19,12 @@ async function main() {
   const env = readEnv();
   const logger = createLogger();
   const clock = createClock(env.CLOCK);
-  const handle = await startWorker({ env, clock, logger });
+  const handle = await startWorker({
+    env,
+    clock,
+    logger,
+    demoClock: env.DEMO_MODE,
+  });
   logger.info({ clock: env.CLOCK }, 'worker started');
 
   let stopping = false;

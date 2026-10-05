@@ -27,6 +27,8 @@ POST /api/demo/bills/:id/simulate/stop
 POST /api/demo/reset
 ```
 
+The API and the worker are separate processes. Clock speed, market nudges, and Simulate runs are Redis records (`demo:clock`, `demo:market`, `demo:sim:{billId}`) so the worker applies them. The worker clock reads `demo:clock`. Simulate pacing stays on the wall clock.
+
 The **`ConnectionIndicator` shows `SIM`** whenever the feed is simulated, so it is clear which parts are simulated. Quote and transfer IDs shown in the UI are real sandbox IDs.
 
 ### 1.1 Simulate button
@@ -100,20 +102,21 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | --- | --- | --- | --- |
 | Simulated market drives the chart and triggers (`RATE_SOURCE=simulated`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/rates/simulated` | Poll bill-sized `rates/current`; triggers only from real ticks |
 | Warp clock (`CLOCK=warp`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/clock` | System clock; demo endpoints removed |
+| Demo clock, market nudges, and Simulate runs are shared through Redis | `DEMO-ONLY` | `src/server/adapters/demo/store.ts`, `src/server/adapters/clock/demo.ts` | System clock; demo endpoints removed |
 | Jump to deadline pays that bill immediately | `DEMO-ONLY` | `src/mocks/mock-data-source.ts` `jumpToDeadline` | The sweeper pays from the stored cutoff |
 | `/dev/*` and `/api/demo/*` routes | `DEMO-ONLY` | `src/app/dev`, `src/app/api/demo` | Not deployed (`DEMO_MODE=false`) |
 | Standing instruction is a single checkbox at arming | `DEMO-ONLY` | `ArmConfirm`, `arm` service | A formal payment mandate with limits, stored with an audit trail |
 | Standing instruction is attributed to one demo user | `DEMO-ONLY` | `src/server/services/bills.ts` `demoUserId` | The authenticated user id |
-| Seeded bills use cached extraction results | `DEMO-ONLY` | `scripts/seed-demo` | Live extraction; human review is always required |
+| Seeded bills use cached extraction results | `DEMO-ONLY` | `scripts/seed-demo.ts`, `src/server/services/seed.ts` | Live extraction; human review is always required |
 | Generated vendors, bank accounts and invoices; mock extractor returns truth by file hash | `DEMO-ONLY` | `src/mocks/generators`, `scripts/generate`, mock `BillExtractor` | Real vendor onboarding and live extraction |
 | Uploads on a local Docker volume | `DEMO-ONLY` | `src/server/adapters/storage/local.ts` | Encrypted object storage with retention rules |
 | Single server, one worker (single point of failure) | `DEMO-ONLY` | `docs/10` | Multi-instance web, managed Redis, `DEADLINE_SAFETY_NET=airwallex` |
-| Transfer status advanced by the simulation endpoint | `SANDBOX` | `src/mocks/mock-data-source.ts`, `src/server/adapters/airwallex/endpoints/simulation.ts`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
+| Transfer status advanced by the simulation endpoint | `SANDBOX` | `src/mocks/mock-data-source.ts`, `src/server/adapters/airwallex/endpoints/simulation.ts`, `src/server/adapters/transfers`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
 | Pre-funded wallet topped up by deposit simulation | `SANDBOX` | `src/server/adapters/airwallex/endpoints/simulation.ts`, `/api/demo/scenario`, seed scripts | Real funding; low-balance alerts before the deadline day |
 | Sandbox FX pricing is simulated, so quote rates may not track the market | `SANDBOX` | quote adapter, receipt, `QUOTE_LOCKED` event | Real quotes; show the trigger rate and the quote rate side by side |
 | Simulate button: per-bill scripted price path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `worker/demoSim.ts`, `RoutingRateSource` | Removed; triggers only from real ticks |
 | Simulated trigger compares the simulated price to the target, then pays on the normal execute path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `src/server/services/strategy.ts` | Always require `p_quote ≤ p_target`; the same job still locks the quote and creates the transfer |
-| Mock payments gateway fabricates quotes and a funded wallet | `DEMO-ONLY` | `src/server/adapters/quotes`, `src/server/adapters/balances` | `PAYMENTS_GATEWAY=airwallex`: `POST /fx/quotes/create` and `GET /balances/current` |
+| Mock payments gateway fabricates quotes and a funded wallet. The insufficient-balance scenario clears it | `DEMO-ONLY` | `src/server/adapters/quotes`, `src/server/adapters/balances`, `src/server/adapters/transfers` | `PAYMENTS_GATEWAY=airwallex`: `POST /fx/quotes/create` and `GET /balances/current` |
 | Activity feed includes simulation started and ended | `DEMO-ONLY` | `ActivityItem` | Production activity has no simulation events |
 | Chart shows simulation markers and a kit Simulate replay | `DEMO-ONLY` | `EventMarkers`, `scenario-simulate` | Production charts have no simulation markers or replay |
 | Demo control bar and the ticket Simulate button | `DEMO-ONLY` | `DemoControlBar`, `SimulateButton` | Removed; no simulated market, warp, or scripted target hit |

@@ -6,8 +6,15 @@ import { POST as arm } from '@/app/api/bills/[id]/arm/route';
 import { GET as balances } from '@/app/api/balances/route';
 import { getEnv } from '@/server/env';
 import { bootDb, shutdownDb, watchingBillInput } from '@/server/test/harness';
+import { closeDemoStore } from '@/server/adapters/demo/store';
 import { closeWorkQueues } from '@/server/queue/work';
-import { armBill, billContext, cancelBill, closeEventPublisher, putStrategy } from '@/server/services/bills';
+import {
+  armBill,
+  billContext,
+  cancelBill,
+  closeEventPublisher,
+  putStrategy,
+} from '@/server/services/bills';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 beforeAll(async () => {
@@ -16,6 +23,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeWorkQueues();
+  await closeDemoStore();
   await closeEventPublisher();
   await shutdownDb();
 });
@@ -42,7 +50,10 @@ describe('bill routes', () => {
         source: 'AIRWALLEX',
       },
     });
-    const ctx = billContext(getEnv(), new SystemClock(() => Date.parse('2026-09-01T00:00:00.000Z')));
+    const ctx = billContext(
+      getEnv(),
+      new SystemClock(() => Date.parse('2026-09-01T00:00:00.000Z')),
+    );
     const strategy = await putStrategy(
       String(bill._id),
       { mode: 'TARGET_RATE', targetPrice: '1.10' },
@@ -65,9 +76,13 @@ describe('bill routes', () => {
     expect(armed.entryPrice).toBe('1.2');
     expect(armed.executionDeadline).toBe('2026-10-02');
     expect(armed.allowedActions).toContain('PAUSE');
-    expect(await BillEvent.countDocuments({ billId: bill._id, type: 'ARMED' })).toBe(1);
+    expect(
+      await BillEvent.countDocuments({ billId: bill._id, type: 'ARMED' }),
+    ).toBe(1);
 
-    const listed = await listBills(new Request('http://localhost/api/bills?state=WATCHING'));
+    const listed = await listBills(
+      new Request('http://localhost/api/bills?state=WATCHING'),
+    );
     expect(listed.status).toBe(200);
     const body = (await listed.json()) as Array<{ id: string }>;
     expect(body.some((row) => row.id === String(bill._id))).toBe(true);
@@ -113,7 +128,10 @@ describe('bill routes', () => {
         transferReason: 'bill_payment',
         reference: 'INV-late',
       },
-      billContext(getEnv(), new SystemClock(() => Date.parse('2026-10-06T00:00:00.000Z'))),
+      billContext(
+        getEnv(),
+        new SystemClock(() => Date.parse('2026-10-06T00:00:00.000Z')),
+      ),
     );
     expect(late.state).toBe('EXECUTING');
     expect(late.executionDeadline).toBe('2026-10-02');
@@ -137,7 +155,9 @@ describe('bill routes', () => {
   it('rejects a cancel once the bill is executing', async () => {
     const bill = await Bill.create(watchingBillInput('executing'));
     await Bill.updateOne({ _id: bill._id }, { state: 'EXECUTING' });
-    await expect(cancelBill(String(bill._id), billContext(getEnv()))).rejects.toThrow(/cannot CANCEL/);
+    await expect(
+      cancelBill(String(bill._id), billContext(getEnv())),
+    ).rejects.toThrow(/cannot CANCEL/);
   });
 
   it('returns cached mock balances', async () => {

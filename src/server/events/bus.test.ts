@@ -45,7 +45,10 @@ describe('app events', () => {
     const reader = response.body?.getReader();
     if (!reader) throw new Error('missing stream');
     await publish(publisher, { ...tick, price: '1.07' });
-    const chunk = await readText(reader);
+    const chunk = await readUntil(
+      reader,
+      (text) => text.includes('event: tick') && text.includes('"price":"1.07"'),
+    );
     expect(chunk).toContain('event: tick');
     expect(chunk).toContain('"price":"1.07"');
     expect(hub.subscriberConnections).toBe(1);
@@ -65,7 +68,9 @@ describe('app events', () => {
       heartbeatMs: 20,
     });
     const reader = stream.getReader();
-    const text = await readText(reader);
+    const text = await readUntil(reader, (value) =>
+      value.includes(formatSseComment('ping')),
+    );
     expect(text).toBe(formatSseComment('ping'));
     abort.abort();
     await reader.cancel();
@@ -81,9 +86,19 @@ async function viWait(seen: AppEvent[]): Promise<void> {
   }
 }
 
-async function readText(
+async function readUntil(
   reader: ReadableStreamDefaultReader<Uint8Array>,
+  found: (text: string) => boolean,
 ): Promise<string> {
-  const { value } = await reader.read();
-  return new TextDecoder().decode(value);
+  const started = Date.now();
+  let text = '';
+  while (!found(text)) {
+    if (Date.now() - started > 5_000) {
+      throw new Error(`stream did not contain the expected event: ${text}`);
+    }
+    const { value, done } = await reader.read();
+    if (done) break;
+    text += new TextDecoder().decode(value);
+  }
+  return text;
 }

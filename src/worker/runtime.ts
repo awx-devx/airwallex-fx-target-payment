@@ -1,6 +1,12 @@
-import type { Clock } from '@/server/adapters/clock';
+import { readRealMs, type Clock } from '@/server/adapters/clock';
+import { demoAwareClock } from '@/server/adapters/clock/demo';
+import {
+  closeDemoStore,
+  refreshDemoClock,
+  scriptedPrice,
+} from '@/server/adapters/demo/store';
 import { closeExtractionBudget } from '@/server/adapters/extraction/budget';
-import { createRateSource } from '@/server/adapters/rates';
+import { createRateSource, routingRateSource } from '@/server/adapters/rates';
 import { connectMongo, disconnectMongo } from '@/server/db/connection';
 import type { Env } from '@/server/env';
 import type { AppLogger } from '@/server/logging/logger';
@@ -21,6 +27,7 @@ import {
   LeaderLock,
   startLeaderLoop,
 } from '@/worker/leader';
+import { startDemoSim } from '@/worker/demoSim';
 import { startPoller } from '@/worker/poller';
 import { defaultProcessors, type ProcessorMap } from '@/worker/processors';
 import { closeWorkQueues } from '@/server/queue/work';
@@ -64,6 +71,11 @@ export async function startWorker(options: {
   sweeperMs?: number;
   pollIntervalMs?: number;
   scheduleReconcile?: boolean;
+  /**
+   * DEMO-ONLY: share the Redis demo clock and run the Simulate loop.
+   * PROD: leave this unset. The worker uses the injected clock only.
+   */
+  demoClock?: boolean;
   closeMongo?: boolean;
   processors?: Partial<Record<QueueName, Processor>>;
   onPoll?: () => Promise<void>;
@@ -71,7 +83,13 @@ export async function startWorker(options: {
   const env = options.env;
   const logger = options.logger;
   await connectMongo(env.MONGODB_URI);
-  const rateSource = await createRateSource(env);
+  const clock = options.demoClock
+    ? demoAwareClock(options.clock, readRealMs)
+    : options.clock;
+  if (options.demoClock) await refreshDemoClock(env.REDIS_URL);
+  const rateSource = routingRateSource(await createRateSource(env), (billId) =>
+    scriptedPrice(env.REDIS_URL, billId),
+  );
 
   const prefix = options.queuePrefix ?? 'bull';
   const lockRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
@@ -108,7 +126,11 @@ export async function startWorker(options: {
     );
     const candles = queues.get('candles');
     if (!candles) throw new Error('candles queue is missing');
-    await candles.upsertJobScheduler('candles', { every: 60_000 }, { name: 'candles', data: {} });
+    await candles.upsertJobScheduler(
+      'candles',
+      { every: 60_000 },
+      { name: 'candles', data: {} },
+    );
     await enqueueBootReconcile(reconcile);
   }
 
@@ -117,13 +139,16 @@ export async function startWorker(options: {
 
   let sweeperAbort: AbortController | undefined;
   let pollerAbort: AbortController | undefined;
+  let demoAbort: AbortController | undefined;
   let heartbeat: NodeJS.Timeout | undefined;
 
   const stopLoops = () => {
     sweeperAbort?.abort();
     pollerAbort?.abort();
+    demoAbort?.abort();
     sweeperAbort = undefined;
     pollerAbort = undefined;
+    demoAbort = undefined;
     if (heartbeat) clearInterval(heartbeat);
     heartbeat = undefined;
   };
@@ -131,7 +156,7 @@ export async function startWorker(options: {
   const writeHeartbeat = async () => {
     await lockRedis.set(
       options.heartbeatKey ?? HEARTBEAT_KEY,
-      options.clock.now().toISOString(),
+      clock.now().toISOString(),
       'PX',
       HEARTBEAT_TTL_MS,
     );
@@ -144,7 +169,7 @@ export async function startWorker(options: {
     startSweeper({
       signal: sweeperAbort.signal,
       intervalMs: options.sweeperMs ?? SWEEPER_MS,
-      clock: options.clock,
+      clock,
       deadlineQueue,
       logger,
     });
@@ -153,10 +178,20 @@ export async function startWorker(options: {
       intervalMs: options.pollIntervalMs ?? env.POLL_INTERVAL_MS,
       logger,
       env,
-      clock: options.clock,
+      clock,
       source: rateSource,
       onPoll: options.onPoll,
     });
+    if (options.demoClock) {
+      demoAbort = new AbortController();
+      startDemoSim({
+        signal: demoAbort.signal,
+        env,
+        clock,
+        source: rateSource,
+        logger,
+      });
+    }
     void writeHeartbeat();
     heartbeat = setInterval(() => {
       void writeHeartbeat();
@@ -188,6 +223,7 @@ export async function startWorker(options: {
       await closeEventPublisher();
       await closeExtractionBudget();
       await closeBalanceCache();
+      await closeDemoStore();
       await closeWorkQueues();
       if (options.closeMongo !== false) await disconnectMongo();
     },

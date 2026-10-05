@@ -100,6 +100,8 @@ With `--gateway mock` (and always in `stress`), the same steps run against the m
 
 **Rendering:** Playwright (already a dev dependency) loads the HTML and prints it to PDF with fixed metadata dates, so the same seed gives the same bytes. The same page is screenshotted for PNG variants, and `sharp` degrades images for `scanned`.
 
+`pnpm gen:invoices` currently writes `*.truth.json` and a one-page text PDF of those fields. The Playwright templates and `sharp` scans are not generated yet. `sharp` is not a dependency; adding it needs a D-xx first.
+
 **Truth sidecar** (`INV-….truth.json`):
 ```json
 {

@@ -22,13 +22,25 @@ export async function pollWatchingBills(input: {
   clock: Clock;
   source: RateSource;
   publish?: (event: AppEvent) => Promise<void>;
+  /** Bills with a running Simulate. The demo loop ticks those, so the poller leaves them. */
+  skipBillIds?: ReadonlySet<string>;
 }): Promise<void> {
-  const bills = (await Bill.find({ state: { $in: ['WATCHING', 'PAUSED'] } }).lean()) as WatchingBill[];
+  const found = (await Bill.find({
+    state: { $in: ['WATCHING', 'PAUSED'] },
+  }).lean()) as WatchingBill[];
+  const bills = found.filter(
+    (bill) => !input.skipBillIds?.has(String(bill._id)),
+  );
   if (bills.length === 0) return;
   input.source.prepare?.(input.clock.now().getTime());
   const groups = new Map<
     string,
-    { buy: string; sell: string; amount: string; members: { id: string; state: string }[] }
+    {
+      buy: string;
+      sell: string;
+      amount: string;
+      members: { id: string; state: string }[];
+    }
   >();
   for (const bill of bills) {
     const amount = decimalString(fromDecimal128(bill.billAmount));
@@ -58,7 +70,11 @@ export async function pollWatchingBills(input: {
       const ids = group.members.map((member) => member.id);
       await Bill.updateMany(
         { _id: { $in: ids } },
-        { $set: { last: { price: toDecimal128(rate.price), at, source: rate.source } } },
+        {
+          $set: {
+            last: { price: toDecimal128(rate.price), at, source: rate.source },
+          },
+        },
       );
       for (const billId of ids) {
         await input.publish?.({
@@ -77,10 +93,18 @@ export async function pollWatchingBills(input: {
             env: input.env,
             clock: input.clock,
             billId: member.id,
-            tick: { id: String(tick._id), price: rate.price, at, source: rate.source },
+            tick: {
+              id: String(tick._id),
+              price: rate.price,
+              at,
+              source: rate.source,
+            },
           });
         } catch (error) {
-          getLogger().warn({ err: error, billId: member.id }, 'trigger evaluation failed');
+          getLogger().warn(
+            { err: error, billId: member.id },
+            'trigger evaluation failed',
+          );
         }
       }
     } catch {

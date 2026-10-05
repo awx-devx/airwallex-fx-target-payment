@@ -9,6 +9,8 @@ export interface IndicativeRequest {
   buy: string;
   sell: string;
   buyAmount: string;
+  /** When set, a running Simulate overrides the configured source for this bill. */
+  billId?: string;
 }
 
 export interface IndicativeRate {
@@ -22,8 +24,36 @@ export interface RateSource {
   getIndicative(input: IndicativeRequest): Promise<IndicativeRate>;
 }
 
+let activeMarket: SimulatedMarket | null = null;
+
+export function activeSimulatedMarket(): SimulatedMarket | null {
+  return activeMarket;
+}
+
+/**
+ * Per-bill prices for a Simulate run. Every other request uses the inner source.
+ */
+export function routingRateSource(
+  inner: RateSource,
+  scripted: (billId: string) => Promise<string | null>,
+): RateSource {
+  return {
+    prepare: (nowMs) => inner.prepare?.(nowMs),
+    async getIndicative(input) {
+      if (input.billId) {
+        const price = await scripted(input.billId);
+        if (price) return { price, source: 'SIMULATED' };
+      }
+      return inner.getIndicative(input);
+    },
+  };
+}
+
 export async function createRateSource(env: Env): Promise<RateSource> {
-  if (env.RATE_SOURCE === 'airwallex') return airwallexRates(env);
+  if (env.RATE_SOURCE === 'airwallex') {
+    activeMarket = null;
+    return airwallexRates(env);
+  }
   const pairs = DEMO_ANCHORS.map((pair) => ({ ...pair }));
   const eur = pairs.find((pair) => pair.base === 'EUR' && pair.quote === 'USD');
   if (eur && env.AIRWALLEX_CLIENT_ID && env.AIRWALLEX_API_KEY) {
@@ -39,14 +69,18 @@ export async function createRateSource(env: Env): Promise<RateSource> {
       // PROD: RATE_SOURCE=airwallex, so there is no simulated anchor.
     }
   }
-  return simulatedRates(new SimulatedMarket(1, pairs, env.POLL_INTERVAL_MS));
+  const market = new SimulatedMarket(1, pairs, env.POLL_INTERVAL_MS);
+  activeMarket = market;
+  return simulatedRates(market);
 }
 
 function clientFor(env: Env) {
   if (!env.AIRWALLEX_CLIENT_ID || !env.AIRWALLEX_API_KEY) {
     throw new Error('Airwallex credentials are not set');
   }
-  return createAirwallexClient(env, { logger: createLogger({ level: 'silent' }) });
+  return createAirwallexClient(env, {
+    logger: createLogger({ level: 'silent' }),
+  });
 }
 
 function airwallexRates(env: Env): RateSource {

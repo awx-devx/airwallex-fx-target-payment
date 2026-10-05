@@ -16,6 +16,10 @@
     "db:indexes": "node --env-file=.env --import tsx scripts/db-indexes.ts",
     "airwallex:smoke": "node --env-file=.env --import tsx scripts/airwallex-smoke.ts",
     "seed:beneficiaries": "node --env-file=.env --import tsx scripts/seed-beneficiaries.ts",
+    "seed:demo": "node --env-file=.env --import tsx scripts/seed-demo.ts",
+    "seed:generate": "node --env-file=.env --import tsx scripts/seed-generate.ts",
+    "seed:reset": "node --env-file=.env --import tsx scripts/seed-reset.ts",
+    "gen:invoices": "node --env-file=.env --import tsx scripts/gen-invoices.ts",
     "test:visual": "playwright test",
     "test:e2e": "playwright test --config playwright.e2e.config.ts",
     "test:extraction": "node --env-file=.env --import tsx scripts/test-extraction.ts"

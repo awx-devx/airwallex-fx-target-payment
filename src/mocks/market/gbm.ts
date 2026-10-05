@@ -35,8 +35,11 @@ interface PairState {
   base: string;
   quote: string;
   price: Decimal;
+  anchor: Decimal;
   drift: Decimal;
+  anchorDrift: Decimal;
   vol: Decimal;
+  anchorVol: Decimal;
   pip: Decimal;
   script?: Script;
   history: MarketTick[];
@@ -71,12 +74,17 @@ export class SimulatedMarket {
   ) {
     this.rng = createRng(seed >>> 0);
     for (const pair of pairs) {
+      const drift = D(pair.drift ?? '0');
+      const vol = D(pair.vol ?? '0.0004');
       this.pairs.set(pairKey(pair.base, pair.quote), {
         base: pair.base,
         quote: pair.quote,
         price: D(pair.price),
-        drift: D(pair.drift ?? '0'),
-        vol: D(pair.vol ?? '0.0004'),
+        anchor: D(pair.price),
+        drift,
+        anchorDrift: drift,
+        vol,
+        anchorVol: vol,
         pip: D(pipSize(pair.quote)),
         history: [],
       });
@@ -130,6 +138,27 @@ export class SimulatedMarket {
       startStep: this.stepIndex,
       durationSteps: Math.max(1, Math.round((seconds * 1000) / this.tickMs)),
     };
+  }
+
+  setParams(
+    base: string,
+    quote: string,
+    params: { vol?: string; drift?: string },
+  ): void {
+    const state = this.require(base, quote);
+    if (params.vol !== undefined) state.vol = D(params.vol);
+    if (params.drift !== undefined) state.drift = D(params.drift);
+  }
+
+  /** Restore anchor prices and clear a ramp or spike. */
+  reset(): void {
+    this.stepIndex = 0;
+    for (const state of this.pairs.values()) {
+      state.price = state.anchor;
+      state.drift = state.anchorDrift;
+      state.vol = state.anchorVol;
+      state.script = undefined;
+    }
   }
 
   spike(base: string, quote: string, pips: number, seconds: number): void {

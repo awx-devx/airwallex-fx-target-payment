@@ -1,4 +1,5 @@
 import type { Clock } from '@/server/adapters/clock';
+import { simBillIds } from '@/server/adapters/demo/store';
 import type { RateSource } from '@/server/adapters/rates';
 import type { Env } from '@/server/env';
 import type { AppLogger } from '@/server/logging/logger';
@@ -27,11 +28,19 @@ export function startPoller(options: {
         await options.onPoll();
         return;
       }
+      const skipBillIds = await simBillIds(options.env.REDIS_URL).catch(
+        (error: unknown) => {
+          options.logger.warn({ err: error }, 'demo sim lookup failed');
+          return new Set<string>();
+        },
+      );
       await pollWatchingBills({
         env: options.env,
         clock: options.clock,
         source: options.source,
-        publish: (event) => eventPublisher(options.env.REDIS_URL).publish(event),
+        publish: (event) =>
+          eventPublisher(options.env.REDIS_URL).publish(event),
+        skipBillIds,
       });
     },
     (error) => {

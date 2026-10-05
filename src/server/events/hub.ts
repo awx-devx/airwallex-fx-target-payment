@@ -1,7 +1,7 @@
 import { appEventSchema, type AppEvent } from '@/contracts/sse';
 import { Redis } from 'ioredis';
 import {
-  APP_EVENTS_CHANNEL,
+  appEventsChannel,
   formatSseComment,
   formatSseEvent,
 } from '@/server/events/bus';
@@ -29,7 +29,7 @@ export class EventHub {
     subscriber.on('message', (_channel, message) => {
       this.dispatch(message);
     });
-    await subscriber.subscribe(APP_EVENTS_CHANNEL);
+    await subscriber.subscribe(appEventsChannel());
     this.subscriber = subscriber;
   }
 

@@ -169,7 +169,7 @@ Adapters are selected by environment:
 
 **Hybrid demo mode** (recommended for the live demo): `RATE_SOURCE=simulated`, `PAYMENTS_GATEWAY=airwallex`. The simulated market drives the chart and triggers, while quotes and transfers are real sandbox calls. The receipt and the `QUOTE_LOCKED` event show both the simulated trigger rate and the real Airwallex quote rate, and we are transparent that the market feed is simulated. Because a real quote won't follow a simulated price, the quote check compares the simulated price for simulated ticks ([03 §3](./03-domain-model.md#3-trigger-rules)). See [08](./08-demo-plan.md).
 
-**Per-bill simulation (Simulate button):** the poller reads rates through a `RoutingRateSource`. A bill with an active `demo:sim:{billId}` key in Redis gets scripted simulated ticks from the worker's `demoSim` loop, and every other bill gets the configured source. This lets the demo run on the live feed and still produce an on-demand target hit for one bill. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
+**Per-bill simulation (Simulate button):** the worker reads rates through a `RoutingRateSource`. A bill with an active `demo:sim:{billId}` key is left out of the shared poll. The `demoSim` loop writes that bill's ticks through `RoutingRateSource` every wall-clock second, and every other bill keeps the configured source. Clock changes and market nudges are Redis records (`demo:clock`, `demo:market`) because the API and the worker are separate processes. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
 
 ## 5. Key runtime flows
 

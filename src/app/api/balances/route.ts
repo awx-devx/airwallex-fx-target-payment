@@ -1,4 +1,5 @@
 import { getCurrentBalances } from '@/server/adapters/airwallex/endpoints/balances';
+import { shortWallet } from '@/server/adapters/demo/store';
 import { AirwallexClient } from '@/server/adapters/airwallex/client';
 import { SystemClock } from '@/server/adapters/clock';
 import { MockPaymentsGateway } from '@/server/adapters/mock/gateway';
@@ -35,10 +36,28 @@ export async function GET(): Promise<Response> {
 function gatewayFor(env: Env): BalanceSource {
   const clock = new SystemClock();
   if (env.PAYMENTS_GATEWAY === 'mock') {
-    return new MockPaymentsGateway({ clock, latencyMs: { getBalances: 0 } });
+    const gateway = new MockPaymentsGateway({
+      clock,
+      latencyMs: { getBalances: 0 },
+    });
+    return {
+      async getBalances() {
+        const rows = await gateway.getBalances();
+        if (!(await shortWallet(env.REDIS_URL))) return rows;
+        return rows.map((row) => ({
+          ...row,
+          available: '0.00',
+          total: '0.00',
+        }));
+      },
+    };
   }
   if (!env.AIRWALLEX_CLIENT_ID || !env.AIRWALLEX_API_KEY) {
-    throw new ServiceError('AIRWALLEX_CONFIG', 'Airwallex credentials are not set', 503);
+    throw new ServiceError(
+      'AIRWALLEX_CONFIG',
+      'Airwallex credentials are not set',
+      503,
+    );
   }
   const client = new AirwallexClient({
     baseUrl: env.AIRWALLEX_BASE_URL,

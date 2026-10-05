@@ -8,6 +8,11 @@ export function instant(ms: number): Date {
   return new Date(ms);
 }
 
+/** Wall time for the demo loop. Domain code keeps using the injected Clock. */
+export function readRealMs(): number {
+  return Date.now();
+}
+
 export function parseInstant(iso: string): Date {
   return new Date(iso);
 }
