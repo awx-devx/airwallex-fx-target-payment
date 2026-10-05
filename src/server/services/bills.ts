@@ -291,6 +291,10 @@ export function resumeBill(id: string, ctx: BillContext): Promise<BillDetail> {
   return simpleTransition(id, ctx, 'RESUME', 'RESUMED');
 }
 
+export function rearmBill(id: string, ctx: BillContext): Promise<BillDetail> {
+  return simpleTransition(id, ctx, 'REARM', 'REARMED');
+}
+
 export async function cancelBill(id: string, ctx: BillContext): Promise<BillDetail> {
   const bill = await Bill.findById(id);
   if (bill?.state === 'IN_FLIGHT') {
@@ -323,8 +327,8 @@ export function payNow(id: string, ctx: BillContext): Promise<BillDetail> {
 function simpleTransition(
   id: string,
   ctx: BillContext,
-  event: 'PAUSE' | 'RESUME' | 'CANCEL',
-  auditType: 'PAUSED' | 'RESUMED' | 'CANCELLED',
+  event: 'PAUSE' | 'RESUME' | 'CANCEL' | 'REARM',
+  auditType: 'PAUSED' | 'RESUMED' | 'CANCELLED' | 'REARMED',
 ): Promise<BillDetail> {
   return applyTransition({
     billId: id,

@@ -7,6 +7,7 @@ import { formatMoney, formatPrice, PipNumber } from '@/ui/format';
 import { Card } from '@/ui/primitives/card';
 import { cx } from '@/ui/primitives/cx';
 import { useRemaining } from '@/ui/trading/clock';
+import { CopyId } from '@/ui/trading/copy-id';
 import { CountdownChip } from '@/ui/trading/countdown-chip';
 import { DeltaText } from '@/ui/trading/delta-text';
 import { KeyValueList } from '@/ui/trading/key-value-list';
@@ -75,7 +76,7 @@ export function QuoteCard({
                   },
                 ]
               : []),
-            { label: 'Quote', value: <span className="num">{quote.airwallexQuoteId}</span> },
+            { label: 'Quote', value: <CopyId value={quote.airwallexQuoteId} /> },
           ]}
         />
       </div>

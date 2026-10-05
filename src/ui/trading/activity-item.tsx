@@ -33,6 +33,7 @@ const COPY: Record<BillEventType, { text: string; icon: LucideIcon }> = {
   STRATEGY_UPDATED: { text: 'Strategy updated', icon: Pencil },
   PAUSED: { text: 'Paused', icon: CirclePause },
   RESUMED: { text: 'Resumed', icon: CirclePlay },
+  REARMED: { text: 'Ready to arm again', icon: RefreshCw },
   CATCH_UP: { text: 'Caught up after a restart', icon: FastForward },
   // DEMO-ONLY: simulation markers exist only for the Simulate run.
   // PROD: the activity feed has no simulation events.

@@ -7,11 +7,14 @@ import type { BillSummary } from '@/contracts/bill';
 import type { ChartRange } from '@/contracts/chart';
 import { DataSourceError } from '@/contracts/data-source';
 import type { AppEvent } from '@/contracts/sse';
-import { dataSource, getDataSource } from '@/features/data/source';
+import { billWithState, billWithStrategy } from '@/features/data/optimistic';
+import { dataSource, getDataSource, isApiDataSource } from '@/features/data/source';
 import { qk } from '@/features/data/keys';
+import { connectStream } from '@/features/data/stream';
+import { applyAppEvent } from '@/features/data/stream-cache';
 import { useUiStore } from '@/features/ui-store';
 
-export type FeedConnection = 'simulated' | 'delayed' | 'offline';
+export type FeedConnection = 'live' | 'simulated' | 'delayed' | 'offline';
 
 function patchBill(list: BillSummary[] | undefined, bill: BillSummary) {
   if (!list) return list;
@@ -60,68 +63,50 @@ export function useBalances() {
   });
 }
 
+function rememberNotice(setNotices: (update: (current: AppEvent[]) => AppEvent[]) => void, event: AppEvent) {
+  if (event.type !== 'notification') return;
+  setNotices((current) => [event, ...current].slice(0, 20));
+}
+
 export function useStream() {
   const client = useQueryClient();
   const speed = useUiStore((state) => state.marketSpeed);
-  const [connection, setConnection] = useState<FeedConnection>('simulated');
+  const api = isApiDataSource();
+  const [connection, setConnection] = useState<FeedConnection>(api ? 'delayed' : 'simulated');
   const [notices, setNotices] = useState<AppEvent[]>([]);
-  const [now, setNow] = useState(() => getDataSource().clock.now().toISOString());
+  // Display clock only. The API path uses the browser until the first clock event.
+  const [now, setNow] = useState(() =>
+    api ? new Date().toISOString() : getDataSource().clock.now().toISOString(),
+  );
 
   useEffect(() => {
+    if (isApiDataSource()) {
+      return connectStream({
+        onEvent: (event) => {
+          if (event.type === 'tick') {
+            setConnection(event.source === 'SIMULATED' ? 'simulated' : 'live');
+          }
+          if (event.type === 'clock') setNow(event.now);
+          rememberNotice(setNotices, event);
+          applyAppEvent(client, event);
+        },
+        onStatus: setConnection,
+        onPoll: () => {
+          void client.invalidateQueries({ queryKey: qk.bills });
+          void client.invalidateQueries({ queryKey: qk.balances });
+        },
+      });
+    }
     const source = getDataSource();
     let lastTick = Date.now();
     const unsub = source.subscribe((event) => {
       if (event.type === 'tick') {
         lastTick = Date.now();
         setConnection('simulated');
-        const bills = client.getQueryData<BillSummary[]>(qk.bills);
-        if (!bills) return;
-        const next = bills.map((bill) =>
-          bill.pair.base === event.pair.base &&
-          bill.pair.quote === event.pair.quote &&
-          bill.lastPrice
-            ? { ...bill, lastPrice: event.price, flags: { ...bill.flags, stale: false } }
-            : bill,
-        );
-        client.setQueryData(qk.bills, next);
-        for (const bill of next) {
-          if (bill.lastPrice !== event.price) continue;
-          if (bill.pair.base !== event.pair.base || bill.pair.quote !== event.pair.quote) continue;
-          client.setQueryData(qk.bill(bill.id), (detail: { lastPrice?: string } | undefined) =>
-            detail ? { ...detail, lastPrice: event.price } : detail,
-          );
-          client.setQueryData(
-            qk.chart(bill.id, 'TO_DUE'),
-            (chart: { series: { time: number; value: string }[] } | undefined) => {
-              if (!chart) return chart;
-              const last = chart.series[chart.series.length - 1];
-              const time = (last?.time ?? 0) + 1;
-              const series =
-                last && last.time >= time
-                  ? chart.series.slice(0, -1).concat({ time: last.time, value: event.price })
-                  : chart.series.concat({ time, value: event.price });
-              return { ...chart, series: series.slice(-400) };
-            },
-          );
-        }
-        return;
-      }
-      if (event.type === 'bill.updated') {
-        client.setQueryData(qk.bills, (list: BillSummary[] | undefined) =>
-          patchBill(list, event.bill),
-        );
-        client.setQueryData(qk.bill(event.bill.id), (detail: unknown) =>
-          detail && typeof detail === 'object'
-            ? { ...detail, ...event.bill }
-            : detail,
-        );
-        void client.invalidateQueries({ queryKey: qk.events(event.bill.id) });
-        return;
-      }
-      if (event.type === 'notification') {
-        setNotices((current) => [event, ...current].slice(0, 20));
       }
       if (event.type === 'clock') setNow(event.now);
+      rememberNotice(setNotices, event);
+      applyAppEvent(client, event);
     });
     const interval = window.setInterval(() => {
       source.stepMarket();
@@ -152,15 +137,48 @@ export function useBillActions() {
       void client.invalidateQueries({ queryKey: qk.events(bill.id) });
       return bill;
     } catch (error) {
-      const message = error instanceof DataSourceError ? error.message : 'That action failed.';
-      throw new Error(message);
+      if (error instanceof DataSourceError && error.error.code === 'INVALID_STATE') {
+        void client.invalidateQueries({ queryKey: qk.bills });
+        void client.invalidateQueries({ queryKey: ['bill'] });
+      }
+      if (error instanceof DataSourceError) throw error;
+      throw new Error('That action failed.');
+    }
+  }
+
+  async function optimistic(
+    id: string,
+    patch: (bill: BillSummary) => BillSummary,
+    run: () => Promise<BillSummary>,
+  ) {
+    const previousList = client.getQueryData<BillSummary[]>(qk.bills);
+    const previousDetail = client.getQueryData(qk.bill(id));
+    const current =
+      previousList?.find((bill) => bill.id === id) ??
+      (previousDetail && typeof previousDetail === 'object' && 'state' in previousDetail
+        ? (previousDetail as BillSummary)
+        : undefined);
+    if (current) {
+      const next = patch(current);
+      client.setQueryData(qk.bills, (list: BillSummary[] | undefined) => patchBill(list, next));
+      client.setQueryData(qk.bill(id), (detail: unknown) =>
+        detail && typeof detail === 'object' ? { ...detail, ...next } : detail,
+      );
+    }
+    try {
+      return await apply(run);
+    } catch (error) {
+      client.setQueryData(qk.bills, previousList);
+      client.setQueryData(qk.bill(id), previousDetail);
+      throw error;
     }
   }
 
   return {
     arm: (id: string, body: ArmBody) => apply(() => dataSource().arm(id, body)),
-    pause: (id: string) => apply(() => dataSource().pause(id)),
-    resume: (id: string) => apply(() => dataSource().resume(id)),
+    pause: (id: string) => optimistic(id, (bill) => billWithState(bill, 'PAUSED'), () => dataSource().pause(id)),
+    resume: (id: string) =>
+      optimistic(id, (bill) => billWithState(bill, 'WATCHING'), () => dataSource().resume(id)),
     payNow: (id: string) => apply(() => dataSource().payNow(id)),
     cancel: (id: string) => apply(() => dataSource().cancel(id)),
     rearm: (id: string) => apply(() => dataSource().rearm(id)),
@@ -168,6 +186,6 @@ export function useBillActions() {
     stop: (id: string) => apply(() => dataSource().stopSimulation(id)),
     advance: (id: string) => apply(() => dataSource().advanceTransfer(id)),
     putStrategy: (id: string, body: PutStrategyBody) =>
-      apply(() => dataSource().putStrategy(id, body)),
+      optimistic(id, (bill) => billWithStrategy(bill, body), () => dataSource().putStrategy(id, body)),
   };
 }

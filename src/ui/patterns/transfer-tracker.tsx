@@ -3,6 +3,7 @@
 import type { ExecutionSummary } from '@/contracts/airwallex';
 import type { ReactNode } from 'react';
 import { formatMoney } from '@/ui/format';
+import { CopyId } from '@/ui/trading/copy-id';
 import { KeyValueList } from '@/ui/trading/key-value-list';
 import { transferNextStep } from '@/ui/trading/measure';
 import { TransferStatusPill } from '@/ui/trading/transfer-status-pill';
@@ -10,10 +11,12 @@ import { formatUtcDate } from '@/ui/trading/time-label';
 
 export function TransferTracker({
   execution,
+  quoteId,
   advance,
   lateFailure = false,
 }: {
   execution: ExecutionSummary;
+  quoteId?: string;
   advance?: ReactNode;
   lateFailure?: boolean;
 }) {
@@ -26,10 +29,11 @@ export function TransferTracker({
         <TransferStatusPill status={execution.status} category={category} lateFailure={lateFailure} />
         {advance}
       </div>
-      <p className="num text-sm">{execution.shortReferenceId}</p>
+      <CopyId value={execution.shortReferenceId} prominent />
       <KeyValueList
         rows={[
-          { label: 'Transfer', value: <span className="num text-xs">{execution.transferId}</span> },
+          { label: 'Transfer', value: <CopyId value={execution.transferId} /> },
+          ...(quoteId ? [{ label: 'Quote', value: <CopyId value={quoteId} /> }] : []),
           { label: 'Quote request', value: <span className="num text-xs">{execution.requestId}</span> },
           {
             label: 'You pay',

@@ -16,6 +16,7 @@ export const BILL_EVENT_TYPES = [
   'STRATEGY_UPDATED',
   'PAUSED',
   'RESUMED',
+  'REARMED',
   'CATCH_UP',
   'SIM_STARTED',
   'SIM_ENDED',

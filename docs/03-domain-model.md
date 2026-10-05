@@ -212,7 +212,7 @@ Secondary index `{ 'meta.base': 1, 'meta.quote': 1, ts: 1 }`. Chart candles come
 
 **`executions`**: `{ billId, mode: 'TARGET'|'DEADLINE'|'MANUAL', attempt, requestId (unique), active: boolean, airwallexTransferId?, shortReferenceId?, transferStatus?, fundingStatus?, statusUpdatedAt?, awxUpdatedAt?, conversionRate?: D128, sourceAmount?: D128, amountPayerPays?: D128, amountBeneficiaryReceives?: D128, feeAmount?: D128, feeCurrency?, feePaidBy?, swiftChargeOption?, dispatchDate?, lateFailureWatchUntil?, failure?: { code?, message?, reasonCodes?, category }, raw: Mixed }`. `mode` is why the payment started: the target was hit (`TARGET`), the cutoff paid at market (`DEADLINE`), or the user chose pay now (`MANUAL`). `awxUpdatedAt` is Airwallex's `updated_at` and is used for the ordering guard. Field mapping: [13 §4.2](./13-airwallex-contracts.md#42-response--executions--executionsummary--transfertracker). Indexes: partial unique `{ billId: 1 }` where `{ active: true }` (invariant 1), unique sparse `{ airwallexTransferId: 1 }`.
 
-**`bill_events`** (append-only audit log that drives the Activity feed): `{ billId, ts, type, actor: 'user:<id>'|'system'|'airwallex', payload: Mixed }`. Types: `ARMED`, `TICK_CROSSED`, `QUOTE_LOCKED`, `NEAR_MISS`, `QUOTE_EXPIRED`, `AUTOSETTLE`, `CANCELLED`, `TRANSFER_CREATED`, `TRANSFER_STATUS`, `PAID`, `FAILED`, `STRATEGY_UPDATED`, `PAUSED`, `RESUMED`, `CATCH_UP`, `SIM_STARTED`, `SIM_ENDED` (demo only). A target hit is `QUOTE_LOCKED`. A deadline payment is `AUTOSETTLE`. A Simulate run records `QUOTE_LOCKED` with actor `system:demo-sim` and payload `{ simId, price }`. Index `{ billId: 1, ts: -1 }`.
+**`bill_events`** (append-only audit log that drives the Activity feed): `{ billId, ts, type, actor: 'user:<id>'|'system'|'airwallex', payload: Mixed }`. Types: `ARMED`, `TICK_CROSSED`, `QUOTE_LOCKED`, `NEAR_MISS`, `QUOTE_EXPIRED`, `AUTOSETTLE`, `CANCELLED`, `TRANSFER_CREATED`, `TRANSFER_STATUS`, `PAID`, `FAILED`, `STRATEGY_UPDATED`, `PAUSED`, `RESUMED`, `REARMED`, `CATCH_UP`, `SIM_STARTED`, `SIM_ENDED` (demo only). A target hit is `QUOTE_LOCKED`. A deadline payment is `AUTOSETTLE`. A Simulate run records `QUOTE_LOCKED` with actor `system:demo-sim` and payload `{ simId, price }`. Index `{ billId: 1, ts: -1 }`.
 
 **`webhook_events`**: `{ _id: <Airwallex event id>, name, createdAt, receivedAt, payload: Mixed, processedAt?, error? }`. An insert that fails with duplicate-key error `11000` identifies a duplicate delivery.
 
@@ -292,7 +292,7 @@ interface ChartOverlays {
 | `POST` | `/api/bills/:id/beneficiary` | Resolve/create the Airwallex beneficiary |
 | `PUT` | `/api/bills/:id/strategy` | Set/update strategy (allowed in WATCHING; re-evaluates) |
 | `POST` | `/api/bills/:id/arm` | Capture entry, consent, schedule deadline jobs |
-| `POST` | `/api/bills/:id/pause` / `resume` | |
+| `POST` | `/api/bills/:id/pause` / `resume` / `rearm` | Pause, resume, or return a failed bill to ready |
 | `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
 | `GET` | `/api/bills/:id/chart?range=1D` | `ChartSeriesPoint[]` + `ChartOverlays` + reference history. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |

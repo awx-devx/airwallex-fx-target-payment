@@ -33,7 +33,7 @@ export interface SimulateOptions {
 
 /**
  * The port `useBills` and the other data hooks call.
- * `mock` is in-memory; `api` will call the REST routes in U7.
+ * `mock` is in-memory. `api` calls the REST routes and `/api/stream`.
  */
 export interface DataSource {
   listBills(query?: ListBillsQuery): Promise<BillSummary[]>;

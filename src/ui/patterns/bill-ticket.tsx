@@ -24,6 +24,7 @@ export function BillTicket({
   events,
   homeCurrency,
   cutoffLabel,
+  notice,
   onAction,
 }: {
   bill: BillSummary;
@@ -31,10 +32,12 @@ export function BillTicket({
   events: readonly BillEvent[];
   homeCurrency: string;
   cutoffLabel: string;
+  notice?: { tone: 'error' | 'warn' | 'info'; text: string };
   onAction?: (action: string) => void;
 }) {
   const [tab, setTab] = useState('strategy');
   const mine = events.filter((event) => event.billId === bill.id);
+  const quoteId = quoteIdOf(mine);
   return (
     <section className="space-y-3 bg-bg-0 p-3">
       <header className="flex flex-wrap items-center gap-2">
@@ -43,6 +46,7 @@ export function BillTicket({
         <MoneyDisplay currency={bill.pair.base} value={bill.amount} />
         <StateBadge state={bill.state} />
       </header>
+      {notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null}
       <Tabs
         value={tab}
         onValueChange={setTab}
@@ -57,6 +61,7 @@ export function BillTicket({
                 now={now}
                 homeCurrency={homeCurrency}
                 cutoffLabel={cutoffLabel}
+                quoteId={quoteId}
                 onAction={onAction}
               />
             ),
@@ -86,17 +91,27 @@ export function BillTicket({
   );
 }
 
+function quoteIdOf(events: readonly BillEvent[]): string | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const value = events[index]?.payload?.quoteId;
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+  return undefined;
+}
+
 function StrategyBody({
   bill,
   now,
   homeCurrency,
   cutoffLabel,
+  quoteId,
   onAction,
 }: {
   bill: BillSummary;
   now: string;
   homeCurrency: string;
   cutoffLabel: string;
+  quoteId?: string;
   onAction?: (action: string) => void;
 }) {
   if (bill.state === 'READY') {
@@ -110,7 +125,7 @@ function StrategyBody({
   }
   if (bill.state === 'IN_FLIGHT' || bill.state === 'EXECUTING') {
     return bill.execution ? (
-      <TransferTracker execution={bill.execution} />
+      <TransferTracker execution={bill.execution} quoteId={quoteId} />
     ) : (
       <p className="text-fg-3">Transfer not created yet.</p>
     );
@@ -119,7 +134,7 @@ function StrategyBody({
     return (
       <div className="space-y-2">
         <p className="text-up">Paid</p>
-        {bill.execution ? <TransferTracker execution={bill.execution} /> : null}
+        {bill.execution ? <TransferTracker execution={bill.execution} quoteId={quoteId} /> : null}
       </div>
     );
   }
@@ -127,7 +142,7 @@ function StrategyBody({
     return (
       <div className="space-y-2">
         <Banner tone="error">{bill.execution?.failure?.message ?? 'The transfer failed.'}</Banner>
-        {bill.execution ? <TransferTracker execution={bill.execution} /> : null}
+        {bill.execution ? <TransferTracker execution={bill.execution} quoteId={quoteId} /> : null}
         <Button size="sm" onClick={() => onAction?.('RESOLVE_BENEFICIARY')}>
           Fix and re-arm
         </Button>

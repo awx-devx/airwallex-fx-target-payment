@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BillAction, BillSummary } from '@/contracts/bill';
 import { CHART_RANGES } from '@/contracts/chart';
+import { DataSourceError } from '@/contracts/data-source';
+import { presentApiError } from '@/features/data/errors';
+import { demoControls } from '@/features/data/source';
 import {
   useBalances,
   useBill,
@@ -13,7 +16,6 @@ import {
   useEvents,
   useStream,
 } from '@/features/data/hooks';
-import { getDataSource } from '@/features/data/source';
 import { useUiStore } from '@/features/ui-store';
 import { AuroraBand } from '@/ui/patterns/grain-aurora';
 import { BillList, type BillRow } from '@/ui/patterns/bill-list';
@@ -51,10 +53,38 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const router = useRouter();
   const width = useWidth();
   const bills = useBills();
+  const loadError = bills.error instanceof DataSourceError ? presentApiError(bills.error.error) : null;
   const balances = useBalances();
   const { connection, notices, now } = useStream();
   const actions = useBillActions();
   const toasts = useToasts();
+  const [ticketNotice, setTicketNotice] = useState<{ tone: 'error' | 'warn' | 'info'; text: string } | null>(
+    null,
+  );
+
+  function showError(error: unknown) {
+    if (error instanceof DataSourceError) {
+      const presented = presentApiError(error.error);
+      if (presented.surface === 'banner') {
+        setTicketNotice({
+          tone: presented.tone === 'warning' ? 'warn' : presented.tone === 'info' ? 'info' : 'error',
+          text: [presented.title, presented.body].filter(Boolean).join(' · '),
+        });
+        return;
+      }
+      toasts.push({
+        tone: presented.tone === 'error' ? 'error' : 'warning',
+        title: presented.title,
+        body: presented.body,
+      });
+      return;
+    }
+    toasts.push({
+      tone: 'error',
+      title: 'Could not do that',
+      body: error instanceof Error ? error.message : undefined,
+    });
+  }
   const ui = useUiStore();
   const selectedId = billId ?? bills.data?.[0]?.id;
   const detail = useBill(selectedId);
@@ -119,6 +149,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
 
   async function onAction(action: string, bill: BillSummary | undefined = selected) {
     if (!bill) return;
+    setTicketNotice(null);
     try {
       if (action === 'ARM') {
         await actions.arm(bill.id, {
@@ -137,11 +168,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       else if (action === 'STOP_SIMULATION') await actions.stop(bill.id);
       else if (action === 'ADVANCE_TRANSFER') await actions.advance(bill.id);
     } catch (error) {
-      toasts.push({
-        tone: 'error',
-        title: 'Could not do that',
-        body: error instanceof Error ? error.message : undefined,
-      });
+      showError(error);
     }
   }
 
@@ -236,7 +263,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       {width < 1280 ? (
         <AccountStrip
           balances={balances.data ?? []}
-          connection={connection === 'delayed' ? 'delayed' : 'simulated'}
+          connection={connection}
           now={now}
         />
       ) : null}
@@ -269,6 +296,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       events={events.data ?? detail.data?.events ?? []}
       homeCurrency="USD"
       cutoffLabel="14:00 Los Angeles"
+      notice={ticketNotice ?? undefined}
       onAction={(action) => void onAction(action)}
     />
   ) : null;
@@ -283,7 +311,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         <TopBar
           divider={false}
           balances={balances.data ?? []}
-          connection={connection === 'delayed' ? 'delayed' : 'simulated'}
+          connection={connection}
           unread={notices.length}
           now={now}
           onNotifications={() => ui.setNoticesOpen(true)}
@@ -326,8 +354,17 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         </div>
         <div className="flex min-h-0 flex-1 justify-center md:px-4 xl:px-6">
         <div className="relative flex h-full min-h-0 w-full max-w-[1600px] flex-col border-line-1 md:border-x">
+        {bills.isError ? (
+          <Banner tone="error">
+            {loadError
+              ? [loadError.title, loadError.body].filter(Boolean).join(' · ')
+              : 'Could not load bills'}
+          </Banner>
+        ) : null}
         {connection === 'delayed' ? (
           <Banner tone="warn">Reconnecting… prices may be stale.</Banner>
+        ) : connection === 'offline' ? (
+          <Banner tone="warn">Price feed offline. Refreshing from the server.</Banner>
         ) : null}
         <div className="flex min-h-0 flex-1">
           {showList ? (
@@ -355,16 +392,23 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                   type={ui.chartType}
                   onTypeChange={ui.setChartType}
                   height="fill"
-                  state={connection === 'delayed' || selected.flags.stale ? 'stale' : 'ready'}
+                  state={
+                    connection === 'delayed' || connection === 'offline' || selected.flags.stale
+                      ? 'stale'
+                      : 'ready'
+                  }
                   interactive={selected.state === 'WATCHING' || selected.state === 'READY'}
                   onTargetDrag={(price) => {
                     if (!selected.strategyMode) return;
-                    void actions.putStrategy(selected.id, {
-                      mode: selected.strategyMode,
-                      targetPrice: price,
-                    });
+                    setTicketNotice(null);
+                    void actions
+                      .putStrategy(selected.id, {
+                        mode: selected.strategyMode,
+                        targetPrice: price,
+                      })
+                      .catch(showError);
                   }}
-                  connection={connection === 'delayed' ? 'delayed' : 'simulated'}
+                  connection={connection}
                   notional={{ amount: selected.amount, currency: selected.pair.base }}
                   subject={{ vendor: selected.vendorName, amount: selected.amount, currency: selected.pair.base }}
                   maxCost={selected.maxCost}
@@ -384,6 +428,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                   type={ui.chartType}
                   onTypeChange={ui.setChartType}
                   state={bills.isLoading || chart.isLoading ? 'loading' : 'empty'}
+                  connection={connection}
                   height="fill"
                   subject={
                     selected
@@ -425,16 +470,15 @@ export function TerminalScreen({ billId }: { billId?: string }) {
               onWarpChange={(next) => {
                 const warp = next as '1' | '60' | '1440';
                 ui.setWarp(warp);
-                getDataSource().setWarp(Number(warp));
+                demoControls().setWarp(Number(warp));
               }}
               onJump={() => {
                 if (!selected) return;
-                getDataSource().jumpToDeadline(selected.id);
+                demoControls().jumpToDeadline(selected.id, selected.executionDeadline);
               }}
               onNudge={() => {
                 if (!selected) return;
-                getDataSource().market.nudge(selected.pair.base, selected.pair.quote, -20);
-                getDataSource().stepMarket();
+                demoControls().nudge(selected.pair.base, selected.pair.quote);
               }}
               onSimulate={() => void onAction('SIMULATE')}
               onAdvance={() => void onAction('ADVANCE_TRANSFER')}
