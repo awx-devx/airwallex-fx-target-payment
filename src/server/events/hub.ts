@@ -15,6 +15,7 @@ type Listener = (event: AppEvent) => void;
  */
 export class EventHub {
   private subscriber: Redis | null = null;
+  private opening: Promise<void> | null = null;
   private readonly listeners = new Set<Listener>();
 
   constructor(private readonly logger: AppLogger) {}
@@ -25,11 +26,30 @@ export class EventHub {
 
   async start(url: string): Promise<void> {
     if (this.subscriber) return;
-    const subscriber = new Redis(url, { maxRetriesPerRequest: null });
+    this.opening ??= this.open(url).finally(() => {
+      this.opening = null;
+    });
+    return this.opening;
+  }
+
+  private async open(url: string): Promise<void> {
+    const subscriber = new Redis(url, {
+      maxRetriesPerRequest: null,
+      connectTimeout: 2_000,
+      lazyConnect: true,
+      retryStrategy: (times) => (times > 2 ? null : Math.min(times * 200, 1_000)),
+    });
+    subscriber.on('error', () => undefined);
     subscriber.on('message', (_channel, message) => {
       this.dispatch(message);
     });
-    await subscriber.subscribe(appEventsChannel());
+    try {
+      await subscriber.connect();
+      await subscriber.subscribe(appEventsChannel());
+    } catch (error) {
+      subscriber.disconnect();
+      throw error;
+    }
     this.subscriber = subscriber;
   }
 
@@ -118,6 +138,7 @@ export function openEventStream(options: {
           // The client already went away.
         }
       });
+      send(formatSseComment('ping'));
     },
   });
 }

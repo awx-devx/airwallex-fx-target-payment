@@ -72,6 +72,14 @@ export function presentApiError(error: ApiError): PresentedError {
     case 'RATE_LIMITED':
       return { surface: 'stale', tone: 'warning', title: 'Price feed is limited' };
     case 'AIRWALLEX_UNAVAILABLE':
+      if (!error.airwallex) {
+        return {
+          surface: 'toast',
+          tone: 'error',
+          title: "The server didn't respond",
+          body: error.message === "The server didn't respond" ? undefined : error.message,
+        };
+      }
       return { surface: 'stale', tone: 'warning', title: 'Airwallex is unavailable', body: error.message };
     case 'INVALID_STATE':
       return { surface: 'toast', tone: 'warning', title: 'That bill changed', body: error.message };

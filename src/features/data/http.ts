@@ -20,7 +20,7 @@ export async function apiRequest<T>(
     if (envelope.success) throw new DataSourceError(response.status, envelope.data.error);
     throw new DataSourceError(response.status, {
       code: FALLBACK[response.status] ?? (response.status >= 500 ? 'AIRWALLEX_UNAVAILABLE' : 'AIRWALLEX_ERROR'),
-      message: response.statusText || 'Request failed',
+      message: response.status >= 500 ? "The server didn't respond" : response.statusText || 'Request failed',
     });
   }
   const parsed = schema.safeParse(body);

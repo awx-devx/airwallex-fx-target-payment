@@ -22,6 +22,16 @@ describe('presentApiError', () => {
     expect(presented.body).toContain('amount: Too many decimals');
   });
 
+  it('does not blame Airwallex for a server failure with no Airwallex payload', () => {
+    const presented = presentApiError({
+      code: 'AIRWALLEX_UNAVAILABLE',
+      message: 'The database is unavailable',
+    });
+    expect(presented.title).toBe("The server didn't respond");
+    expect(presented.body).toBe('The database is unavailable');
+    expect(presented.surface).toBe('toast');
+  });
+
   it('uses the quote-expired toast', () => {
     expect(presentApiError({ code: 'QUOTE_EXPIRED', message: 'expired' }).title).toBe(
       'Quote expired · still watching',

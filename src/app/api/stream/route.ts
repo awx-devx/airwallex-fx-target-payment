@@ -15,8 +15,13 @@ const SSE_HEADERS = {
 export async function GET(request: Request): Promise<Response> {
   const env = getEnv();
   const hub = getEventHub();
-  await hub.start(env.REDIS_URL);
   const log = requestLogger(request.headers);
+  try {
+    await hub.start(env.REDIS_URL);
+  } catch (error) {
+    log.warn({ err: error }, 'sse unavailable');
+    return new Response('stream unavailable', { status: 503 });
+  }
   log.info('sse connected');
   const stream = openEventStream({ hub, signal: request.signal });
   return new Response(stream, { headers: SSE_HEADERS });
