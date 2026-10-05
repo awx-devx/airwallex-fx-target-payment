@@ -146,6 +146,11 @@ export class AirwallexClient {
     });
   }
 
+  /** Confirms the process can obtain an access token. Health uses this and nothing else. */
+  async confirmToken(): Promise<void> {
+    await this.auth.getToken();
+  }
+
   async request(input: AirwallexRequest): Promise<unknown> {
     const retryable = canRetry(input);
     let authRetried = false;

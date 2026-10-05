@@ -279,6 +279,8 @@ interface ChartOverlays {
 
 **`allowedActions`** is computed by a pure `allowedActions(bill)` in `src/contracts/permissions.ts`, from the bill state (§1). The server uses it to fill the DTO and to reject a request early with `INVALID_STATE` before calling `transition()`. The mock `DataSource` uses the same function. The UI renders ticket and row actions only from this list and never re-derives state rules.
 
+`HealthReport` (`src/contracts/health.ts`) is the body of `GET /api/health`. `ok` is true only when `checks.mongo`, `checks.redis`, `checks.worker`, and `checks.airwallex` are all `ok`. `feeds` is one row per active pair (`ageMs`, `fresh` when the newest tick is younger than two poll intervals). `queues` lists waiting, active, delayed, and failed counts. A mock payments gateway reports the Airwallex check as `ok` without a login.
+
 ## 6. Internal REST API
 
 | Method | Path | Purpose |
@@ -301,6 +303,7 @@ interface ChartOverlays {
 | `GET` | `/api/beneficiaries/banks` | Bank search for `DYNAMIC_SELECT` fields |
 | `POST` | `/api/beneficiaries/validate` · `/api/beneficiaries/verify` | Validate before create · account/name verification |
 | `GET` | `/api/reference/currencies` · `/api/reference/non-conversion-days?pair=` | Currency capability + precision · FX holidays |
+| `GET` | `/api/health` | `HealthReport`. `200` when Mongo, Redis, the worker heartbeat, and the Airwallex token are ok; `503` otherwise. The body still lists feed freshness and queue depths |
 | `GET` | `/api/stream` | SSE |
 | `POST` | `/api/webhooks/airwallex` | Airwallex webhooks |
 | `POST` | `/api/demo/*` | Demo controls (see [08](./08-demo-plan.md)) |

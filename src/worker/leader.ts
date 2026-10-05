@@ -1,4 +1,11 @@
 import type { Redis } from 'ioredis';
+import {
+  HEARTBEAT_KEY,
+  HEARTBEAT_MS,
+  HEARTBEAT_TTL_MS,
+} from '@/server/heartbeat';
+
+export { HEARTBEAT_KEY, HEARTBEAT_MS, HEARTBEAT_TTL_MS };
 
 const RELEASE_SCRIPT = `
 if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -17,11 +24,8 @@ end
 `;
 
 export const LEADER_KEY = 'worker:leader';
-export const HEARTBEAT_KEY = 'worker:heartbeat';
 export const LEADER_TTL_MS = 15_000;
 export const LEADER_RENEW_MS = 5_000;
-export const HEARTBEAT_MS = 10_000;
-export const HEARTBEAT_TTL_MS = 30_000;
 
 export class LeaderLock {
   constructor(

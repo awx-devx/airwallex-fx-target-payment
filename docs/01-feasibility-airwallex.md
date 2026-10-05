@@ -112,6 +112,8 @@ Exotic pairs without third-party coverage show only our own ticks from the armin
 
 Sandbox allows 10 req/s on `fx/rates/current`. Polling each active bill every 10 s gives about 0.1 req/s per bill, so **~50 bills fit comfortably** with headroom for quotes and transfers. The poller uses a token-bucket limiter shared across the worker. If needed, requests are coalesced by `(F, H, amount bucket)`.
 
+B10.3 leaves `POLL_INTERVAL_MS` at 10 seconds. Fifty watching bills is 5 requests/s, under the worker's endpoint bucket of 8 and under the V10 result (about 8/s, all 200). A fresh sandbox soak waits for approval before anyone calls Airwallex again.
+
 ### 3.5 Quote validity
 
 The quote is locked in the same job that creates the transfer, so the default validity is `MIN_1` (the shortest Airwallex offers). If the quote expires before that transfer is created, the bill stays **WATCHING** and the worker retries. Longer validity means a wider price; the settings form still lists the other Airwallex validities.

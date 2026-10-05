@@ -1,19 +1,38 @@
-import { executionSummarySchema, type ExecutionSummary } from '@/contracts/airwallex';
+import {
+  executionSummarySchema,
+  type ExecutionSummary,
+} from '@/contracts/airwallex';
 import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import { webhookSignature } from '@/server/adapters/airwallex/webhooks';
 import { instant, type Clock } from '@/server/adapters/clock';
 import type { TransferGateway } from '@/server/adapters/transfers';
 import { toDecimal128 } from '@/server/db/decimal';
 import { billDetail } from '@/server/db/repositories/bills';
-import { Beneficiary, Bill, Execution, Quote, WebhookEvent } from '@/server/db/models';
+import {
+  Beneficiary,
+  Bill,
+  Execution,
+  Quote,
+  WebhookEvent,
+} from '@/server/db/models';
 import { parseEnv, type Env } from '@/server/env';
 import { closeWorkQueues } from '@/server/queue/work';
 import { closeBalanceCache } from '@/server/services/balanceCache';
-import { cancelInFlightTransfer, RetryableExecutionError, runExecution } from '@/server/services/execution';
+import {
+  cancelInFlightTransfer,
+  RetryableExecutionError,
+  runExecution,
+} from '@/server/services/execution';
 import { runReconcile } from '@/server/services/reconcile';
 import { processWebhook, receiveWebhook } from '@/server/services/webhooks';
-import { bootDb, shutdownDb, watchingBillInput } from '@/server/test/harness';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createQueue, createWorker, jobIds } from '@/server/queue';
+import {
+  bootDb,
+  isolatedPrefix,
+  shutdownDb,
+  watchingBillInput,
+} from '@/server/test/harness';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const NOW = Date.parse('2026-06-01T16:00:00.000Z');
 
@@ -49,7 +68,9 @@ describe('execution', () => {
     const saved = await Bill.findById(bill._id);
     expect(saved?.state).toBe('WATCHING');
     expect(gateway.creates).toBe(0);
-    expect(await Execution.countDocuments({ billId: bill._id, active: true })).toBe(0);
+    expect(
+      await Execution.countDocuments({ billId: bill._id, active: true }),
+    ).toBe(0);
   });
 
   it('returns to watching when the balance is short', async () => {
@@ -62,31 +83,51 @@ describe('execution', () => {
 
   it('fails the bill when the transfer is rejected', async () => {
     const { bill, deps } = await ready('reject', {
-      fail: new AirwallexError({ status: 400, code: 'validation_failed', message: 'bad reference' }),
+      fail: new AirwallexError({
+        status: 400,
+        code: 'validation_failed',
+        message: 'bad reference',
+      }),
     });
-    await runExecution({ ...deps, env: { ...deps.env, PAYMENTS_GATEWAY: 'airwallex' } });
+    await runExecution({
+      ...deps,
+      env: { ...deps.env, PAYMENTS_GATEWAY: 'airwallex' },
+    });
     const saved = await Bill.findById(bill._id);
     expect(saved?.state).toBe('FAILED');
   });
 
   it('releases an expired quote from the provider and fails a second invalid quote', async () => {
-    const expired = new AirwallexError({ status: 400, code: 'quote_expired', message: 'expired' });
+    const expired = new AirwallexError({
+      status: 400,
+      code: 'quote_expired',
+      message: 'expired',
+    });
     const first = await ready('qexp', { fail: expired });
     await runExecution(first.deps);
     expect((await Bill.findById(first.bill._id))?.state).toBe('WATCHING');
 
-    const invalid = new AirwallexError({ status: 400, code: 'quote_id_invalid', message: 'bad quote' });
+    const invalid = new AirwallexError({
+      status: 400,
+      code: 'quote_id_invalid',
+      message: 'bad quote',
+    });
     const second = await ready('qbad', { fail: invalid });
     await runExecution(second.deps);
     expect((await Bill.findById(second.bill._id))?.state).toBe('WATCHING');
-    await Bill.updateOne({ _id: second.bill._id }, { $set: { state: 'EXECUTING' } });
+    await Bill.updateOne(
+      { _id: second.bill._id },
+      { $set: { state: 'EXECUTING' } },
+    );
     await runExecution(second.deps);
     expect((await Bill.findById(second.bill._id))?.state).toBe('FAILED');
   });
 
   it('retries a cutoff when the balance is short', async () => {
     const { deps } = await ready('cutoff', { available: '0' });
-    await expect(runExecution({ ...deps, mode: 'DEADLINE' })).rejects.toBeInstanceOf(RetryableExecutionError);
+    await expect(
+      runExecution({ ...deps, mode: 'DEADLINE' }),
+    ).rejects.toBeInstanceOf(RetryableExecutionError);
     expect((await Bill.findById(deps.billId))?.state).toBe('EXECUTING');
   });
 
@@ -127,7 +168,12 @@ describe('execution', () => {
       timestamp,
     });
     expect(await WebhookEvent.countDocuments({ _id: 'evt-paid' })).toBe(1);
-    await processWebhook({ env, clock: clock(), eventId: 'evt-paid', demoMode: true });
+    await processWebhook({
+      env,
+      clock: clock(),
+      eventId: 'evt-paid',
+      demoMode: true,
+    });
     expect((await Bill.findById(bill._id))?.state).toBe('PAID');
 
     const cancelBody = webhookBody({
@@ -145,7 +191,12 @@ describe('execution', () => {
       signature: webhookSignature('whsec', timestamp, cancelBody),
       timestamp,
     });
-    await processWebhook({ env, clock: clock(), eventId: 'evt-cancel', demoMode: true });
+    await processWebhook({
+      env,
+      clock: clock(),
+      eventId: 'evt-cancel',
+      demoMode: true,
+    });
     expect((await Bill.findById(bill._id))?.state).toBe('PAID');
   });
 
@@ -159,6 +210,158 @@ describe('execution', () => {
         timestamp: String(NOW),
       }),
     ).rejects.toThrow(/signature/);
+  });
+
+  it('creates one transfer when two executions run together', async () => {
+    const { bill, deps, gateway } = await ready('double');
+    let started = 0;
+    let release = () => {};
+    const bothEntered = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = gateway.create.bind(gateway);
+    gateway.create = async (input) => {
+      started += 1;
+      if (started >= 2) release();
+      await Promise.race([
+        bothEntered,
+        new Promise((resolve) => setTimeout(resolve, 300)),
+      ]);
+      return original(input);
+    };
+    await Promise.all([runExecution(deps), runExecution(deps)]);
+    expect(started).toBe(2);
+    expect(await Execution.countDocuments({ billId: bill._id })).toBe(1);
+    expect((await Bill.findById(bill._id))?.state).toBe('IN_FLIGHT');
+    expect((await Execution.findOne({ billId: bill._id }))?.requestId).toBe(
+      `tr:${String(bill._id)}:1`,
+    );
+  });
+
+  it('applies a webhook that arrives before the create response', async () => {
+    const env = webhookEnv();
+    const { bill, deps, gateway } = await ready('racehook');
+    const requestId = `tr:${String(bill._id)}:1`;
+    const body = webhookBody({
+      id: 'evt-race',
+      name: 'payout.transfer.paid',
+      requestId,
+      transferId: 'trf-racehook',
+      status: 'PAID',
+      updatedAt: '2026-06-01T18:00:00+0000',
+    });
+    const timestamp = String(NOW);
+    await receiveWebhook({
+      env,
+      clock: clock(),
+      rawBody: body,
+      signature: webhookSignature('whsec', timestamp, body),
+      timestamp,
+    });
+    await expect(
+      processWebhook({
+        env,
+        clock: clock(),
+        eventId: 'evt-race',
+        demoMode: true,
+      }),
+    ).rejects.toThrow(/before the transfer/);
+    expect(
+      (await WebhookEvent.findById('evt-race'))?.processedAt,
+    ).toBeUndefined();
+
+    let release = () => {};
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = gateway.create.bind(gateway);
+    gateway.create = async (input) => {
+      await hold;
+      return original(input);
+    };
+    const running = runExecution(deps);
+    try {
+      await vi.waitFor(async () => {
+        expect(await Execution.countDocuments({ billId: bill._id })).toBe(1);
+      });
+      await processWebhook({
+        env,
+        clock: clock(),
+        eventId: 'evt-race',
+        demoMode: true,
+      });
+    } finally {
+      release();
+    }
+    await running;
+    expect((await Bill.findById(bill._id))?.state).toBe('PAID');
+    expect(await Execution.countDocuments({ billId: bill._id })).toBe(1);
+    expect(gateway.creates).toBe(1);
+  });
+
+  it('finishes a crashed execution on the next worker', async () => {
+    const env = parseEnv(process.env);
+    const { bill, deps, gateway } = await ready('restart');
+    let attempts = 0;
+    const original = gateway.create.bind(gateway);
+    gateway.create = async (input) => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new AirwallexError({
+          status: 503,
+          code: 'service_unavailable',
+          message: 'down',
+        });
+      }
+      return original(input);
+    };
+    const prefix = isolatedPrefix('restart-exec');
+    const queue = createQueue('execution', { url: env.REDIS_URL, prefix });
+    const first = createWorker(
+      'execution',
+      async () => {
+        await runExecution(deps);
+      },
+      { url: env.REDIS_URL, prefix },
+    );
+    try {
+      await queue.add(
+        'execution',
+        { billId: String(bill._id), attempt: 1, mode: 'TARGET' },
+        {
+          jobId: jobIds.execute(String(bill._id), 1),
+          attempts: 2,
+          backoff: { type: 'fixed', delay: 1_500 },
+        },
+      );
+      await vi.waitFor(() => expect(attempts).toBe(1));
+      await first.close();
+      const second = createWorker(
+        'execution',
+        async () => {
+          await runExecution(deps);
+        },
+        { url: env.REDIS_URL, prefix },
+      );
+      try {
+        await vi.waitFor(
+          async () => {
+            expect((await Bill.findById(bill._id))?.state).toBe('IN_FLIGHT');
+          },
+          { timeout: 8_000 },
+        );
+      } finally {
+        await second.close();
+      }
+    } finally {
+      await first.close().catch(() => undefined);
+      await queue.close();
+    }
+    expect(await Execution.countDocuments({ billId: bill._id })).toBe(1);
+    expect((await Execution.findOne({ billId: bill._id }))?.requestId).toBe(
+      `tr:${String(bill._id)}:1`,
+    );
+    expect(gateway.creates).toBe(1);
   });
 
   it('reconciles an open transfer to paid', async () => {
@@ -244,7 +447,10 @@ async function ready(
   return { bill, deps, gateway };
 }
 
-function fakeGateway(suffix: string, fail?: Error): TransferGateway & {
+function fakeGateway(
+  suffix: string,
+  fail?: Error,
+): TransferGateway & {
   creates: number;
   cancels: number;
   advance: (status: ExecutionSummary['status']) => void;
@@ -269,7 +475,9 @@ function fakeGateway(suffix: string, fail?: Error): TransferGateway & {
         ...summary,
         status,
         updatedAt: instant(NOW + 3_600_000).toISOString(),
-        ...(status === 'PAID' ? { lateFailureWatchUntil: instant(NOW + 86_400_000).toISOString() } : {}),
+        ...(status === 'PAID'
+          ? { lateFailureWatchUntil: instant(NOW + 86_400_000).toISOString() }
+          : {}),
       });
     },
     async create(input) {

@@ -377,7 +377,7 @@ What users see during a deploy: web is unavailable for about 2–5 s while its c
 
 | Signal | How |
 | --- | --- |
-| `/api/health` | Returns 200 only if Mongo ping, Redis ping, worker heartbeat (`worker:heartbeat` key < 30 s old), and Airwallex token are OK. The body includes feed freshness per active pair and queue depths. |
+| `/api/health` | Returns 200 only if Mongo ping, Redis ping, worker heartbeat (`worker:heartbeat` key < 30 s old), and Airwallex token are OK. Otherwise 503. The body includes feed freshness per active pair and queue depths. `PAYMENTS_GATEWAY=mock` reports the token check ok without a login. |
 | Docker health | `web` healthcheck on `/api/health`; `redis` on `PING` |
 | Uptime | External monitor (UptimeRobot, Better Stack) on `/api/health` every 1 min, alerting you by email (ops only; the app itself has no out-of-band alerts) |
 | Logs | pino JSON to stdout; Docker `json-file` rotation (10 MB × 5). View with `docker compose logs -f worker`. Optionally ship to Better Stack or Grafana Loki. |

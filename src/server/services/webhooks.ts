@@ -74,7 +74,8 @@ export async function processWebhook(input: {
     stored.error = undefined;
     await stored.save();
   } catch (error) {
-    stored.error = error instanceof Error ? error.message : 'Webhook processing failed';
+    stored.error =
+      error instanceof Error ? error.message : 'Webhook processing failed';
     await stored.save();
     throw error;
   }
@@ -93,12 +94,18 @@ async function dispatch(
     await applyTransferEvent(input, event);
     return;
   }
-  if (event.name === 'balance.ga.top_up' || event.name === 'balance.adjustment') {
+  if (
+    event.name === 'balance.ga.top_up' ||
+    event.name === 'balance.adjustment'
+  ) {
     await invalidateBalanceCache(input.env.REDIS_URL);
     return;
   }
   if (event.name.startsWith('conversion.')) {
-    getLogger().info({ name: event.name }, 'conversion webhook is not a transfer');
+    getLogger().info(
+      { name: event.name },
+      'conversion webhook is not a transfer',
+    );
   }
 }
 
@@ -113,19 +120,36 @@ async function applyTransferEvent(
   const object = event.object;
   if (!isRecord(object)) return;
   const transferId = typeof object.id === 'string' ? object.id : undefined;
-  const requestId = typeof object.request_id === 'string' ? object.request_id : undefined;
+  const requestId =
+    typeof object.request_id === 'string' ? object.request_id : undefined;
   if (requestId?.startsWith('sn:')) return;
   const metadata = isRecord(object.metadata) ? object.metadata : undefined;
-  const billId = metadata && typeof metadata.bill_id === 'string' ? metadata.bill_id : undefined;
-  const byTransfer = transferId ? await Execution.findOne({ airwallexTransferId: transferId }) : null;
+  const billId =
+    metadata && typeof metadata.bill_id === 'string'
+      ? metadata.bill_id
+      : undefined;
+  const byTransfer = transferId
+    ? await Execution.findOne({ airwallexTransferId: transferId })
+    : null;
   const byRequest = requestId ? await Execution.findOne({ requestId }) : null;
-  const byBill = billId ? await Execution.findOne({ billId, active: true }) : null;
+  const byBill = billId
+    ? await Execution.findOne({ billId, active: true })
+    : null;
   const execution =
     byTransfer ??
     byRequest ??
-    (byBill && (!byBill.airwallexTransferId || byBill.airwallexTransferId === transferId) ? byBill : null);
+    (byBill &&
+    (!byBill.airwallexTransferId || byBill.airwallexTransferId === transferId)
+      ? byBill
+      : null);
   if (!execution) {
-    getLogger().info({ transferId, name: event.name }, 'webhook transfer has no execution');
+    if (requestId?.startsWith('tr:')) {
+      throw new Error('webhook arrived before the transfer was stored');
+    }
+    getLogger().info(
+      { transferId, name: event.name },
+      'webhook transfer has no execution',
+    );
     return;
   }
   const summary = mapTransfer(object, execution.mode);
@@ -139,7 +163,11 @@ async function applyTransferEvent(
   });
 }
 
-function eventFrom(stored: { name: string; payload: unknown; _id: unknown }): AirwallexWebhookEvent {
+function eventFrom(stored: {
+  name: string;
+  payload: unknown;
+  _id: unknown;
+}): AirwallexWebhookEvent {
   const payload = stored.payload;
   if (!isRecord(payload) || !isRecord(payload.data)) {
     throw new Error('Stored webhook is missing data');
@@ -155,5 +183,10 @@ function eventFrom(stored: { name: string; payload: unknown; _id: unknown }): Ai
 }
 
 function isDuplicateKey(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: number }).code === 11000;
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: number }).code === 11000
+  );
 }

@@ -92,7 +92,7 @@ Bill 3 is intentionally a **buy-only currency** to show the single-call convert-
 - [ ] `pnpm seed:demo` from a clean reset
 - [ ] Simulate run end to end on a throwaway bill reaches **Paid** in < 40 s (checks the quote, balance, transfer and simulation endpoints together); then reset
 - [ ] Browser at 1440 × 900 or 1920 × 1080, zoom 100%, notifications muted
-- [ ] Fallback: if Airwallex is unreachable, switch to `PAYMENTS_GATEWAY=mock` (UI marks "MOCK GATEWAY") and continue
+- [ ] Fallback: if Airwallex is unreachable, switch to `PAYMENTS_GATEWAY=mock` (UI marks "MOCK GATEWAY") and continue. The mock gateway still creates one transfer, and `/api/health` reports the token check ok without calling Airwallex.
 
 ## 5. Demo vs production inventory
 
