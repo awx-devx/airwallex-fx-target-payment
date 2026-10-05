@@ -130,6 +130,7 @@ function flagsFor(bill: LoadedBill, today: string, read?: BillReadContext): Bill
     today,
     ...(usdEquivalent ? { usdEquivalent } : {}),
   }).flags;
+  if (bill.insufficientBalance) flags.insufficientBalance = true;
   if (read?.historySource === 'none') flags.noReferenceHistory = true;
   if (
     read?.nowMs !== undefined &&
@@ -250,6 +251,7 @@ interface LoadedBill {
   lastPrice?: string;
   lastTickAt?: string;
   lastSource?: RateSourceKind;
+  insufficientBalance?: boolean;
   strategy?: StrategyDetail;
 }
 
@@ -271,6 +273,7 @@ function asBill(doc: {
   beneficiaryId?: { toString(): string } | null;
   entry?: { price: { toString(): string } } | null;
   last?: { price: { toString(): string }; at: Date; source: RateSourceKind } | null;
+  insufficientBalance?: boolean | null;
   strategy?: {
     mode: StrategyDetail['mode'];
     targetPrice: { toString(): string };
@@ -316,6 +319,7 @@ function asBill(doc: {
     ...(doc.last
       ? { lastPrice: money(doc.last.price), lastTickAt: doc.last.at.toISOString(), lastSource: doc.last.source }
       : {}),
+    ...(doc.insufficientBalance ? { insufficientBalance: true } : {}),
     ...(strategy ? { strategy } : {}),
   };
 }

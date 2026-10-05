@@ -8,6 +8,7 @@ import { transition, type TransitionEvent } from '@/server/domain/stateMachine';
 import { getLogger } from '@/server/logging/logger';
 import mongoose from 'mongoose';
 import { ServiceError, notFound } from '@/server/services/errors';
+import { notificationFor } from '@/server/services/notify';
 
 export interface EventPublisher {
   publish(event: AppEvent): Promise<void>;
@@ -59,6 +60,19 @@ export async function applyTransition(input: {
       await input.publisher.publish({ type: 'bill.updated', bill: detail });
     } catch (error) {
       getLogger().warn({ err: error, billId: input.billId }, 'bill update was not published');
+    }
+    const notification = notificationFor({
+      billId: input.billId,
+      auditType: input.auditType,
+      at,
+      payload: input.payload,
+    });
+    if (notification) {
+      try {
+        await input.publisher.publish(notification);
+      } catch (error) {
+        getLogger().warn({ err: error, billId: input.billId }, 'notification was not published');
+      }
     }
   }
   return detail;

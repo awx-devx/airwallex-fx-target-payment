@@ -112,7 +112,8 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Pre-funded wallet topped up by deposit simulation | `SANDBOX` | `src/server/adapters/airwallex/endpoints/simulation.ts`, `/api/demo/scenario`, seed scripts | Real funding; low-balance alerts before the deadline day |
 | Sandbox FX pricing is simulated, so quote rates may not track the market | `SANDBOX` | quote adapter, receipt, `QUOTE_LOCKED` event | Real quotes; show the trigger rate and the quote rate side by side |
 | Simulate button: per-bill scripted price path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `worker/demoSim.ts`, `RoutingRateSource` | Removed; triggers only from real ticks |
-| Simulated trigger compares the simulated price to the target, then pays on the normal execute path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, strategy engine (simulated ticks only) | Always require `p_quote ≤ p_target`; the same job still locks the quote and creates the transfer |
+| Simulated trigger compares the simulated price to the target, then pays on the normal execute path | `DEMO-ONLY` | `src/mocks/mock-data-source.ts`, `src/server/services/strategy.ts` | Always require `p_quote ≤ p_target`; the same job still locks the quote and creates the transfer |
+| Mock payments gateway fabricates quotes and a funded wallet | `DEMO-ONLY` | `src/server/adapters/quotes`, `src/server/adapters/balances` | `PAYMENTS_GATEWAY=airwallex`: `POST /fx/quotes/create` and `GET /balances/current` |
 | Activity feed includes simulation started and ended | `DEMO-ONLY` | `ActivityItem` | Production activity has no simulation events |
 | Chart shows simulation markers and a kit Simulate replay | `DEMO-ONLY` | `EventMarkers`, `scenario-simulate` | Production charts have no simulation markers or replay |
 | Demo control bar and the ticket Simulate button | `DEMO-ONLY` | `DemoControlBar`, `SimulateButton` | Removed; no simulated market, warp, or scripted target hit |

@@ -23,6 +23,7 @@ import {
 } from '@/worker/leader';
 import { startPoller } from '@/worker/poller';
 import { defaultProcessors, type ProcessorMap } from '@/worker/processors';
+import { closeWorkQueues } from '@/server/queue/work';
 import { closeEventPublisher } from '@/server/services/bills';
 import { startSweeper } from '@/worker/sweeper';
 import type { Processor, Queue, Worker } from 'bullmq';
@@ -169,6 +170,7 @@ export async function startWorker(options: {
       await lockRedis.quit();
       await closeEventPublisher();
       await closeExtractionBudget();
+      await closeWorkQueues();
       if (options.closeMongo !== false) await disconnectMongo();
     },
   };

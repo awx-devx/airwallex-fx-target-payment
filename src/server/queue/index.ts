@@ -76,6 +76,7 @@ export const quoteRetryPayload = z.object({ billId: z.string().min(1) });
 export const executionPayload = z.object({
   billId: z.string().min(1),
   attempt: z.number().int().positive(),
+  mode: z.enum(['TARGET', 'DEADLINE', 'MANUAL']),
 });
 export const webhookPayload = z.object({ eventId: z.string().min(1) });
 export const notifyPayload = z.object({ notificationId: z.string().min(1) });

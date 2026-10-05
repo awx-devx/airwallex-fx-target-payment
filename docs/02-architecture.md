@@ -342,7 +342,7 @@ MongoDB has no built-in job queue or cross-process push. Without Redis we would 
 | `extraction` | `POST /api/uploads` | 4 | `extract.{documentId}` | 3, exp 5 s |
 | `strategy` | poller (on trigger) | 4 | `trigger.{billId}.{tickId}` | 2 |
 | `deadline` | sweeper | 2 | `deadline.autosettle.{billId}` | 5, exp 10 s |
-| `quote-retry` | sweeper | 4 | `quote-retry.{billId}` | 3 |
+| `quote-retry` | strategy, when the locked quote has already expired | 4 | `quote-retry.{billId}` | 3 |
 | `execution` | strategy, cutoff, pay-now | 2 | `execute.{billId}.{attempt}` | 5, exp 2 s (same `request_id`) |
 | `webhook` | webhook route | 4 | `webhook.{eventId}` | 10, exp 5 s |
 | `notify` | services | 4 | `notify.{notificationId}` | 5 |
@@ -350,6 +350,8 @@ MongoDB has no built-in job queue or cross-process push. Without Redis we would 
 | `candles` | repeatable job, every 60 s | 1 | repeatable | — |
 
 BullMQ rejects a custom `jobId` that contains `:`. The separator is `.`. A `:` inside an id segment is stored as `_`.
+
+The execution job payload includes `mode`: `TARGET` (a confirmed trigger), `DEADLINE` (the cutoff), or `MANUAL` (pay now).
 
 The poller is a plain loop inside the worker, not a queue, so tick timing stays predictable.
 

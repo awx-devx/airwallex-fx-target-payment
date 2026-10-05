@@ -2,7 +2,9 @@ import type { ArmBody, BillDetail, PatchBillBody, PutStrategyBody, StrategyDetai
 import type { BillSummary } from '@/contracts/bill';
 import type { QuoteValidity } from '@/contracts/airwallex';
 import { D, decimalString } from '@/contracts/money';
+import { currentBalances } from '@/server/adapters/balances';
 import { SystemClock, type Clock } from '@/server/adapters/clock';
+import { quoteLock } from '@/server/adapters/quotes';
 import { publish } from '@/server/events/bus';
 import type { Env } from '@/server/env';
 import { Redis } from 'ioredis';
@@ -21,6 +23,8 @@ import { REARM_IMPROVE_BPS, evaluateTrigger } from '@/server/domain/trigger';
 import mongoose from 'mongoose';
 import { invalid, notFound, ServiceError } from '@/server/services/errors';
 import { conversionSkipDates } from '@/server/services/reference';
+import { enqueueStrategy } from '@/server/queue/work';
+import { payBillNow } from '@/server/services/strategy';
 import { applyTransition, type EventPublisher } from '@/server/services/transitionBill';
 import { assertTransferValid } from '@/server/services/transferValidation';
 
@@ -143,6 +147,7 @@ export async function putStrategy(
     ...(body.mode === 'MAX_COST' && body.maxCost ? { maxCost: body.maxCost } : {}),
   };
   let consecutiveHits = bill.trigger?.consecutiveHits ?? 0;
+  let triggerReady = false;
   if (bill.state === 'WATCHING' && bill.last) {
     const outcome = evaluateTrigger({
       now: ctx.clock.now(),
@@ -153,11 +158,13 @@ export async function putStrategy(
       pollIntervalMs: ctx.pollIntervalMs,
       consecutiveHits,
       cooldownUntil: bill.timers?.cooldownUntil ?? undefined,
+      lastNearMissPrice: bill.timers?.nearMissPrice ? moneyOf(bill.timers.nearMissPrice) : undefined,
       rearmImproveBps: REARM_IMPROVE_BPS,
     });
     consecutiveHits = outcome.consecutiveHits;
+    triggerReady = outcome.kind === 'ready';
   }
-  return applyTransition({
+  const detail = await applyTransition({
     billId: id,
     event: 'SET_STRATEGY',
     clock: ctx.clock,
@@ -179,6 +186,10 @@ export async function putStrategy(
       displayInverted: D(targetPrice).lt('0.01'),
     },
   });
+  if (triggerReady && bill.last) {
+    await enqueueStrategy(ctx.env.REDIS_URL, id, `edit.${bill.last.at.getTime()}`);
+  }
+  return detail;
 }
 
 export async function armBill(id: string, body: ArmBody, ctx: BillContext): Promise<BillDetail> {
@@ -235,6 +246,19 @@ export function resumeBill(id: string, ctx: BillContext): Promise<BillDetail> {
 
 export function cancelBill(id: string, ctx: BillContext): Promise<BillDetail> {
   return simpleTransition(id, ctx, 'CANCEL', 'CANCELLED');
+}
+
+export function payNow(id: string, ctx: BillContext): Promise<BillDetail> {
+  return payBillNow({
+    billId: id,
+    env: ctx.env,
+    clock: ctx.clock,
+    quotes: quoteLock(ctx.env, ctx.clock),
+    balances: currentBalances(ctx.env),
+    publisher: ctx.publisher,
+    demoMode: ctx.demoMode,
+    read: billReadContext(ctx.env, ctx.clock),
+  });
 }
 
 function simpleTransition(

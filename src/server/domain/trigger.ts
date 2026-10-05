@@ -2,6 +2,8 @@ import type { RateSourceKind } from '@/contracts/sse';
 import { D } from '@/contracts/money';
 
 export const REARM_IMPROVE_BPS = 10;
+export const REARM_COOLDOWN_MS = 10 * 60_000;
+export const REARM_COOLDOWN_DEMO_MS = 2 * 60_000;
 
 export interface PriceTick {
   price: string;

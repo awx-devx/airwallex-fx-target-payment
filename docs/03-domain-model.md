@@ -107,6 +107,9 @@ Evaluated by the strategy engine on every tick for `WATCHING` bills:
    - Otherwise → `NEAR_MISS` event (shown on the chart as a hollow marker) and stay `WATCHING`.
    - If the wallet balance in H is short, stay `WATCHING`, raise `insufficientBalance`, and retry until the cutoff.
    - **Demo exception:** when the triggering tick is simulated (`source = 'SIMULATED'`: a Simulate run or `RATE_SOURCE=simulated`), a real sandbox quote can't be expected to follow it. The check then compares the simulated price with the target instead of `p_quote`, and records both on the `QUOTE_LOCKED` event. The transfer still executes at the real quote. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
+   - If `valid_to_at` has already passed, stay `WATCHING`, record `QUOTE_EXPIRED`, and enqueue `quote-retry.{billId}`.
+
+A ready tick enqueues `trigger.{billId}.{tickId}`. That job locks `quoteValidityTarget`. Pay now (`POST /api/bills/:id/pay-now`, `WATCHING` only) locks `MIN_1` and enqueues execution with mode `MANUAL`. A strategy edit while `WATCHING` recomputes the target, re-evaluates immediately, and logs `STRATEGY_UPDATED`.
 
 ### Deadline rules
 
