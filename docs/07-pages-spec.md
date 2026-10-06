@@ -37,13 +37,13 @@ The sheet sits on `--bg-0` with the grain aurora from [05 §2](./05-design-syste
 - **Grouping:** "Group by pair" in the list shows `PairGroupHeader` with the total exposure. Bills in the same pair share the reference series but keep **their own** entry and target lines and their own deadline.
 - **Live updates:** SSE `tick` updates the list sparkline, the table row (flash), the chart and the ticket. `bill.updated` re-renders the state badges. A `notification` for a target hit raises an informational toast ("Target hit · paying") and deep-links to `/bills/:id`.
 - **Bottom tabs partition the list.** Every bill is on exactly one of Positions (`DRAFT`, `READY`, `WATCHING`, `PAUSED`) or Executed (`EXECUTING`, `IN_FLIGHT`, `PAID`, `FAILED`, `CANCELLED`). Activity is the selected bill's events, not another slice of the book. From `lg` up the panel is a fixed `18rem` and the active tab scrolls inside it, so switching tabs does not resize the chart. Below `lg` the panel sizes to its content and the column scrolls.
-- **Chart interactions:** in `WATCHING`/`READY`, the user can drag the target line to edit the target. A cost preview bubble follows the cursor, and releasing it opens a confirm popover. The range defaults to `TO_DUE` (from arming until the due date + padding).
+- **Chart interactions:** in `WATCHING`/`READY`, the user can drag the target line to edit the target. A cost preview bubble follows the cursor, and releasing it opens a confirm popover. The range defaults to `TO_DUE`: about 90 days of ECB daily history, with our own ticks on the recent days, through the due date plus padding.
 - **Ticket by state:**
 
 | State | Ticket shows | Primary action |
 | --- | --- | --- |
 | `DRAFT` | "Needs review" + fields summary | Review bill |
-| `READY` | Strategy form + `ArmConfirm` | **Arm** (`Enter`) |
+| `READY` | Strategy form + `ArmConfirm`. Without a beneficiary the ticket asks for bank details instead of offering Arm | **Arm** (`Enter`) |
 | `WATCHING` / `PAUSED` | Strategy (editable), savings, distance, `DeadlineMeter` ("pays at market on this day if the target is not hit") | Pause/Resume, Pay now (demo, `WATCHING` only: **Simulate target hit**, see [08 §1.1](./08-demo-plan.md#11-simulate-button)) |
 | `EXECUTING` | Progress + the quote being used | — |
 | `IN_FLIGHT` | `TransferTracker` | (demo: Advance status) |
@@ -82,7 +82,7 @@ Other pages follow the same split: the upload review's document preview stacks a
 
 ## 2. Upload & review flow (`/upload`, also a modal over the terminal)
 
-1. **Drop** (`UploadModal`): multi-file PDF/PNG/JPG (≤ 20 MB each). Each file gets a row with upload → extraction progress. Files process in parallel (max 4). The user can close the modal; progress continues and a toast appears on completion. Demo sample buttons insert ready bills (`POST /api/demo/samples`) and open the first ticket. They are not extracted documents.
+1. **Drop** (`UploadModal`): multi-file PDF/PNG/JPG (≤ 20 MB each). Each file gets a row with upload → extraction progress. Files process in parallel (max 4). The user can close the modal; progress continues and a toast appears on completion. Demo sample buttons insert a scanned draft with fictional bank details (`POST /api/demo/samples`). **Review** then opens the same steps as an upload: the extracted fields, then the target and the pay-by date, then arm. They are not extracted documents.
    - While a file's extraction `status` is `RUNNING`, the row shows a [`ThinkingOrb`](https://libraries.dev/orbs) (`thinking-orbs`, D-21) instead of the generic spinner, since a model is reading the document. The orb's `state` follows the stage the server reports: `working` while queued, `searching` while the deterministic readers run, `solving` while Claude (or the escalation model) reads the document, and it is removed the moment the status becomes `DONE` or `FAILED`. Size 20 inline in the file row, size 64 on the extraction screen itself. `dark`, `speed` 1. Under reduced motion, and while time is frozen, the orb is `paused` and the row falls back to the status text.
 2. **Review** (`ExtractionReview`), one bill at a time with a stepper (1 of n):
    - Left: document preview with extracted-field highlights (bounding boxes if the extractor returns them).

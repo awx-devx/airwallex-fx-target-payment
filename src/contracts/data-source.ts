@@ -5,6 +5,7 @@ import type {
   ListBillsQuery,
   PatchBillBody,
   PutStrategyBody,
+  ResolveBeneficiaryBody,
 } from '@/contracts/api';
 import type { BillDetail } from '@/contracts/api';
 import type { ApiError, BalanceSummary, BeneficiaryFormSchema } from '@/contracts/airwallex';
@@ -45,6 +46,8 @@ export interface DataSource {
   subscribe(listener: (event: AppEvent) => void): () => void;
 
   patchBill(id: string, body: PatchBillBody): Promise<BillSummary>;
+  review(id: string): Promise<BillSummary>;
+  resolveBeneficiary(id: string, body: ResolveBeneficiaryBody): Promise<BillSummary>;
   putStrategy(id: string, body: PutStrategyBody): Promise<BillSummary>;
   arm(id: string, body: ArmBody): Promise<BillSummary>;
   pause(id: string): Promise<BillSummary>;

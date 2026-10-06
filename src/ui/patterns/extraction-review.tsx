@@ -39,6 +39,7 @@ export function ExtractionReview({
   duplicate = false,
   fieldErrors = [],
   beneficiaryForm,
+  extra,
   onSave,
   onContinue,
 }: {
@@ -54,6 +55,7 @@ export function ExtractionReview({
   duplicate?: boolean;
   fieldErrors?: readonly FieldError[];
   beneficiaryForm?: ReactNode;
+  extra?: ReactNode;
   onSave?: () => void;
   onContinue?: () => void;
 }) {
@@ -92,6 +94,7 @@ export function ExtractionReview({
             {error.path}: {error.message}
           </p>
         ))}
+        {extra}
         {beneficiary ? <BeneficiaryCard beneficiary={beneficiary} /> : beneficiaryForm}
         {!beneficiary && !beneficiaryForm ? (
           <BeneficiaryCard missing={['IBAN', 'Bank name']} />

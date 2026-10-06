@@ -35,7 +35,7 @@ async function cachedFrankfurter(
   })
     .sort({ date: 1 })
     .lean();
-  if (cached.length > 0) {
+  if (coversRange(cached, from, to)) {
     return cached.map((row) => ({
       date: row.date.toISOString().slice(0, 10),
       mid: fromDecimal128(row.mid).toFixed(),
@@ -45,7 +45,10 @@ async function cachedFrankfurter(
   try {
     fetched = await fetchFrankfurter({ base: pair.base, quote: pair.quote, from, to });
   } catch {
-    return [];
+    return cached.map((row) => ({
+      date: row.date.toISOString().slice(0, 10),
+      mid: fromDecimal128(row.mid).toFixed(),
+    }));
   }
   for (const point of fetched) {
     await ReferenceRate.updateOne(
@@ -55,6 +58,21 @@ async function cachedFrankfurter(
     );
   }
   return fetched;
+}
+
+/** A short cached slice must not hide the rest of the requested window. */
+function coversRange(
+  cached: readonly { date: Date }[],
+  from: string,
+  to: string,
+): boolean {
+  const first = cached[0];
+  const last = cached[cached.length - 1];
+  if (!first || !last) return false;
+  const slack = 4 * 86_400_000;
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`);
+  const toMs = Date.parse(`${to}T00:00:00.000Z`);
+  return first.date.getTime() <= fromMs + slack && last.date.getTime() >= toMs - slack;
 }
 
 function simulatedDaily(pair: { base: string; quote: string }, from: string, to: string): DailyMid[] {

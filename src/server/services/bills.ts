@@ -9,7 +9,7 @@ import { publish } from '@/server/events/bus';
 import type { Env } from '@/server/env';
 import { Redis } from 'ioredis';
 import { fromDecimal128, toDecimal128 } from '@/server/db/decimal';
-import { Beneficiary, Bill, User } from '@/server/db/models';
+import { Beneficiary, Bill, RateTick, User } from '@/server/db/models';
 import { billDetail, listBills, type BillListQuery, type BillReadContext } from '@/server/db/repositories/bills';
 import {
   accountDate,
@@ -199,11 +199,35 @@ export async function putStrategy(
   return detail;
 }
 
+export async function reviewBill(id: string, ctx: BillContext): Promise<BillDetail> {
+  const bill = await requireDoc(id);
+  if (!bill.beneficiaryId) throw invalid('Add the vendor bank account before review');
+  const userId = await demoUserId();
+  return applyTransition({
+    billId: id,
+    event: 'REVIEW',
+    clock: ctx.clock,
+    actor: `user:${userId}`,
+    auditType: 'STRATEGY_UPDATED',
+    demoMode: ctx.demoMode,
+    read: billReadContext(ctx.env, ctx.clock),
+    publisher: ctx.publisher,
+    today: accountDate(ctx.clock.now(), ctx.accountTz),
+  });
+}
+
 export async function armBill(id: string, body: ArmBody, ctx: BillContext): Promise<BillDetail> {
   const bill = await requireDoc(id);
   if (!bill.beneficiaryId) throw invalid('Resolve a beneficiary before arming');
   if (!bill.strategy) throw invalid('Set a strategy before arming');
   if (!bill.last) throw invalid('A rate is required to capture the entry');
+  const entry = await armEntry({
+    base: bill.billCurrency,
+    quote: bill.homeCurrency,
+    price: moneyOf(bill.last.price),
+    at: bill.last.at,
+    source: bill.last.source === 'AIRWALLEX' ? 'AIRWALLEX' : 'SIMULATED',
+  });
   await assertTransferValid(ctx, bill, body);
   const leadDays = defaultLeadDays(body.transferMethod);
   const skip = await conversionSkipDates(ctx, bill.billCurrency, bill.homeCurrency);
@@ -261,13 +285,14 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
       reference: body.reference,
       leadDays,
       executionDeadline: utcDateOnly(schedule.executionDeadline),
-      entry: { price: bill.last.price, at: ctx.clock.now() },
+      entry: { price: toDecimal128(entry.price), at: ctx.clock.now() },
+      last: { price: toDecimal128(entry.price), at: entry.at, source: entry.source },
       standingInstruction: { at: ctx.clock.now(), by: userId },
       'timers.autosettleAt': schedule.autosettleAt,
       'timers.autosettleFiredAt': past ? ctx.clock.now() : null,
       ...(safetyNetTransferId ? { safetyNet: { transferId: safetyNetTransferId } } : {}),
       'trigger.consecutiveHits': 0,
-      displayInverted: D(moneyOf(bill.last.price)).lt('0.01'),
+      displayInverted: D(entry.price).lt('0.01'),
     },
   });
   if (!past || !locked) return detail;
@@ -352,6 +377,27 @@ async function requireDoc(id: string) {
 
 function moneyOf(value: { toString(): string }): string {
   return decimalString(fromDecimal128(value));
+}
+
+/** Prefer a tick newer than the price stored on the draft, so entry sits on the live chart. */
+async function armEntry(stored: {
+  base: string;
+  quote: string;
+  price: string;
+  at: Date;
+  source: 'AIRWALLEX' | 'SIMULATED';
+}): Promise<{ price: string; at: Date; source: 'AIRWALLEX' | 'SIMULATED' }> {
+  const tick = await RateTick.findOne({ 'meta.base': stored.base, 'meta.quote': stored.quote })
+    .sort({ ts: -1 })
+    .lean();
+  if (tick && tick.ts.getTime() > stored.at.getTime()) {
+    return {
+      price: decimalString(fromDecimal128(tick.price)),
+      at: tick.ts,
+      source: tick.meta.source === 'AIRWALLEX' ? 'AIRWALLEX' : 'SIMULATED',
+    };
+  }
+  return stored;
 }
 
 function resolveTarget(body: PutStrategyBody, amount: string, fee: string): string {

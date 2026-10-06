@@ -5,6 +5,7 @@ import type {
   ListBillsQuery,
   PatchBillBody,
   PutStrategyBody,
+  ResolveBeneficiaryBody,
 } from '@/contracts/api';
 import type { BillDetail, StrategyDetail } from '@/contracts/api';
 import type {
@@ -33,7 +34,7 @@ import { allowedActions } from '@/contracts/permissions';
 import type { AppEvent, SimPhase } from '@/contracts/sse';
 import { createRng } from '@/mocks/generators/rng';
 import { balances, bills, events } from '@/mocks/fixtures/catalog';
-import { execution, FIXTURE_NOW } from '@/mocks/fixtures/build';
+import { beneficiary, execution, FIXTURE_NOW } from '@/mocks/fixtures/build';
 import { formSchemaFor } from '@/mocks/fixtures/forms';
 import type { Clock } from '@/mocks/market/clock';
 import { ManualClock, WarpClock } from '@/mocks/market/clock';
@@ -164,8 +165,13 @@ export class MockDataSource implements DataSource {
         ...structuredClone(template),
         id,
         invoiceNumber: `SAMPLE-${id.slice(-4)}`,
+        state: 'DRAFT',
         events: [],
       };
+      delete detail.strategy;
+      delete detail.strategyMode;
+      delete detail.targetPrice;
+      delete detail.maxCost;
       this.refresh(detail);
       this.store.set(id, detail);
       ids.push(id);
@@ -242,6 +248,14 @@ export class MockDataSource implements DataSource {
     return this.publish(bill, undefined, 'user');
   }
 
+  async review(id: string): Promise<BillSummary> {
+    const bill = this.requireBill(id);
+    this.guard(bill, 'REVIEW');
+    if (!bill.beneficiary) fail(400, 'VALIDATION_FAILED', 'Add the vendor bank account before review');
+    bill.state = 'READY';
+    return this.publish(bill, undefined, 'user');
+  }
+
   async putStrategy(id: string, body: PutStrategyBody): Promise<BillSummary> {
     const bill = this.requireBill(id);
     this.guard(bill, 'EDIT_STRATEGY');
@@ -262,6 +276,22 @@ export class MockDataSource implements DataSource {
       };
     }
     return this.publish(bill, 'STRATEGY_UPDATED', 'user');
+  }
+
+  async resolveBeneficiary(id: string, body: ResolveBeneficiaryBody): Promise<BillSummary> {
+    const bill = this.requireBill(id);
+    this.guard(bill, 'RESOLVE_BENEFICIARY');
+    const account = (body.iban ?? body.accountNumber ?? '').replaceAll(/\s+/g, '');
+    if (account.length < 4) fail(400, 'VALIDATION_FAILED', 'An IBAN or account number is required');
+    bill.beneficiary = beneficiary({
+      id: `ben-${bill.id}`,
+      name: body.name,
+      country: body.bankCountry.toUpperCase(),
+      currency: body.accountCurrency,
+      maskedAccount: `••••${account.slice(-4)}`,
+      methods: [body.transferMethod],
+    });
+    return this.publish(bill, undefined, 'user');
   }
 
   async arm(id: string, body: ArmBody): Promise<BillSummary> {

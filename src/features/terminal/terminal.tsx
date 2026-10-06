@@ -11,6 +11,7 @@ import { DataSourceError } from '@/contracts/data-source';
 import { presentApiError } from '@/features/data/errors';
 import { qk } from '@/features/data/keys';
 import { addSampleBills } from '@/features/data/samples';
+import { BillIntake } from '@/features/terminal/intake';
 import { demoControls } from '@/features/data/source';
 import { useKitReducedMotion } from '@/ui/motion/freeze';
 import { targetHitTiming } from '@/ui/motion/target-hit';
@@ -109,6 +110,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const chart = useChart(selectedId, ui.range);
   const events = useEvents(selectedId);
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
+  const [intakeIds, setIntakeIds] = useState<string[]>([]);
   const [uploadFiles, setUploadFiles] = useState<DropFile[]>([]);
   const toasted = useRef(0);
 
@@ -394,6 +396,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
 
   const ticket = selected ? (
     <BillTicket
+      key={selected.id}
       bill={selected}
       now={now}
       events={events.data ?? detail.data?.events ?? []}
@@ -401,6 +404,25 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       cutoffLabel="14:00 Los Angeles"
       notice={ticketNotice ?? undefined}
       onAction={(action) => void onAction(action)}
+      onSaveBankDetails={(input) => {
+        void (async () => {
+          try {
+            await actions.resolveBeneficiary(selected.id, {
+              name: input.name,
+              entityType: 'COMPANY',
+              bankCountry: input.bankCountry,
+              accountCurrency: selected.pair.base,
+              transferMethod: selected.transferMethod,
+              ...(input.iban ? { iban: input.iban } : {}),
+              ...(input.accountNumber ? { accountNumber: input.accountNumber } : {}),
+              ...(input.bic ? { bic: input.bic } : {}),
+              ...(input.localBankCode ? { localBankCode: input.localBankCode } : {}),
+            });
+          } catch (error) {
+            showError(error);
+          }
+        })();
+      }}
     />
   ) : null;
 
@@ -593,20 +615,27 @@ export function TerminalScreen({ billId }: { billId?: string }) {
               const ids = await addSampleBills(count);
               await queryClient.invalidateQueries({ queryKey: qk.bills });
               ui.setUpload(false);
-              const id = ids[0];
-              if (id) {
-                select(id);
-                ui.setTicketOpen(true);
-              }
-              toasts.push({
-                tone: 'success',
-                title: ids.length === 1 ? 'Sample bill ready to arm' : `${ids.length} sample bills ready to arm`,
-              });
+              setUploadPhase('idle');
+              setIntakeIds(ids);
             } catch (error) {
               showError(error);
             }
           })();
         }}
+      />
+      <BillIntake
+        ids={intakeIds}
+        open={intakeIds.length > 0}
+        cutoffLabel="14:00 Los Angeles"
+        onOpenChange={(next) => {
+          if (!next) setIntakeIds([]);
+        }}
+        onFinished={(id) => {
+          setIntakeIds([]);
+          select(id);
+          ui.setTicketOpen(true);
+        }}
+        onError={showError}
       />
       <Drawer open={ui.listOpen} onOpenChange={ui.setListOpen} title="Bills" side="right">
         {list}

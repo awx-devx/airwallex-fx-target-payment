@@ -34,7 +34,7 @@ stateDiagram-v2
 | State | Meaning | UI badge | Who/what moves it on |
 | --- | --- | --- | --- |
 | `DRAFT` | Extracted or entered, not yet reviewed | `Draft` (muted) | User review |
-| `READY` | Valid bill + beneficiary, no strategy armed | `Ready` (neutral) | User arms |
+| `READY` | Valid bill + beneficiary, strategy not yet armed. A bill with anything still missing stays `DRAFT` | `Ready` (neutral) | User arms |
 | `WATCHING` | Armed; the worker is comparing the live rate to this bill's target | `Watching` (orange pulse) | Worker trigger, cutoff, user |
 | `PAUSED` | Monitoring suspended; **deadline still enforced** | `Paused` (muted) | User, cutoff |
 | `EXECUTING` | Quote locked and the transfer is being created | `Executing` (spinner) | Executor |
@@ -291,11 +291,12 @@ interface ChartOverlays {
 | `PATCH` | `/api/bills/:id` | Edit reviewed fields (DRAFT/READY/FAILED only) |
 | `POST` | `/api/bills/:id/beneficiary` | Resolve/create the Airwallex beneficiary |
 | `PUT` | `/api/bills/:id/strategy` | Set/update strategy (allowed in WATCHING; re-evaluates) |
+| `POST` | `/api/bills/:id/review` | Mark a draft reviewed once the beneficiary is stored. Moves it to `READY` |
 | `POST` | `/api/bills/:id/arm` | Capture entry, consent, schedule deadline jobs |
 | `POST` | `/api/bills/:id/pause` / `resume` / `rearm` | Pause, resume, or return a failed bill to ready |
 | `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
-| `GET` | `/api/bills/:id/chart?range=1D` | `ChartSeriesPoint[]` + `ChartOverlays` + reference history. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
+| `GET` | `/api/bills/:id/chart?range=1D` | Merged series (ECB daily history plus our ticks) + `ChartOverlays` + the reference series. `TO_DUE` looks back 90 days. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
 | `GET` | `/api/bills/:id/events` | Activity log |
 | `GET` | `/api/balances` | Proxy of Airwallex balances (cached 30 s) |
 | `POST` | `/api/bills/:id/validate-transfer` | `transfers/validate` dry run (also run by `arm`); returns `FieldError[]` |

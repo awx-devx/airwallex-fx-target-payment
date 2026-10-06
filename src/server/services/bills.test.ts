@@ -47,7 +47,7 @@ describe('bill routes', () => {
       dueDate: new Date('2026-10-05T00:00:00.000Z'),
       last: {
         price: toDecimal128('1.20'),
-        at: new Date('2026-09-01T00:00:00.000Z'),
+        at: new Date('2099-01-01T00:00:00.000Z'),
         source: 'AIRWALLEX',
       },
     });
@@ -161,7 +161,7 @@ describe('bill routes', () => {
     ).rejects.toThrow(/cannot CANCEL/);
   });
 
-  it('inserts a sample bill that is ready to arm', async () => {
+  it('inserts a sample bill as a draft for review', async () => {
     const ids = await createSampleBills({
       env: getEnv(),
       clock: new SystemClock(),
@@ -169,9 +169,13 @@ describe('bill routes', () => {
     });
     expect(ids).toHaveLength(1);
     const bill = await Bill.findById(ids[0]);
-    expect(bill?.state).toBe('READY');
-    expect(bill?.strategy?.mode).toBe('TARGET_RATE');
+    expect(bill?.state).toBe('DRAFT');
+    expect(bill?.beneficiaryId).toBeDefined();
+    expect(bill?.strategy).toBeUndefined();
     expect(bill?.last?.price).toBeDefined();
+    const beneficiary = await Beneficiary.findById(bill?.beneficiaryId);
+    expect(beneficiary?.verification?.code).toBe('NOT_SUPPORTED');
+    expect(beneficiary?.verification?.nameMatch).toBeUndefined();
   });
 
   it('returns cached mock balances', async () => {

@@ -18,6 +18,11 @@ export function safetyNetRequestId(billId: string): string {
   return bounded(`sn:${billId}`);
 }
 
+/** Dry-run. Distinct from `tr:` and `sn:` so it cannot collide with a payment. */
+export function validateRequestId(billId: string, scope: string): string {
+  return bounded(`tv:${billId}:${scope}`);
+}
+
 /** Transfer create. `attempt` increments only after a terminal failure. */
 export function transferRequestId(billId: string, attempt: number): string {
   attemptNo(attempt);

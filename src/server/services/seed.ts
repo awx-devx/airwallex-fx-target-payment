@@ -16,9 +16,10 @@ import {
   Execution,
   Quote,
 } from '@/server/db/models';
-import { accountDate, utcDateOnly } from '@/server/domain/deadline';
+import { accountDate, defaultLeadDays, executionSchedule, utcDateOnly } from '@/server/domain/deadline';
 import type { Env } from '@/server/env';
 import { DEMO_ANCHORS } from '@/mocks/market';
+import { currentPairPrice } from '@/server/services/pairPrice';
 import { addDays } from '@/mocks/generators/dates';
 import {
   generateSnapshot,
@@ -26,7 +27,9 @@ import {
   type BillPlan,
   type ProfileName,
 } from '@/mocks/generators/snapshot';
-import type { BankDetails } from '@/mocks/generators/bankDetails';
+import { generateBank, type BankDetails } from '@/mocks/generators/bankDetails';
+import { CORRIDORS } from '@/mocks/generators/corridors';
+import { createRng } from '@/mocks/generators/rng';
 import type { InvoiceTruth } from '@/mocks/generators/invoices';
 import {
   billContext,
@@ -221,8 +224,10 @@ const SAMPLE_BILLS = [
 ] as const;
 
 /**
- * DEMO-ONLY: sample invoices are inserted as ready bills, not extracted from a file.
+ * DEMO-ONLY: sample invoices are inserted with fictional bank details, not extracted from a file.
  * PROD: only uploaded documents are extracted and reviewed.
+ * A sample stays a draft with the scanned fields and bank account. The user reviews
+ * those fields and sets the target and pay-by date, the same path as an upload.
  */
 export async function createSampleBills(input: {
   env: Env;
@@ -237,6 +242,8 @@ export async function createSampleBills(input: {
   for (let index = 0; index < count; index += 1) {
     const sample = SAMPLE_BILLS[index];
     if (!sample) continue;
+    const corridor = CORRIDORS.find((row) => row.currency === sample.currency);
+    if (!corridor) throw invalid(`No sample bank details for ${sample.currency}`);
     const invoiceNumber = `SAMPLE-${stamp}-${index + 1}`;
     const id = await insertDraft(input.env, {
       seedKey: `sample:${stamp}:${index + 1}`,
@@ -247,36 +254,69 @@ export async function createSampleBills(input: {
       amount: sample.amount,
       dueDate: addDays(today, 14),
       issueDate: today,
-      transferMethod: 'LOCAL',
+      transferMethod: corridor.method,
       transferReason: 'bill_payment',
     });
-    await review(input.env, input.clock, id);
-    const anchor = DEMO_ANCHORS.find((pair) => pair.base === sample.currency)?.price ?? '1';
-    const target = significantPrice(new Decimal(anchor).mul('0.99'));
+    const bank = generateBank(createRng(hashSeed(`${sample.vendorName}:${sample.currency}`)), {
+      country: corridor.country,
+      currency: corridor.currency,
+      accountName: sample.vendorName,
+      kind: corridor.kind,
+      ...(corridor.bankCode ? { bankCode: corridor.bankCode } : {}),
+      ...(corridor.bic ? { bic: corridor.bic } : {}),
+      ...(corridor.bbanLength ? { bbanLength: corridor.bbanLength } : {}),
+      ...(corridor.routingValue ? { routingValue: corridor.routingValue } : {}),
+    });
+    await attachBank(input.env, input.clock, id, sample.vendorName, corridor.method, bank);
+    await acceptSampleAccount(id, input.clock);
+    const live = await currentPairPrice(input.env, {
+      base: sample.currency,
+      quote: input.env.HOME_CURRENCY,
+    });
     await Bill.updateOne(
       { _id: id },
       {
         $set: {
           last: {
-            price: toDecimal128(anchor),
+            price: toDecimal128(live.price),
             at: input.clock.now(),
-            source: 'SIMULATED',
+            source: live.source,
           },
         },
       },
     );
-    const beneficiary = await Beneficiary.findOne({ accountCurrency: sample.currency });
-    if (beneficiary) {
-      await Bill.updateOne({ _id: id }, { $set: { beneficiaryId: beneficiary._id } });
-    }
-    await putStrategy(
-      id,
-      { mode: 'TARGET_RATE', targetPrice: target },
-      billContext(input.env, input.clock),
-    );
     ids.push(id);
   }
   return ids;
+}
+
+/**
+ * DEMO-ONLY: sandbox verification of payee compares the fictional name with the
+ * real account directory and returns NOT_MATCHED for a valid sample IBAN.
+ * The sample does not ask for a confirmation the demo cannot satisfy.
+ * PROD: keep the verify_account result. A name mismatch stays a draft until
+ * the user confirms it.
+ */
+async function acceptSampleAccount(billId: string, clock: Clock): Promise<void> {
+  const bill = await Bill.findById(billId);
+  if (!bill?.beneficiaryId) return;
+  await Beneficiary.updateOne(
+    { _id: bill.beneficiaryId },
+    {
+      $set: {
+        verification: { code: 'NOT_SUPPORTED', checkedAt: clock.now() },
+      },
+    },
+  );
+}
+
+function hashSeed(value: string): number {
+  let hash = 2166136261;
+  for (const char of value) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 export async function resetGenerated(): Promise<number> {
@@ -385,6 +425,13 @@ async function insertDraft(
     transferReason: TransferReason;
   },
 ): Promise<string> {
+  const leadDays = defaultLeadDays(input.transferMethod);
+  const schedule = executionSchedule({
+    dueDate: input.dueDate,
+    leadDays,
+    cutoff: env.DEADLINE_AUTOSETTLE_CUTOFF,
+    timeZone: env.AIRWALLEX_ACCOUNT_TZ,
+  });
   const created = await Bill.create({
     state: 'DRAFT',
     vendorName: input.vendorName,
@@ -394,9 +441,9 @@ async function insertDraft(
     homeCurrency: env.HOME_CURRENCY,
     issuedDate: utcDateOnly(input.issueDate),
     dueDate: utcDateOnly(input.dueDate),
-    executionDeadline: utcDateOnly(input.dueDate),
+    executionDeadline: utcDateOnly(schedule.executionDeadline),
     transferMethod: input.transferMethod,
-    leadDays: input.transferMethod === 'SWIFT' ? 3 : 1,
+    leadDays,
     transferReason: input.transferReason,
     reference: input.invoiceNumber,
     seedKey: input.seedKey,

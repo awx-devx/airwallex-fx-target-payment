@@ -6,6 +6,7 @@ import { fromDecimal128 } from '@/server/db/decimal';
 import { Bill, BillEvent, Quote, RateTick } from '@/server/db/models';
 import type { Env } from '@/server/env';
 import { notFound } from '@/server/services/errors';
+import { mergeHistory } from '@/server/services/chartHistory';
 import { referenceSeries } from '@/server/services/history';
 import mongoose from 'mongoose';
 
@@ -30,8 +31,8 @@ export async function billChart(input: {
   const bill = await Bill.findById(input.billId).lean();
   if (!bill) throw notFound();
   const now = input.clock.now();
-  const span = rangeWindow(input.range, bill.dueDate, bill.executionDeadline, now);
-  const series = await seriesFor(bill.billCurrency, bill.homeCurrency, span.from, span.to, span.unit);
+  const span = rangeWindow(input.range, bill.dueDate, now);
+  const ticks = await seriesFor(bill.billCurrency, bill.homeCurrency, span.from, span.to, span.unit);
   const reference = await referenceSeries(
     input.env,
     { base: bill.billCurrency, quote: bill.homeCurrency },
@@ -62,7 +63,7 @@ export async function billChart(input: {
     }),
   };
   return chartResponseSchema.parse({
-    series,
+    series: mergeHistory(reference, ticks),
     overlays,
     ...(reference.length > 0 ? { reference } : {}),
   });
@@ -71,17 +72,19 @@ export async function billChart(input: {
 function rangeWindow(
   range: ChartRange,
   due: Date,
-  deadline: Date,
   now: Date,
 ): { from: Date; to: Date; unit: 'minute' | 'hour' | 'day' } {
   const day = 86_400_000;
+  if (range === 'TO_DUE') {
+    const from = instant(now.getTime() - 90 * day);
+    const end = due.getTime() < now.getTime() ? due : now;
+    return { from, to: end.getTime() < from.getTime() ? now : end, unit: 'day' };
+  }
   if (range === '1D') return { from: instant(now.getTime() - day), to: now, unit: 'minute' };
   if (range === '5D') return { from: instant(now.getTime() - 5 * day), to: now, unit: 'minute' };
   if (range === '1M') return { from: instant(now.getTime() - 30 * day), to: now, unit: 'hour' };
   if (range === '3M') return { from: instant(now.getTime() - 90 * day), to: now, unit: 'day' };
-  const from = deadline.getTime() < now.getTime() ? deadline : instant(now.getTime() - day);
-  const end = due.getTime() < now.getTime() ? due : now;
-  return { from, to: end.getTime() < from.getTime() ? now : end, unit: end.getTime() - from.getTime() > 2 * day ? 'hour' : 'minute' };
+  return { from: instant(now.getTime() - day), to: now, unit: 'minute' };
 }
 
 async function seriesFor(

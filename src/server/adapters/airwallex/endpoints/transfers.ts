@@ -10,7 +10,7 @@ import {
   isDuplicateRequest,
 } from '@/server/adapters/airwallex/errors';
 import { mapTransfer } from '@/server/adapters/airwallex/mappers';
-import { safetyNetRequestId, transferRequestId } from '@/server/adapters/airwallex/requestIds';
+import { safetyNetRequestId, transferRequestId, validateRequestId } from '@/server/adapters/airwallex/requestIds';
 
 const APP = 'fx-target-payment';
 
@@ -103,12 +103,13 @@ export async function createScheduledTransfer(
   }
 }
 
-/** Same body as create, without `quote_id` or `request_id`. Called when the user arms. */
+/** Same body as create, without `quote_id`. Sandbox requires `request_id` (field 001). */
 export async function validateTransfer(
   client: AirwallexClient,
-  input: Omit<CreateTransferInput, 'attempt' | 'quoteId' | 'mode'>,
+  input: Omit<CreateTransferInput, 'attempt' | 'quoteId' | 'mode'> & { attempt?: number },
 ): Promise<void> {
   const body: Record<string, unknown> = {
+    request_id: validateRequestId(input.billId, input.attempt ? `e${input.attempt}` : 'arm'),
     beneficiary_id: input.beneficiaryId,
     transfer_currency: input.transferCurrency,
     transfer_amount: input.transferAmount,

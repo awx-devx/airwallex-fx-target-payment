@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { billDetailSchema } from '@/contracts/api';
-import { balanceSummarySchema, beneficiaryFormSchemaSchema } from '@/contracts/airwallex';
+import { balanceSummarySchema, beneficiaryFormSchemaSchema, beneficiarySummarySchema } from '@/contracts/airwallex';
 import { billSummarySchema } from '@/contracts/bill';
 import { chartResponseSchema } from '@/contracts/chart';
 import type {
@@ -10,6 +10,7 @@ import type {
   ListBillsQuery,
   PatchBillBody,
   PutStrategyBody,
+  ResolveBeneficiaryBody,
 } from '@/contracts/api';
 import type { BillDetail } from '@/contracts/api';
 import type { BalanceSummary, BeneficiaryFormSchema } from '@/contracts/airwallex';
@@ -68,6 +69,17 @@ export function createApiDataSource(): DataSource {
         onStatus: () => undefined,
         onPoll: () => undefined,
       });
+    },
+    async resolveBeneficiary(id: string, body: ResolveBeneficiaryBody): Promise<BillSummary> {
+      await apiRequest(
+        billPath(id, '/beneficiary'),
+        beneficiarySummarySchema,
+        apiPost(billPath(id, '/beneficiary'), body),
+      );
+      return asSummary(await apiRequest(billPath(id), billDetailSchema));
+    },
+    async review(id: string): Promise<BillSummary> {
+      return asSummary(await apiRequest(billPath(id, '/review'), billDetailSchema, apiPost(billPath(id, '/review'))));
     },
     async patchBill(id: string, body: PatchBillBody): Promise<BillSummary> {
       return asSummary(

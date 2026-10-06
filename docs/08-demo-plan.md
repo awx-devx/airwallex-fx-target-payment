@@ -120,5 +120,5 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Activity feed includes simulation started and ended | `DEMO-ONLY` | `ActivityItem` | Production activity has no simulation events |
 | Chart shows simulation markers and a kit Simulate replay | `DEMO-ONLY` | `EventMarkers`, `scenario-simulate` | Production charts have no simulation markers or replay |
 | Demo control bar and the ticket Simulate button | `DEMO-ONLY` | `DemoControlBar`, `SimulateButton` | Removed; no simulated market, warp, or scripted target hit |
-| Upload offers generated sample invoices | `DEMO-ONLY` | `UploadModal`, `POST /api/demo/samples` | Only real uploaded documents are extracted |
+| Upload offers generated sample invoices. A sample is a scanned draft; review, target, and pay-by date use the upload flow. Fictional sample accounts are not held for a sandbox name-match confirmation | `DEMO-ONLY` | `UploadModal`, `BillIntake`, `POST /api/demo/samples`, `acceptSampleAccount` | Only real uploaded documents are extracted, and `verify_account` is kept |
 | Sim reads transfer status immediately instead of waiting for webhooks | `SANDBOX` | `worker/demoSim.ts` | Webhooks + reconciler |

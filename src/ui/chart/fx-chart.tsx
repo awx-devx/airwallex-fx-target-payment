@@ -157,7 +157,7 @@ export function FxChart(props: FxChartProps) {
         horzLines: { color: colors.line1 },
       },
       rightPriceScale: { borderColor: colors.line2 },
-      timeScale: { borderColor: colors.line2, rightOffset: 8, timeVisible: true },
+      timeScale: { borderColor: colors.line2, rightOffset: 8, timeVisible: true, minBarSpacing: 6 },
       crosshair: {
         vertLine: { color: colors.line3, labelBackgroundColor: colors.bg0 },
         horzLine: { color: colors.line3, labelBackgroundColor: colors.bg0 },

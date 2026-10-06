@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import type { ArmBody, PutStrategyBody } from '@/contracts/api';
+import type { ArmBody, PatchBillBody, PutStrategyBody, ResolveBeneficiaryBody } from '@/contracts/api';
 import type { BillSummary } from '@/contracts/bill';
 import type { ChartRange } from '@/contracts/chart';
 import { DataSourceError } from '@/contracts/data-source';
@@ -187,6 +187,10 @@ export function useBillActions() {
     simulate: (id: string) => apply(() => dataSource().simulate(id)),
     stop: (id: string) => apply(() => dataSource().stopSimulation(id)),
     advance: (id: string) => apply(() => dataSource().advanceTransfer(id)),
+    resolveBeneficiary: (id: string, body: ResolveBeneficiaryBody) =>
+      apply(() => dataSource().resolveBeneficiary(id, body)),
+    review: (id: string) => apply(() => dataSource().review(id)),
+    patch: (id: string, body: PatchBillBody) => apply(() => dataSource().patchBill(id, body)),
     putStrategy: (id: string, body: PutStrategyBody) =>
       optimistic(id, (bill) => billWithStrategy(bill, body), () => dataSource().putStrategy(id, body)),
   };

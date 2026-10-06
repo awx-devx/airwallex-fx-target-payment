@@ -5,6 +5,7 @@ import type { BillEvent } from '@/contracts/events';
 import { useState } from 'react';
 import { Banner } from '@/ui/primitives/banner';
 import { Button } from '@/ui/primitives/button';
+import { Input } from '@/ui/primitives/input';
 import { Tabs } from '@/ui/primitives/tabs';
 import { ActivityItem } from '@/ui/trading/activity-item';
 import { BeneficiaryCard } from '@/ui/trading/beneficiary-card';
@@ -26,6 +27,7 @@ export function BillTicket({
   cutoffLabel,
   notice,
   onAction,
+  onSaveBankDetails,
 }: {
   bill: BillSummary;
   now: string;
@@ -34,8 +36,11 @@ export function BillTicket({
   cutoffLabel: string;
   notice?: { tone: 'error' | 'warn' | 'info'; text: string };
   onAction?: (action: string) => void;
+  onSaveBankDetails?: (input: BankDetailsInput) => void;
 }) {
-  const [tab, setTab] = useState('strategy');
+  const needsBank =
+    !bill.beneficiary && bill.allowedActions.includes('RESOLVE_BENEFICIARY');
+  const [tab, setTab] = useState(needsBank ? 'details' : 'strategy');
   const mine = events.filter((event) => event.billId === bill.id);
   const quoteId = quoteIdOf(mine);
   return (
@@ -69,7 +74,7 @@ export function BillTicket({
           {
             value: 'details',
             label: 'Details',
-            content: <Details bill={bill} />,
+            content: <Details bill={bill} onSaveBankDetails={onSaveBankDetails} />,
           },
           {
             value: 'activity',
@@ -185,7 +190,26 @@ function StrategyBody({
   );
 }
 
-function Details({ bill }: { bill: BillSummary }) {
+export interface BankDetailsInput {
+  name: string;
+  bankCountry: string;
+  iban?: string;
+  accountNumber?: string;
+  bic?: string;
+  localBankCode?: string;
+}
+
+function Details({
+  bill,
+  onSaveBankDetails,
+}: {
+  bill: BillSummary;
+  onSaveBankDetails?: (input: BankDetailsInput) => void;
+}) {
+  const canAdd =
+    !bill.beneficiary &&
+    bill.allowedActions.includes('RESOLVE_BENEFICIARY') &&
+    onSaveBankDetails !== undefined;
   return (
     <div className="space-y-3">
       <KeyValueList
@@ -201,7 +225,98 @@ function Details({ bill }: { bill: BillSummary }) {
             : []),
         ]}
       />
-      <BeneficiaryCard beneficiary={bill.beneficiary} missing={bill.beneficiary ? [] : ['Bank details']} />
+      {canAdd ? (
+        <BankDetailsForm
+          name={bill.vendorName}
+          country={BANK_COUNTRY[bill.pair.base] ?? ''}
+          onSave={onSaveBankDetails}
+        />
+      ) : (
+        <BeneficiaryCard beneficiary={bill.beneficiary} missing={bill.beneficiary ? [] : ['Bank details']} />
+      )}
     </div>
+  );
+}
+
+const BANK_COUNTRY: Record<string, string> = {
+  EUR: 'DE',
+  GBP: 'GB',
+  JPY: 'JP',
+  SGD: 'SG',
+  INR: 'IN',
+  USD: 'US',
+  AUD: 'AU',
+};
+
+function BankDetailsForm({
+  name,
+  country,
+  onSave,
+}: {
+  name: string;
+  country: string;
+  onSave: (input: BankDetailsInput) => void;
+}) {
+  const [accountName, setAccountName] = useState(name);
+  const [bankCountry, setBankCountry] = useState(country);
+  const [iban, setIban] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [bic, setBic] = useState('');
+  const [localBankCode, setLocalBankCode] = useState('');
+  const [error, setError] = useState<string | undefined>();
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const trimmedIban = iban.replaceAll(/\s+/g, '');
+        const trimmedAccount = accountNumber.replaceAll(/\s+/g, '');
+        if (bankCountry.trim().length !== 2) {
+          setError('Bank country is a two-letter code.');
+          return;
+        }
+        if (trimmedIban.length < 4 && trimmedAccount.length < 4) {
+          setError('Enter an IBAN or an account number.');
+          return;
+        }
+        setError(undefined);
+        onSave({
+          name: accountName.trim() || name,
+          bankCountry: bankCountry.trim().toUpperCase(),
+          ...(trimmedIban ? { iban: trimmedIban } : {}),
+          ...(trimmedAccount ? { accountNumber: trimmedAccount } : {}),
+          ...(bic.trim() ? { bic: bic.trim() } : {}),
+          ...(localBankCode.trim() ? { localBankCode: localBankCode.trim() } : {}),
+        });
+      }}
+    >
+      <p className="text-fg-2">Save the vendor's bank account before this bill can be armed.</p>
+      <Input aria-label="Account name" value={accountName} onChange={(event) => setAccountName(event.target.value)} />
+      <Input
+        aria-label="Bank country"
+        value={bankCountry}
+        maxLength={2}
+        onChange={(event) => setBankCountry(event.target.value.toUpperCase())}
+        placeholder="Country"
+      />
+      <Input aria-label="IBAN" value={iban} onChange={(event) => setIban(event.target.value)} placeholder="IBAN" />
+      <Input
+        aria-label="Account number"
+        value={accountNumber}
+        onChange={(event) => setAccountNumber(event.target.value)}
+        placeholder="Account number"
+      />
+      <Input aria-label="BIC" value={bic} onChange={(event) => setBic(event.target.value)} placeholder="BIC" />
+      <Input
+        aria-label="Local bank code"
+        value={localBankCode}
+        onChange={(event) => setLocalBankCode(event.target.value)}
+        placeholder="Sort code, IFSC, or bank code"
+      />
+      {error ? <p className="text-xs text-down">{error}</p> : null}
+      <Button size="sm" type="submit">
+        Save bank details
+      </Button>
+    </form>
   );
 }
