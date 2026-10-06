@@ -92,6 +92,12 @@ export async function billChart(input: {
   const spot = bill.last
     ? { time: seconds(bill.last.at), value: decimalString(fromDecimal128(bill.last.price)) }
     : undefined;
+  const sessionLast =
+    bill.simulation != null &&
+    bill.last != null &&
+    bill.last.at.getTime() >= bill.simulation.startedAt.getTime();
+  const real = ticks[ticks.length - 1];
+  const anchor = sessionLast ? (real?.value ?? null) : undefined;
   if (history.pending && !intraday) {
     return chartResponseSchema.parse({
       series: [],
@@ -106,6 +112,7 @@ export async function billChart(input: {
     ticks,
     session,
     spot,
+    anchor,
     from: seconds(span.from),
     to: seconds(now),
     step,

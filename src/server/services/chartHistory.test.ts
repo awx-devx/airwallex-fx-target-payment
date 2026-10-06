@@ -52,6 +52,27 @@ describe('composeSeries', () => {
     expect(series[0]?.value).not.toBe('9.99');
     expect(series[1]?.value).toBe('1.21');
   });
+
+  it('scales history to the real anchor and keeps the session bar', () => {
+    const start = Math.floor(Date.parse('2026-10-06T12:00:00.000Z') / 1000);
+    const series = composeSeries({
+      history: [],
+      intraday: [
+        { time: start, value: '1.00' },
+        { time: start + 300, value: '1.10' },
+      ],
+      ticks: [{ time: start, value: '1.10' }],
+      session: [{ time: start + 600, value: '1.05' }],
+      spot: { time: start + 600, value: '1.05' },
+      anchor: '1.10',
+      from: start,
+      to: start + 600,
+      step: 300,
+    });
+    expect(series[0]?.value).toBe('1');
+    expect(series[1]?.value).toBe('1.1');
+    expect(series[series.length - 1]?.value).toBe('1.05');
+  });
 });
 
 describe('sessionSpans', () => {

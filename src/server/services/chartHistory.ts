@@ -35,8 +35,9 @@ export function mergeHistory(
 
 /**
  * One series on the trading grid. Intraday or daily history is scaled to the
- * spot, then session ticks and the spot replace those bars. Shared ticks are
- * stamped only on the daily fallback, where they are already in Airwallex terms.
+ * anchor (the spot, unless a Simulate session is the bill's last price), then
+ * session ticks and the spot replace those bars. Shared ticks are stamped only
+ * on the daily fallback, where they are already in Airwallex terms.
  */
 export function composeSeries(input: {
   history: readonly ChartSeriesPoint[];
@@ -44,6 +45,8 @@ export function composeSeries(input: {
   ticks: readonly ChartSeriesPoint[];
   session: readonly ChartSeriesPoint[];
   spot?: ChartSeriesPoint;
+  /** Price history scales to. Omit to use the spot. `null` leaves history unscaled. */
+  anchor?: string | null;
   from: number;
   to: number;
   step: number;
@@ -54,7 +57,8 @@ export function composeSeries(input: {
   const source = intraday ?? (input.history.length > 0 ? input.history : [...input.ticks, ...input.session]);
   let series = onGrid(source, input.step, times);
   const scaleHistory = Boolean(intraday || input.history.length > 0);
-  if (scaleHistory && input.spot) series = scaleToSpot(series, input.spot.value);
+  const anchor = input.anchor === null ? undefined : (input.anchor ?? input.spot?.value);
+  if (scaleHistory && anchor) series = scaleToSpot(series, anchor);
   if (!intraday) series = stampGrid(series, input.ticks, input.step);
   series = stampGrid(series, input.session, input.step);
   if (input.spot) series = stampGrid(series, [input.spot], input.step);
