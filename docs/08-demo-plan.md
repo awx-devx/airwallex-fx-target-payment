@@ -13,7 +13,7 @@ Real FX moves slowly, and sandbox pricing is simulated, so the demo needs **cont
 | **Simulate button** | One click on a watching bill: that bill alone switches to a scripted simulated price path that crosses its target in about 12 s. The normal trigger locks a real sandbox quote and creates a real sandbox transfer, then drives it to `PAID`. About 26 s end to end. See §1.1. | `/api/demo/bills/:id/simulate`, `worker/demoSim.ts` |
 | **Seed** | Creates 3 beneficiaries + 3 bills from sample invoice PDFs in `demo/invoices/`. | `pnpm seed:demo` |
 | **Test-data generator** | Seeded random vendors, bank accounts, sandbox beneficiaries, invoice PDFs and bills in any state, by profile. For development, QA and rehearsals, not the stage. See [11](./11-test-data-and-seeding.md). | `pnpm seed:generate`, `/dev/market` → Test data |
-| **Reset** | Drops app collections (keeps beneficiaries), obliterates the BullMQ queues, and resets the clock and market. | `/api/demo/reset` |
+| **Reset** | Drops every app collection (including beneficiaries), obliterates the BullMQ queues, and resets the clock and market. | `pnpm db:reset` |
 
 Demo control endpoints (`DEMO_MODE=true` only):
 
@@ -24,7 +24,6 @@ POST /api/demo/scenario     { name: 'target-hit' | 'stay-watching' | 'deadline-p
 POST /api/demo/transfers/:id/advance { to?: 'PROCESSING'|'SENT'|'PAID'|'FAILED' }
 POST /api/demo/bills/:id/simulate    { durationSec?: number, overshootBps?: number, advanceEverySec?: number }
 POST /api/demo/bills/:id/simulate/stop
-POST /api/demo/reset
 ```
 
 The API and the worker are separate processes. Clock speed, market nudges, and Simulate runs are Redis records (`demo:clock`, `demo:market`, `demo:sim:{billId}`) so the worker applies them. The worker clock reads `demo:clock`. Simulate pacing stays on the wall clock.

@@ -68,6 +68,7 @@ pnpm infra:up             # MongoDB (rs0) + Redis via docker compose
 pnpm dev                  # Next.js dev server
 pnpm worker               # worker: BullMQ processors + poller + sweeper
 pnpm db:indexes           # sync Mongoose indexes / time-series collections
+pnpm db:reset             # drop every app collection, empty queues, reset clock and market (DEMO_MODE only); then db:indexes
 pnpm seed:beneficiaries   # sandbox beneficiaries
 pnpm seed:demo            # 3 curated demo bills from demo/invoices/
 pnpm seed:generate        # seeded random vendors/beneficiaries/invoices/bills (--profile mixed|lifecycle|deadline|corridors|upload|stress|e2e --seed N)

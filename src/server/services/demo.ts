@@ -1,12 +1,8 @@
 import { decimalString, significantPrice } from '@/contracts/money';
 import type { BillDetail } from '@/contracts/api';
 import { instant, type Clock } from '@/server/adapters/clock';
+import { type DemoClockState } from '@/server/adapters/clock/demo';
 import {
-  noteDemoClock,
-  type DemoClockState,
-} from '@/server/adapters/clock/demo';
-import {
-  clearDemoKeys,
   createSim,
   deleteSim,
   drainMarket,
@@ -21,18 +17,8 @@ import { activeSimulatedMarket } from '@/server/adapters/rates';
 import type { SimulationStatus } from '@/server/adapters/airwallex/endpoints/simulation';
 import { transferGateway } from '@/server/adapters/transfers';
 import { fromDecimal128 } from '@/server/db/decimal';
-import {
-  Bill,
-  BillDocument,
-  BillEvent,
-  Execution,
-  Quote,
-  RateCandle,
-  RateTick,
-  WebhookEvent,
-} from '@/server/db/models';
+import { Bill, Execution } from '@/server/db/models';
 import type { Env } from '@/server/env';
-import { QUEUE_NAMES, createQueue } from '@/server/queue';
 import {
   billReadContext,
   eventPublisher,
@@ -394,31 +380,6 @@ export async function runScenario(input: {
     );
   }
   return { name: input.name, billId: bill ? String(bill._id) : undefined };
-}
-
-export async function resetDemo(input: {
-  env: Env;
-  prefix?: string;
-}): Promise<{ ok: true }> {
-  assertDemo(input.env);
-  await Bill.deleteMany({});
-  await BillDocument.deleteMany({});
-  await BillEvent.deleteMany({});
-  await Quote.deleteMany({});
-  await Execution.deleteMany({});
-  await WebhookEvent.deleteMany({});
-  await RateTick.deleteMany({});
-  await RateCandle.deleteMany({});
-  const prefix = input.prefix ?? 'bull';
-  for (const name of QUEUE_NAMES) {
-    const queue = createQueue(name, { url: input.env.REDIS_URL, prefix });
-    await queue.obliterate({ force: true });
-    await queue.close();
-  }
-  await clearDemoKeys(input.env.REDIS_URL);
-  await pushMarket(input.env.REDIS_URL, { op: 'reset' });
-  noteDemoClock(null);
-  return { ok: true };
 }
 
 async function requireSeed(seedKey: string) {

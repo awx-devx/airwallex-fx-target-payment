@@ -28,7 +28,6 @@ import {
   advanceDemoTransfer,
   applyPendingMarket,
   enqueueMarket,
-  resetDemo,
   runScenario,
   startSimulation,
 } from '@/server/services/demo';
@@ -314,24 +313,6 @@ describe('demo mode', () => {
       to: 'SENT',
     });
     expect(advanced.status).toBe('SENT');
-  });
-
-  it('resets bills and keeps beneficiaries', async () => {
-    const env = parseEnv(process.env);
-    const beneficiary = await Beneficiary.create({
-      airwallexBeneficiaryId: 'keep-me',
-      name: 'Kept',
-      entityType: 'COMPANY',
-      bankCountry: 'DE',
-      accountCurrency: 'EUR',
-      maskedAccount: '••••9',
-      transferMethods: ['LOCAL'],
-    });
-    await Bill.create(watchingBillInput('reset-me'));
-    const prefix = isolatedPrefix('reset');
-    await resetDemo({ env, prefix });
-    expect(await Bill.countDocuments()).toBe(0);
-    expect(await Beneficiary.findById(beneficiary._id)).toBeTruthy();
   });
 
   it('creates nothing new when the same seed runs twice', async () => {

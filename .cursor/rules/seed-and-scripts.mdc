@@ -23,7 +23,7 @@ Spec: `docs/11-test-data-and-seeding.md` (generator), `docs/08-demo-plan.md` §1
 - `seed:demo` uses cached extraction results by default for determinism (`--live-extraction` to call the LLM).
 
 ## Reset, indexes, smoke, spikes
-- Reset (`/api/demo/reset`, `pnpm seed:reset --generated`) keeps beneficiaries, cancels still-cancellable in-flight transfers first, obliterates the BullMQ queues (full reset only), and resets the clock and market.
+- `pnpm seed:reset --generated` keeps beneficiaries and cancels still-cancellable in-flight transfers first. `pnpm db:reset` drops every Mongo collection (including beneficiaries), obliterates the BullMQ queues, and resets the clock and market. It does not cancel in-flight Airwallex transfers.
 - `db:indexes` is idempotent (`syncIndexes()` + creating the time-series collection if missing), and is safe to run on every deploy.
 - `airwallex:smoke` runs V1–V10 and V12–V17, prints a pass/fail table, writes `docs/verification-results.md`, and records redacted raw responses to `src/server/adapters/airwallex/__fixtures__/`. Resolved findings also update `docs/01` §7 and the related `docs/09` Q-xx.
 - Spike scripts write raw responses to `scripts/spike/out/` (gitignored) and findings to `scripts/spike/FINDINGS.md`.
