@@ -14,12 +14,18 @@ function patchBill(list: BillSummary[] | undefined, bill: BillSummary) {
 
 type CachedChart = {
   series: { time: number; value: string }[];
+  step?: number;
   overlays: { simulatedRanges?: { from: number; to?: number }[] };
 };
 
 function tickHits(bill: BillSummary, event: Extract<AppEvent, { type: 'tick' }>): boolean {
   if (event.billId) return bill.id === event.billId;
   return bill.pair.base === event.pair.base && bill.pair.quote === event.pair.quote && Boolean(bill.lastPrice);
+}
+
+function snapStep(time: number, step: number | undefined): number {
+  if (!step || step < 1) return time;
+  return Math.floor(time / step) * step;
 }
 
 function upsertPoint(
@@ -58,17 +64,22 @@ export function applyAppEvent(client: QueryClient, event: AppEvent): void {
         : bill,
     );
     client.setQueryData(qk.bills, next);
-    const time = Math.floor(Date.parse(event.ts) / 1000);
+    const rawTime = Math.floor(Date.parse(event.ts) / 1000);
     for (const bill of next) {
       if (!tickHits(bill, event)) continue;
-      client.setQueryData(qk.bill(bill.id), (detail: { lastPrice?: string } | undefined) =>
-        detail ? { ...detail, lastPrice: event.price } : detail,
+      client.setQueryData(
+        qk.bill(bill.id),
+        (detail: { lastPrice?: string; flags?: BillSummary['flags'] } | undefined) =>
+          detail
+            ? { ...detail, lastPrice: event.price, flags: { ...detail.flags, stale: false } }
+            : detail,
       );
       client.setQueriesData({ queryKey: ['chart', bill.id] }, (chart: CachedChart | undefined) => {
         if (!chart) return chart;
+        const time = snapStep(rawTime, chart.step);
         return {
           ...chart,
-          series: upsertPoint(chart.series, time, event.price).slice(-400),
+          series: upsertPoint(chart.series, time, event.price),
           overlays: event.simId ? extendSession(chart.overlays, time) : chart.overlays,
         };
       });

@@ -17,6 +17,7 @@ export function SchemaForm({
   errors = [],
   loading = false,
   refreshing = false,
+  submitting = false,
   banks = [],
   searching = false,
   onSearch,
@@ -29,6 +30,7 @@ export function SchemaForm({
   errors?: readonly FieldError[];
   loading?: boolean;
   refreshing?: boolean;
+  submitting?: boolean;
   banks?: readonly BankOption[];
   searching?: boolean;
   onSearch?: (path: string, keyword: string) => void;
@@ -84,7 +86,7 @@ export function SchemaForm({
           onChange={(value) => change(field, value)}
         />
       ))}
-      <Button type="submit">Validate and verify</Button>
+      <Button type="submit" loading={submitting}>Validate and verify</Button>
     </form>
   );
 }

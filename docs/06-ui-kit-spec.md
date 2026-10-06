@@ -109,10 +109,10 @@ interface FxChartProps {
   pair: { base: string; quote: string };
   inverted?: boolean;
   series: ChartSeriesPoint[];            // live/own ticks
-  reference?: ChartSeriesPoint[];        // third-party history
   overlays: ChartOverlays;               // entry, target, deadline, due, now, markers
   strategyMode?: 'TARGET_RATE' | 'MAX_COST';
-  range: '1H' | '1D' | '1W' | '1M' | 'ALL' | 'TO_DUE';
+  range: '1D' | '5D' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'TO_DUE';
+  step?: number;                         // seconds between bars; defaults from the range
   type?: 'area' | 'line' | 'candles';
   height?: number | 'fill';
   state?: 'ready' | 'loading' | 'empty' | 'stale' | 'error';

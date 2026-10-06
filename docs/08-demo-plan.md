@@ -121,3 +121,4 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Demo control bar and the ticket Simulate button | `DEMO-ONLY` | `DemoControlBar`, `SimulateButton` | Removed; no simulated market, warp, or scripted target hit |
 | Upload offers generated sample invoices. A sample is a scanned draft; review, target, and pay-by date use the upload flow. Fictional sample accounts are not held for a sandbox name-match confirmation | `DEMO-ONLY` | `UploadModal`, `BillIntake`, `POST /api/demo/samples`, `acceptSampleAccount` | Only real uploaded documents are extracted, and `verify_account` is kept |
 | Sim reads transfer status immediately instead of waiting for webhooks | `SANDBOX` | `worker/demoSim.ts` | Webhooks + reconciler |
+| Intraday FX bars come from Yahoo's unofficial chart endpoint and are scaled onto the Airwallex spot | `DEMO-ONLY` | `src/server/adapters/history/yahoo.ts` | A licensed intraday feed behind the same adapter |

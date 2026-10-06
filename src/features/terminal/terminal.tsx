@@ -113,6 +113,10 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const chart = useChart(selectedId, ui.range);
   const events = useEvents(selectedId);
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
+  const [pending, setPending] = useState<{ billId: string; action: string } | null>(null);
+  const [demoPending, setDemoPending] = useState<'nudge' | 'jump' | null>(null);
+  const [sampling, setSampling] = useState<number | undefined>();
+  const [reviewing, setReviewing] = useState(false);
   const [intake, setIntake] = useState<{ ids: string[]; mode: IntakeMode } | null>(null);
   const [uploadFiles, setUploadFiles] = useState<DropFile[]>([]);
   const toasted = useRef(0);
@@ -175,9 +179,10 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   }
 
   async function onAction(action: string, bill: BillSummary | undefined = selected) {
-    if (!bill) return;
+    if (!bill || pending) return;
     if (openIntake(bill, action)) return;
     setTicketNotice(null);
+    setPending({ billId: bill.id, action });
     try {
       if (action === 'ARM') {
         await actions.arm(bill.id, {
@@ -197,6 +202,8 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       else if (action === 'ADVANCE_TRANSFER') await actions.advance(bill.id);
     } catch (error) {
       showError(error);
+    } finally {
+      setPending(null);
     }
   }
 
@@ -360,6 +367,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       progress: 30,
       extraction: 'working',
     }));
+    setSampling(count);
     setUploadFiles(files);
     setUploadPhase('extracting');
     window.setTimeout(() => {
@@ -370,6 +378,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
     }, 800);
     window.setTimeout(() => {
       setUploadFiles((current) => current.map((file) => ({ ...file, progress: 100, extraction: undefined })));
+      setSampling(undefined);
     }, 1200);
   }
 
@@ -413,8 +422,12 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       homeCurrency="USD"
       cutoffLabel="14:00 Los Angeles"
       notice={ticketNotice ?? undefined}
+      pendingAction={pending?.billId === selected.id ? pending.action : undefined}
+      savingBank={pending?.billId === selected.id && pending.action === 'SAVE_BANK'}
       onAction={(action) => void onAction(action)}
       onSaveBankDetails={(input) => {
+        if (pending) return;
+        setPending({ billId: selected.id, action: 'SAVE_BANK' });
         void (async () => {
           try {
             await actions.resolveBeneficiary(selected.id, {
@@ -430,6 +443,8 @@ export function TerminalScreen({ billId }: { billId?: string }) {
             });
           } catch (error) {
             showError(error);
+          } finally {
+            setPending(null);
           }
         })();
       }}
@@ -507,8 +522,8 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                 <FxChart
                   pair={selected.pair}
                   series={chart.data.series}
-                  reference={chart.data.reference}
                   overlays={chart.data.overlays}
+                  step={chart.data.step}
                   strategyMode={selected.strategyMode}
                   range={ui.range}
                   onRangeChange={ui.setRange}
@@ -603,13 +618,27 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                 ui.setWarp(warp);
                 demoControls().setWarp(Number(warp));
               }}
+              pending={
+                demoPending ??
+                (pending?.action === 'SIMULATE'
+                  ? 'simulate'
+                  : pending?.action === 'ADVANCE_TRANSFER'
+                    ? 'advance'
+                    : undefined)
+              }
               onJump={() => {
-                if (!selected) return;
-                demoControls().jumpToDeadline(selected.id, selected.executionDeadline);
+                if (!selected || demoPending) return;
+                setDemoPending('jump');
+                void Promise.resolve(
+                  demoControls().jumpToDeadline(selected.id, selected.executionDeadline),
+                ).finally(() => setDemoPending(null));
               }}
               onNudge={() => {
-                if (!selected) return;
-                demoControls().nudge(selected.pair.base, selected.pair.quote);
+                if (!selected || demoPending) return;
+                setDemoPending('nudge');
+                void Promise.resolve(demoControls().nudge(selected.pair.base, selected.pair.quote)).finally(() =>
+                  setDemoPending(null),
+                );
               }}
               onSimulate={() => void onAction('SIMULATE')}
               onAdvance={() => void onAction('ADVANCE_TRANSFER')}
@@ -624,6 +653,8 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         phase={uploadPhase}
         files={uploadFiles}
         trigger={null}
+        sampling={sampling}
+        reviewing={reviewing}
         onSamples={startSamples}
         onFiles={(files) => {
           const split = splitUploadFiles(files);
@@ -662,7 +693,9 @@ export function TerminalScreen({ billId }: { billId?: string }) {
           })();
         }}
         onReview={() => {
+          if (reviewing) return;
           const count = Math.max(1, uploadFiles.filter((file) => !file.error).length);
+          setReviewing(true);
           void (async () => {
             try {
               const ids = await addSampleBills(count);
@@ -672,6 +705,8 @@ export function TerminalScreen({ billId }: { billId?: string }) {
               setIntake({ ids, mode: 'arm' });
             } catch (error) {
               showError(error);
+            } finally {
+              setReviewing(false);
             }
           })();
         }}

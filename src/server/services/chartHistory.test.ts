@@ -1,4 +1,4 @@
-import { appendSpot, mergeHistory, sessionSpans } from '@/server/services/chartHistory';
+import { appendSpot, composeSeries, mergeHistory, sessionSpans } from '@/server/services/chartHistory';
 import { describe, expect, it } from 'vitest';
 
 describe('mergeHistory', () => {
@@ -29,6 +29,28 @@ describe('appendSpot', () => {
   it('leaves a series that already has that timestamp', () => {
     const series = [{ time: 10, value: '1.10' }];
     expect(appendSpot(series, { time: 10, value: '1.12' })).toEqual(series);
+  });
+});
+
+describe('composeSeries', () => {
+  it('scales intraday history to the spot and lets a session tick replace its bar', () => {
+    const start = Math.floor(Date.parse('2026-10-06T12:00:00.000Z') / 1000);
+    const series = composeSeries({
+      history: [],
+      intraday: [
+        { time: start, value: '1.00' },
+        { time: start + 300, value: '1.10' },
+      ],
+      ticks: [{ time: start, value: '9.99' }],
+      session: [{ time: start + 300, value: '1.15' }],
+      spot: { time: start + 300, value: '1.21' },
+      from: start,
+      to: start + 300,
+      step: 300,
+    });
+    expect(series.map((point) => point.time)).toEqual([start, start + 300]);
+    expect(series[0]?.value).not.toBe('9.99');
+    expect(series[1]?.value).toBe('1.21');
   });
 });
 

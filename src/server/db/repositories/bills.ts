@@ -16,6 +16,7 @@ import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel, Execution
 import { formatUtcDate } from '@/server/domain/deadline';
 import { extractedBillSchema, extractionStatusSchema } from '@/contracts/extraction';
 import { checkBill } from '@/server/domain/billChecks';
+import { watchingFeedStale } from '@/server/domain/feedAge';
 import { showsSimulated, type SimulationOutcome } from '@/server/domain/simulation';
 import { distanceBps, estimatedCost, homePrecision, savings, savingsPercent } from '@/server/domain/rateMath';
 
@@ -169,8 +170,13 @@ function flagsFor(
   if (
     read?.nowMs !== undefined &&
     read.pollIntervalMs &&
-    (bill.state === 'WATCHING' || bill.state === 'PAUSED') &&
-    (!bill.lastTickAt || read.nowMs - Date.parse(bill.lastTickAt) > 2 * read.pollIntervalMs)
+    watchingFeedStale({
+      state: bill.state,
+      lastTickAt: bill.lastTickAt,
+      updatedAtMs: bill.updatedAtMs,
+      nowMs: read.nowMs,
+      pollIntervalMs: read.pollIntervalMs,
+    })
   ) {
     flags.stale = true;
   }
@@ -303,6 +309,7 @@ interface LoadedBill {
   lastPrice?: string;
   lastTickAt?: string;
   lastSource?: RateSourceKind;
+  updatedAtMs?: number;
   insufficientBalance?: boolean;
   safetyNetTransferId?: string;
   simulation?: { outcome: SimulationOutcome };
@@ -327,6 +334,7 @@ function asBill(doc: {
   beneficiaryId?: { toString(): string } | null;
   entry?: { price: { toString(): string } } | null;
   last?: { price: { toString(): string }; at: Date; source: RateSourceKind } | null;
+  updatedAt?: Date;
   insufficientBalance?: boolean | null;
   safetyNet?: { transferId?: string | null } | null;
   simulation?: { outcome: SimulationOutcome } | null;
@@ -375,6 +383,7 @@ function asBill(doc: {
     ...(doc.last
       ? { lastPrice: money(doc.last.price), lastTickAt: doc.last.at.toISOString(), lastSource: doc.last.source }
       : {}),
+    ...(doc.updatedAt ? { updatedAtMs: doc.updatedAt.getTime() } : {}),
     ...(doc.insufficientBalance ? { insufficientBalance: true } : {}),
     ...(doc.safetyNet?.transferId ? { safetyNetTransferId: doc.safetyNet.transferId } : {}),
     ...(doc.simulation ? { simulation: { outcome: doc.simulation.outcome } } : {}),

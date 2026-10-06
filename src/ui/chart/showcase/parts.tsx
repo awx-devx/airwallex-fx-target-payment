@@ -18,7 +18,6 @@ import {
   PAIR,
   WATCHING,
   baseOverlays,
-  referenceOf,
 } from '@/ui/chart/chart.fixtures';
 import { RangeSwitcher } from '@/ui/chart/range-switcher';
 import { Cell, Matrix } from '@/ui/primitives/showcase/frame';
@@ -48,7 +47,6 @@ function DragTarget() {
     <FxChart
       pair={PAIR}
       series={series}
-      reference={referenceOf(series)}
       overlays={baseOverlays(series, { target })}
       range="TO_DUE"
       onRangeChange={() => undefined}

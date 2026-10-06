@@ -29,6 +29,7 @@ const testEnv: Record<string, string> = {
   RATE_SOURCE: 'simulated',
   PAYMENTS_GATEWAY: 'mock',
   HISTORY_SOURCE: 'none',
+  INTRADAY_SOURCE: 'none',
   BILL_EXTRACTOR: 'mock',
   CLOCK: 'system',
   DEADLINE_SAFETY_NET: 'none',

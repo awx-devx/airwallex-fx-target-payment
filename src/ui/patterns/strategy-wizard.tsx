@@ -23,6 +23,7 @@ export function StrategyWizardStep({
   series,
   overlays,
   state,
+  step,
 }: {
   pair: Pair;
   amount: string;
@@ -36,6 +37,7 @@ export function StrategyWizardStep({
   series: ChartSeriesPoint[];
   overlays: ChartOverlays;
   state?: 'ready' | 'loading';
+  step?: number;
 }) {
   const [range, setRange] = useState<ChartRange>('TO_DUE');
   const cost = formatMoney(homeCurrency, decimalString(D(amount).mul(D(target))));
@@ -64,6 +66,7 @@ export function StrategyWizardStep({
         series={series}
         overlays={{ ...overlays, target }}
         range={range}
+        step={step}
         onRangeChange={setRange}
         strategyMode={mode}
         interactive

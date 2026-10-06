@@ -1,50 +1,63 @@
 import { describe, expect, it } from 'vitest';
 import { clusterMarkers, markerText } from '@/ui/chart/markers';
+import { tradingTimes } from '@/contracts/chartGrid';
 import {
   canonicalFromChart,
   chartPrice,
-  paddingTimes,
+  clampLogicalToWidth,
+  futureTimes,
+  gridOffset,
+  paddingHorizon,
   seriesChange,
-  seriesStep,
-  visibleWindow,
-  whitespaceEnd,
+  snapToBar,
+  visibleLogical,
 } from '@/ui/chart/scale';
 
 describe('chart scale', () => {
-  it('extends the time axis past the due date', () => {
-    expect(whitespaceEnd(1_000, 1_000 + 100_000)).toBe(1_000 + 110_000);
+  it('pads the future on the trading grid and caps a distant due date', () => {
+    const last = Math.floor(Date.parse('2026-10-06T12:00:00.000Z') / 1000);
+    const times = futureTimes(last, last + 3600, 300);
+    expect(times[0]).toBe(last + 300);
+    expect(times).not.toContain(last);
+    expect(futureTimes(0, 86_400 * 400, 300).length).toBeLessThanOrEqual(20_000);
   });
 
-  it('fills the future with the series step and keeps overlay times', () => {
-    const times = paddingTimes(1_000, 1_050, 10, [1_025, 900]);
-    expect(times[0]).toBe(1_010);
-    expect(times).toContain(1_025);
-    expect(times).not.toContain(900);
-    expect(times[times.length - 1]).toBe(1_050);
-    expect(seriesStep([{ time: 0 }, { time: 10 }, { time: 20 }])).toBe(10);
-    const capped = paddingTimes(0, 10_000, 1, [42]);
-    expect(capped.length).toBeLessThanOrEqual(482);
-    expect(capped).toContain(42);
+  it('shows 288 bars for 1D, a year index for 1Y, and the due date plus 10% for TO_DUE', () => {
+    const now = Math.floor(Date.parse('2026-10-07T12:00:00.000Z') / 1000);
+    const times = tradingTimes(now - 3 * 86_400, now, 300);
+    const nowIndex = times.length - 1;
+    const day = visibleLogical('1D', times, now, now + 12 * 86_400);
+    expect(day.from).toBe(nowIndex - 287);
+    expect(day.to).toBe(nowIndex + Math.max(1, Math.round(287 * 0.04)));
+
+    const year = tradingTimes(now - 400 * 86_400, now, 86_400);
+    const yearView = visibleLogical('1Y', year, now, now + 12 * 86_400);
+    const start = now - 365 * 86_400;
+    expect(year[yearView.from]).toBeGreaterThanOrEqual(start);
+    expect(year[(yearView.from ?? 1) - 1] ?? 0).toBeLessThan(start);
+
+    const due = now + 20 * 3600;
+    const span = tradingTimes(now - 10 * 86_400, due + 86_400, 3600);
+    const dueView = visibleLogical('TO_DUE', span, now, due);
+    const dueIndex = span.findIndex((time) => time >= due);
+    expect(dueView.from).toBe(0);
+    expect(dueView.to).toBeGreaterThan(dueIndex);
+    expect(dueView.to).toBe(dueIndex + Math.max(1, Math.round(dueIndex * 0.1)));
+    const fitted = clampLogicalToWidth(dueView, 100, 1);
+    expect(fitted.to).toBe(dueView.to);
+    expect(fitted.from).toBeGreaterThan(dueView.from);
+    expect(paddingHorizon('TO_DUE', now, due, span[0] ?? now)).toBe(
+      Math.round(due + (due - (span[0] ?? now)) * 0.1),
+    );
   });
 
-  it('fills the future with the series step and keeps overlay times', () => {
-    const times = paddingTimes(1_000, 1_050, 10, [1_025, 900]);
-    expect(times[0]).toBe(1_010);
-    expect(times).toContain(1_025);
-    expect(times).not.toContain(900);
-    expect(times[times.length - 1]).toBe(1_050);
-    expect(seriesStep([{ time: 0 }, { time: 10 }, { time: 20 }])).toBe(10);
-    const capped = paddingTimes(0, 10_000, 1, [42]);
-    expect(capped.length).toBeLessThanOrEqual(482);
-    expect(capped).toContain(42);
-  });
-
-  it('windows a range from now and keeps the deadline in view for TO_DUE', () => {
-    const now = 1_700_000_000;
-    const first = now - 20 * 86_400;
-    const due = now + 12 * 86_400;
-    expect(visibleWindow('1D', now, first, due).from).toBe(now - 86_400);
-    expect(visibleWindow('TO_DUE', now, first, due).to).toBe(whitespaceEnd(first, due));
+  it('interpolates inside a session and jumps a weekend gap to the next bar', () => {
+    expect(gridOffset(150, [0, 300, 600], 300)).toBe(0.5);
+    const friday = Math.floor(Date.parse('2026-10-02T21:00:00.000Z') / 1000);
+    const sunday = Math.floor(Date.parse('2026-10-04T22:00:00.000Z') / 1000);
+    expect(gridOffset(friday + 3600, [friday, sunday], 3600)).toBe(1);
+    expect(snapToBar(150, [0, 300, 600])).toBe(0);
+    expect(snapToBar(200, [0, 300, 600])).toBe(300);
   });
 
   it('treats one appended tick as an update', () => {

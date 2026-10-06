@@ -179,8 +179,7 @@ Patterns:
 | --- | --- |
 | Background | transparent over `--bg-1`. No ambient bloom. |
 | Grid | `rgba(255,255,255,0.04)`, vertical grid off by default |
-| Price series (area) | line `--fg-1` at 1.5 px; area gradient from `rgba(255,255,255,0.10)` to `0` |
-| Reference history | line `--info` at 40% opacity, dashed 2/4, labelled "Reference (ECB)" |
+| Price series (area) | line `--fg-1` at 1.5 px; area gradient from `rgba(255,255,255,0.10)` to `0`. This is the payable rate. No second ECB comparison line |
 | **Entry line** | horizontal, `--info`, solid 1 px, right label chip "ENTRY 1.08412" |
 | **Target line** | horizontal, `--orange-500`, dashed 6/4 at 1.5 px **with a glow** (drawn twice: 6 px blurred at 30% opacity + crisp line), label chip filled orange "TARGET 1.07500" |
 | **Target zone** | fill between the target line and the bottom of the pane with `--orange-wash` (the "favourable zone") |

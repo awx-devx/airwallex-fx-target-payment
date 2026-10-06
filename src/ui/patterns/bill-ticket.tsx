@@ -26,6 +26,8 @@ export function BillTicket({
   homeCurrency,
   cutoffLabel,
   notice,
+  pendingAction,
+  savingBank = false,
   onAction,
   onSaveBankDetails,
 }: {
@@ -35,6 +37,8 @@ export function BillTicket({
   homeCurrency: string;
   cutoffLabel: string;
   notice?: { tone: 'error' | 'warn' | 'info'; text: string };
+  pendingAction?: string;
+  savingBank?: boolean;
   onAction?: (action: string) => void;
   onSaveBankDetails?: (input: BankDetailsInput) => void;
 }) {
@@ -68,6 +72,7 @@ export function BillTicket({
                 homeCurrency={homeCurrency}
                 cutoffLabel={cutoffLabel}
                 quoteId={quoteId}
+                pendingAction={pendingAction}
                 onAction={onAction}
               />
             ),
@@ -75,7 +80,7 @@ export function BillTicket({
           {
             value: 'details',
             label: 'Details',
-            content: <Details bill={bill} onSaveBankDetails={onSaveBankDetails} />,
+            content: <Details bill={bill} savingBank={savingBank} onSaveBankDetails={onSaveBankDetails} />,
           },
           {
             value: 'activity',
@@ -117,6 +122,7 @@ function StrategyBody({
   homeCurrency,
   cutoffLabel,
   quoteId,
+  pendingAction,
   onAction,
 }: {
   bill: BillSummary;
@@ -125,13 +131,14 @@ function StrategyBody({
   homeCurrency: string;
   cutoffLabel: string;
   quoteId?: string;
+  pendingAction?: string;
   onAction?: (action: string) => void;
 }) {
   if (bill.state === 'DRAFT') {
     return (
       <div className="space-y-3">
         <p className="text-fg-2">Review the invoice, then set a target and arm it.</p>
-        <Button size="sm" onClick={() => onAction?.('REVIEW')}>
+        <Button size="sm" loading={pendingAction === 'REVIEW'} onClick={() => onAction?.('REVIEW')}>
           Review bill
         </Button>
       </div>
@@ -149,7 +156,7 @@ function StrategyBody({
       return (
         <div className="space-y-3">
           <p className="text-fg-2">Set a target before this bill can be armed.</p>
-          <Button size="sm" onClick={() => onAction?.('EDIT_STRATEGY')}>
+          <Button size="sm" loading={pendingAction === 'EDIT_STRATEGY'} onClick={() => onAction?.('EDIT_STRATEGY')}>
             Set target
           </Button>
         </div>
@@ -157,10 +164,15 @@ function StrategyBody({
     }
     return (
       <div className="space-y-3">
-        <Button size="sm" variant="ghost" onClick={() => onAction?.('EDIT_STRATEGY')}>
+        <Button size="sm" variant="ghost" loading={pendingAction === 'EDIT_STRATEGY'} onClick={() => onAction?.('EDIT_STRATEGY')}>
           Edit target
         </Button>
-        <ArmConfirm bill={bill} cutoffLabel={cutoffLabel} onArm={() => onAction?.('ARM')} />
+        <ArmConfirm
+          bill={bill}
+          cutoffLabel={cutoffLabel}
+          loading={pendingAction === 'ARM'}
+          onArm={() => onAction?.('ARM')}
+        />
       </div>
     );
   }
@@ -184,7 +196,7 @@ function StrategyBody({
       <div className="space-y-2">
         <Banner tone="error">{bill.execution?.failure?.message ?? 'The transfer failed.'}</Banner>
         {bill.execution ? <TransferTracker execution={bill.execution} quoteId={quoteId} /> : null}
-        <Button size="sm" onClick={() => onAction?.('RESOLVE_BENEFICIARY')}>
+        <Button size="sm" loading={pendingAction === 'RESOLVE_BENEFICIARY'} onClick={() => onAction?.('RESOLVE_BENEFICIARY')}>
           Fix and re-arm
         </Button>
       </div>
@@ -207,14 +219,19 @@ function StrategyBody({
       />
       {bill.state === 'WATCHING' || bill.state === 'PAUSED' ? (
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => onAction?.('EDIT_STRATEGY')}>
+          <Button size="sm" variant="secondary" loading={pendingAction === 'EDIT_STRATEGY'} onClick={() => onAction?.('EDIT_STRATEGY')}>
             Edit target
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => onAction?.(bill.state === 'PAUSED' ? 'RESUME' : 'PAUSE')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={pendingAction === 'PAUSE' || pendingAction === 'RESUME'}
+            onClick={() => onAction?.(bill.state === 'PAUSED' ? 'RESUME' : 'PAUSE')}
+          >
             {bill.state === 'PAUSED' ? 'Resume' : 'Pause'}
           </Button>
           {bill.state === 'WATCHING' ? (
-            <Button size="sm" variant="ghost" onClick={() => onAction?.('PAY_NOW')}>
+            <Button size="sm" variant="ghost" loading={pendingAction === 'PAY_NOW'} onClick={() => onAction?.('PAY_NOW')}>
               Pay now
             </Button>
           ) : null}
@@ -226,9 +243,11 @@ function StrategyBody({
 
 function Details({
   bill,
+  savingBank = false,
   onSaveBankDetails,
 }: {
   bill: BillSummary;
+  savingBank?: boolean;
   onSaveBankDetails?: (input: BankDetailsInput) => void;
 }) {
   const canAdd =
@@ -254,6 +273,7 @@ function Details({
         <BankDetailsForm
           name={bill.vendorName}
           country={bankCountryFor(bill.pair.base)}
+          saving={savingBank}
           onSave={onSaveBankDetails}
         />
       ) : (

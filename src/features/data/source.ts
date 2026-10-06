@@ -44,21 +44,21 @@ export function demoControls() {
   if (isApiDataSource()) {
     return {
       setWarp(speed: number) {
-        void fetch('/api/demo/clock', {
+        return fetch('/api/demo/clock', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ speed }),
         });
       },
       jumpToDeadline(_billId: string, deadline: string) {
-        void fetch('/api/demo/clock', {
+        return fetch('/api/demo/clock', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ jumpTo: deadline }),
         });
       },
       nudge(base: string, quote: string) {
-        void fetch(`/api/demo/market/${base}${quote}`, {
+        return fetch(`/api/demo/market/${base}${quote}`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ nudgePips: -20 }),

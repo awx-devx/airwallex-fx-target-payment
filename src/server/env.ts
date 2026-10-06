@@ -109,6 +109,10 @@ export const envSchema = z.object({
     blankToUndefined,
     z.enum(['frankfurter', 'none', 'simulated']).default('frankfurter'),
   ),
+  INTRADAY_SOURCE: z.preprocess(
+    blankToUndefined,
+    z.enum(['yahoo', 'none']).default('yahoo'),
+  ),
   BILL_EXTRACTOR: z.preprocess(
     blankToUndefined,
     z.enum(['anthropic', 'ollama', 'mock']).default('anthropic'),

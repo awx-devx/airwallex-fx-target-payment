@@ -12,7 +12,7 @@ The main screen, modelled on a perps trading terminal.
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
 │ TopBar: [mark] · USD 1,240,000 · EUR 80,000 · ● Live · 🔔3                                 │
 ├──────────────┬──────────────────────────────────────────────────────────┬─────────────────┤
-│ BillList     │ ChartHeader: 🇪🇺🇺🇸 EUR/USD  1.08412 ▼0.21%  ● Live  1H 1D 1W 1M TO_DUE │ BillTicket      │
+│ BillList     │ ChartHeader: 🇪🇺🇺🇸 EUR/USD  1.08412 ▼0.21%  ● Live  1D 5D 1M 3M 6M YTD 1Y TO_DUE │ BillTicket      │
 │ [search]     │──────────────────────────────────────────────────────────│ [Strategy|Det.| │
 │ All·Watch·   │                                                          │  Activity]      │
 │ Paid         │        FxChart                                           │                 │
@@ -37,7 +37,7 @@ The sheet sits on `--bg-0` with the grain aurora from [05 §2](./05-design-syste
 - **Grouping:** "Group by pair" in the list shows `PairGroupHeader` with the total exposure. Bills in the same pair share the reference series but keep **their own** entry and target lines and their own deadline.
 - **Live updates:** SSE `tick` updates the list sparkline, the table row (flash), the chart and the ticket. A tick with `simId` updates only that bill. `bill.updated` re-renders the state badges. A `notification` for a target hit raises an informational toast ("Target hit · paying") and deep-links to `/bills/:id`.
 - **Bottom tabs partition the list.** Every bill is on exactly one of Positions (`DRAFT`, `READY`, `WATCHING`, `PAUSED`) or Executed (`EXECUTING`, `IN_FLIGHT`, `PAID`, `FAILED`, `CANCELLED`). Activity is the selected bill's events, not another slice of the book. From `lg` up the panel is a fixed `18rem` and the active tab scrolls inside it, so switching tabs does not resize the chart. Below `lg` the panel sizes to its content and the column scrolls.
-- **Chart interactions:** in `WATCHING`/`READY`, the user can drag the target line to edit the target. A cost preview bubble follows the cursor, and releasing it opens a confirm popover. The range defaults to `TO_DUE`: about 90 days of ECB daily history, with our own ticks on the recent days, through the due date plus padding. A Simulate session is appended only on that bill. The chart header reads Simulated for that bill while the run is going and after it triggers, and the header price stays on the last session price. Other bills keep the Live label. Stop returns that bill to Live. The dashed session stays on the chart.
+- **Chart interactions:** in `WATCHING`/`READY`, the user can drag the target line to edit the target. A cost preview bubble follows the cursor, and releasing it opens a confirm popover. The range defaults to `TO_DUE`: 90 days of hourly bars through the due date plus 10% of that span, so the execute-by and due lines open on screen. That window is put back after each data update until the user pans or zooms; the chart then stays where they left it, and choosing the range again restores the due window. The deadline stays at that fraction as time passes; bars slide left one step at a time. `1D` shows the last 24 hours of 5-minute bars and scrolls back about 5 days. `5D` shows 5 trading days of 15-minute bars and scrolls back about a month. `1M` shows 30 days of hourly bars. `3M`, `6M`, `YTD`, and `1Y` show that span of daily closes, with a year loaded behind the shorter ones. The FX weekend is omitted, so scrolling does not cross an empty Saturday. A Simulate session replaces bars only on that bill. The chart header reads Simulated for that bill while the run is going and after it triggers, and the header price stays on the last session price. Other bills keep the Live label. Stop returns that bill to Live. The dashed session stays on the chart.
 - **Ticket by state:**
 
 | State | Ticket shows | Primary action |
@@ -73,7 +73,7 @@ Other pages follow the same split: the upload review's document preview stacks a
 | `U` | Upload bills |
 | `P` | Pause / resume |
 | `T` | Focus target input |
-| `1`–`5` | Chart range |
+| `1`–`5` | First five chart ranges (`1D` through `6M`) |
 | `G` | Toggle group by pair |
 | `?` | Shortcuts sheet |
 | `` ` `` | Toggle demo control bar (demo mode) |

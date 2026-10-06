@@ -112,12 +112,30 @@ describe('applyAppEvent', () => {
     expect(client.getQueryData<typeof bill[]>(qk.bills)?.[0]?.lastPrice).toBe('1.08');
   });
 
+  it('clears stale on the open bill when a tick arrives', () => {
+    const client = new QueryClient();
+    const stale = buildBill({ ...bill, flags: { stale: true } });
+    client.setQueryData(qk.bills, [stale]);
+    client.setQueryData(qk.bill(bill.id), stale);
+    applyAppEvent(client, {
+      type: 'tick',
+      pair: { base: 'EUR', quote: 'USD' },
+      ts: '2026-10-01T14:00:01.000Z',
+      price: '1.08',
+      source: 'AIRWALLEX',
+    });
+    expect(client.getQueryData<typeof bill>(qk.bill(bill.id))?.flags.stale).toBe(false);
+    expect(client.getQueryData<typeof bill>(qk.bill(bill.id))?.lastPrice).toBe('1.08');
+    expect(client.getQueryData<typeof bill[]>(qk.bills)?.[0]?.flags.stale).toBe(false);
+  });
+
   it('keeps a Simulate tick on the bill that owns it', () => {
     const client = new QueryClient();
     const other = buildBill({ ...bill, id: 'bill-2', invoiceNumber: 'INV-2', lastPrice: '1.120000' });
     client.setQueryData(qk.bills, [bill, other]);
     client.setQueryData(qk.chart(bill.id, 'TO_DUE'), {
       series: [{ time: 1_700_000_000, value: '1.120000' }],
+      step: 3600,
       overlays: { simulatedRanges: [] as { from: number; to?: number }[] },
     });
     applyAppEvent(client, {
@@ -129,15 +147,28 @@ describe('applyAppEvent', () => {
       price: '1.073612925',
       source: 'SIMULATED',
     });
+    applyAppEvent(client, {
+      type: 'tick',
+      pair: { base: 'EUR', quote: 'USD' },
+      billId: bill.id,
+      simId: 'sim-1',
+      ts: '2026-10-06T03:55:00.000Z',
+      price: '1.070000',
+      source: 'SIMULATED',
+    });
     const listed = client.getQueryData<typeof bill[]>(qk.bills);
-    expect(listed?.[0]?.lastPrice).toBe('1.073612925');
+    expect(listed?.[0]?.lastPrice).toBe('1.070000');
     expect(listed?.[1]?.lastPrice).toBe('1.120000');
+    const snapped = Math.floor(Date.parse('2026-10-06T03:42:00.000Z') / 1000 / 3600) * 3600;
     const chart = client.getQueryData<{
-      series: { value: string }[];
+      series: { time: number; value: string }[];
       overlays: { simulatedRanges: { from: number }[] };
     }>(qk.chart(bill.id, 'TO_DUE'));
-    expect(chart?.series.at(-1)?.value).toBe('1.073612925');
-    expect(chart?.overlays.simulatedRanges).toEqual([{ from: Math.floor(Date.parse('2026-10-06T03:42:00.000Z') / 1000) }]);
+    expect(chart?.series).toEqual([
+      { time: 1_700_000_000, value: '1.120000' },
+      { time: snapped, value: '1.070000' },
+    ]);
+    expect(chart?.overlays.simulatedRanges).toEqual([{ from: snapped }]);
     expect(client.getQueryData(qk.chart(other.id, 'TO_DUE'))).toBeUndefined();
   });
 

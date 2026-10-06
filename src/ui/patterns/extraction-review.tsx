@@ -44,6 +44,8 @@ export function ExtractionReview({
   fieldErrors = [],
   beneficiaryForm,
   extra,
+  saving = false,
+  continuing = false,
   onSave,
   onContinue,
 }: {
@@ -60,6 +62,8 @@ export function ExtractionReview({
   fieldErrors?: readonly FieldError[];
   beneficiaryForm?: ReactNode;
   extra?: ReactNode;
+  saving?: boolean;
+  continuing?: boolean;
   onSave?: () => void;
   onContinue?: () => void;
 }) {
@@ -104,10 +108,10 @@ export function ExtractionReview({
           <BeneficiaryCard missing={['IBAN', 'Bank name']} />
         ) : null}
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={onSave}>
+          <Button variant="secondary" loading={saving} onClick={onSave}>
             Save as draft
           </Button>
-          <Button onClick={onContinue}>Continue to strategy</Button>
+          <Button loading={continuing} onClick={onContinue}>Continue to strategy</Button>
         </div>
       </div>
     </div>

@@ -57,6 +57,21 @@ describe('market data', () => {
     expect(chart.overlays.now).toBe(Math.floor(NOW / 1000));
     expect(chart.reference).toBeUndefined();
 
+    await Bill.collection.updateOne(
+      { _id: first._id },
+      { $set: { 'last.at': new Date(NOW - 120_000), updatedAt: new Date(NOW) } },
+    );
+    const held = await listBills({}, true, '2026-10-05', {
+      nowMs: NOW + 1_000,
+      pollIntervalMs: 10_000,
+      historySource: 'none',
+    });
+    expect(held.find((bill) => bill.id === String(first._id))?.flags.stale).toBe(false);
+
+    await Bill.collection.updateOne(
+      { _id: first._id },
+      { $set: { 'last.at': new Date(NOW), updatedAt: new Date(NOW) } },
+    );
     const listed = await listBills({}, true, '2026-10-05', {
       nowMs: NOW + 60_000,
       pollIntervalMs: 10_000,

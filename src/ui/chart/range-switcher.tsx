@@ -8,6 +8,9 @@ const LABEL: Record<ChartRange, string> = {
   '5D': '5D',
   '1M': '1M',
   '3M': '3M',
+  '6M': '6M',
+  YTD: 'YTD',
+  '1Y': '1Y',
   TO_DUE: 'To due',
 };
 

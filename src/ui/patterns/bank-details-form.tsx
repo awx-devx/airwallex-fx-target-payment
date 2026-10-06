@@ -44,6 +44,7 @@ export function BankDetailsForm({
   onValuesChange,
   hideSubmit = false,
   disabled = false,
+  saving = false,
 }: {
   name: string;
   country: string;
@@ -51,6 +52,7 @@ export function BankDetailsForm({
   onValuesChange?: (input: BankDetailsInput) => void;
   hideSubmit?: boolean;
   disabled?: boolean;
+  saving?: boolean;
 }) {
   const [accountName, setAccountName] = useState(name);
   const [bankCountry, setBankCountry] = useState(country);
@@ -151,7 +153,7 @@ export function BankDetailsForm({
       />
       {error ? <p className="text-xs text-down">{error}</p> : null}
       {hideSubmit ? null : (
-        <Button size="sm" type="submit" disabled={disabled}>
+        <Button size="sm" type="submit" disabled={disabled} loading={saving}>
           Save bank details
         </Button>
       )}

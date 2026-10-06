@@ -7,18 +7,21 @@ import { useState } from 'react';
 import { Banner } from '@/ui/primitives/banner';
 import { Button } from '@/ui/primitives/button';
 import { Checkbox } from '@/ui/primitives/choice';
+import { cx } from '@/ui/primitives/cx';
 import { formatUtcDate } from '@/ui/trading/time-label';
 
 export function ArmConfirm({
   bill,
   cutoffLabel,
   consent,
+  loading = false,
   onConsentChange,
   onArm,
 }: {
   bill: BillSummary;
   cutoffLabel: string;
   consent?: boolean;
+  loading?: boolean;
   onConsentChange?: (consent: boolean) => void;
   onArm?: () => void;
 }) {
@@ -52,8 +55,10 @@ export function ArmConfirm({
         onCheckedChange={setChecked}
         label={`If the target is not hit by ${cutoffLabel}, pay at market`}
       />
-      {!checked ? <p className="text-xs text-down">Standing instruction is required.</p> : null}
-      <Button disabled={!checked} onClick={onArm}>
+      <p className={cx('text-xs text-down', checked && 'invisible')} aria-hidden={checked}>
+        Standing instruction is required.
+      </p>
+      <Button disabled={!checked} loading={loading} onClick={onArm}>
         Arm bill
       </Button>
     </div>

@@ -21,7 +21,6 @@ import {
   WATCHING,
   baseOverlays,
   createEurMarket,
-  referenceOf,
   seriesEnding,
 } from '@/ui/chart/chart.fixtures';
 import type { ChartType } from '@/ui/chart/chart-header';
@@ -116,7 +115,6 @@ function LiveScenario() {
       <Story
         pair={PAIR}
         series={series}
-        reference={referenceOf(series.slice(-400))}
         overlays={baseOverlays(series, { now: jumped ? deadline : NOW, executionDeadline: deadline })}
       />
     </div>
@@ -235,7 +233,6 @@ export const chartScenarioShowcases: Showcase[] = [
           <Story
             pair={PAIR}
             series={WATCHING}
-            reference={referenceOf(WATCHING)}
             overlays={baseOverlays(WATCHING)}
           />
         ),
@@ -255,7 +252,6 @@ export const chartScenarioShowcases: Showcase[] = [
           <Story
             pair={PAIR}
             series={APPROACHING}
-            reference={referenceOf(APPROACHING)}
             overlays={baseOverlays(APPROACHING, {
               markers: [
                 { time: APPROACHING[0]?.time ?? NOW, kind: 'ARMED' },
@@ -280,7 +276,6 @@ export const chartScenarioShowcases: Showcase[] = [
           <Story
             pair={PAIR}
             series={HIT}
-            reference={referenceOf(HIT)}
             targetPulse
             overlays={baseOverlays(HIT, {
               markers: [
@@ -307,7 +302,6 @@ export const chartScenarioShowcases: Showcase[] = [
           <Story
             pair={PAIR}
             series={BOUNCE}
-            reference={referenceOf(BOUNCE)}
             overlays={baseOverlays(BOUNCE, {
               markers: [
                 { time: BOUNCE[0]?.time ?? NOW, kind: 'ARMED' },

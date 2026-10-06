@@ -17,6 +17,7 @@ export function DemoControlBar({
   onJump,
   onAdvance,
   onSimulate,
+  pending,
   showMarket = true,
 }: {
   expanded?: boolean;
@@ -29,6 +30,7 @@ export function DemoControlBar({
   onJump?: () => void;
   onAdvance?: () => void;
   onSimulate?: () => void;
+  pending?: 'nudge' | 'jump' | 'advance' | 'simulate';
   /** Speed and nudge only move the simulated walk. Hide them on the Airwallex feed. */
   showMarket?: boolean;
 }) {
@@ -64,17 +66,17 @@ export function DemoControlBar({
             ]}
           />
           {showMarket ? (
-            <Button size="sm" variant="secondary" onClick={onNudge}>
+            <Button size="sm" variant="secondary" loading={pending === 'nudge'} onClick={onNudge}>
               Nudge price
             </Button>
           ) : null}
-          <Button size="sm" variant="secondary" onClick={onJump}>
+          <Button size="sm" variant="secondary" loading={pending === 'jump'} onClick={onJump}>
             Jump to deadline
           </Button>
-          <Button size="sm" variant="secondary" onClick={onAdvance}>
+          <Button size="sm" variant="secondary" loading={pending === 'advance'} onClick={onAdvance}>
             Advance transfer
           </Button>
-          <Button size="sm" onClick={onSimulate}>
+          <Button size="sm" loading={pending === 'simulate'} onClick={onSimulate}>
             Simulate selected bill
           </Button>
         </>

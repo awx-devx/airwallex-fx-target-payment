@@ -1,6 +1,6 @@
 'use client';
 
-import type { ChartOverlays, ChartRange, ChartSeriesPoint } from '@/contracts/chart';
+import { CHART_STEP_SEC, type ChartOverlays, type ChartRange, type ChartSeriesPoint } from '@/contracts/chart';
 import type { Pair, StrategyMode } from '@/contracts/bill';
 import { roundToPayout } from '@/contracts/currencies';
 import { D, decimalString } from '@/contracts/money';
@@ -16,12 +16,14 @@ import { candles, covers, linePoint, priceAt, type Span } from '@/ui/chart/plot'
 import {
   canonicalFromChart,
   chartPrice,
+  clampLogicalToWidth,
+  futureTimes,
+  MIN_BAR_SPACING,
+  paddingHorizon,
   sameUtcDay,
-  paddingTimes,
   seriesChange,
-  seriesStep,
-  visibleWindow,
-  whitespaceEnd,
+  snapToBar,
+  visibleLogical,
 } from '@/ui/chart/scale';
 import { readChartColors, withAlpha, type ChartColors } from '@/ui/chart/theme';
 import { formatUtcDate } from '@/ui/trading/time-label';
@@ -53,10 +55,11 @@ export interface FxChartProps {
   pair: Pair;
   inverted?: boolean;
   series: ChartSeriesPoint[];
-  reference?: ChartSeriesPoint[];
   overlays: ChartOverlays;
   strategyMode?: StrategyMode;
   range: ChartRange;
+  /** Seconds between bars. Defaults to the range's step. */
+  step?: number;
   type?: ChartType;
   height?: number | 'fill';
   state?: 'ready' | 'loading' | 'empty' | 'stale' | 'error';
@@ -83,7 +86,6 @@ interface Handle {
   chart: IChartApi;
   kind: ChartType;
   main: ISeriesApi<'Area' | 'Line' | 'Candlestick'>;
-  reference: ISeriesApi<'Line'> | null;
   simulated: ISeriesApi<'Line'> | null;
   tail: ISeriesApi<'Line'> | null;
   axis: ISeriesApi<'Line'> | null;
@@ -98,10 +100,10 @@ export function FxChart(props: FxChartProps) {
     pair,
     inverted = false,
     series,
-    reference,
     overlays,
     strategyMode,
     range,
+    step: stepProp,
     type = 'area',
     height = 320,
     state = 'ready',
@@ -120,6 +122,7 @@ export function FxChart(props: FxChartProps) {
     errorMessage = "Couldn't load this chart.",
     subject,
   } = props;
+  const step = stepProp ?? CHART_STEP_SEC[range];
   const reduced = useReducedMotion();
   const kitReduced = useKitReducedMotion();
   const frozen = useTimeFrozen();
@@ -128,6 +131,19 @@ export function FxChart(props: FxChartProps) {
   const previous = useRef<ChartSeriesPoint[]>([]);
   const windowKey = useRef('');
   const axisKey = useRef('');
+  const userMoved = useRef(false);
+  const gesturing = useRef(false);
+  const gestureStart = useRef<{ from: number; to: number } | null>(null);
+  const heldRange = useRef<{ from: number; to: number } | null>(null);
+  const trackedRange = useRef(range);
+  const applyWindow = useRef<() => void>(() => undefined);
+  if (trackedRange.current !== range) {
+    trackedRange.current = range;
+    userMoved.current = false;
+    heldRange.current = null;
+    gestureStart.current = null;
+    windowKey.current = '';
+  }
   const [tip, setTip] = useState<{ x: number; y: number; price: string; time: string } | null>(
     null,
   );
@@ -161,7 +177,14 @@ export function FxChart(props: FxChartProps) {
         horzLines: { color: colors.line1 },
       },
       rightPriceScale: { borderColor: colors.line2 },
-      timeScale: { borderColor: colors.line2, rightOffset: 8, timeVisible: true, minBarSpacing: 6 },
+      timeScale: {
+        borderColor: colors.line2,
+        rightOffset: 0,
+        timeVisible: false,
+        secondsVisible: false,
+        minBarSpacing: MIN_BAR_SPACING,
+        shiftVisibleRangeOnNewBar: false,
+      },
       crosshair: {
         vertLine: { color: colors.line3, labelBackgroundColor: colors.bg0 },
         horzLine: { color: colors.line3, labelBackgroundColor: colors.bg0 },
@@ -177,7 +200,6 @@ export function FxChart(props: FxChartProps) {
       chart,
       kind: 'area',
       main,
-      reference: null,
       simulated: null,
       tail: null,
       axis: null,
@@ -207,7 +229,43 @@ export function FxChart(props: FxChartProps) {
       });
     };
     chart.subscribeCrosshairMove(onMove);
+    const keepGesture = () => {
+      if (!gesturing.current) return;
+      gesturing.current = false;
+      const current = chart.timeScale().getVisibleLogicalRange();
+      const start = gestureStart.current;
+      gestureStart.current = null;
+      if (!current || !start) return;
+      if (Math.abs(current.to - start.to) > 0.5 || Math.abs(current.from - start.from) > 0.5) {
+        userMoved.current = true;
+        heldRange.current = { from: current.from, to: current.to };
+      }
+    };
+    const onPointerDown = () => {
+      gesturing.current = true;
+      const current = chart.timeScale().getVisibleLogicalRange();
+      gestureStart.current = current ? { from: current.from, to: current.to } : null;
+    };
+    const onWheel = () => {
+      window.requestAnimationFrame(() => {
+        const current = chart.timeScale().getVisibleLogicalRange();
+        if (!current) return;
+        userMoved.current = true;
+        heldRange.current = { from: current.from, to: current.to };
+      });
+    };
+    node.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', keepGesture);
+    window.addEventListener('pointercancel', keepGesture);
+    node.addEventListener('wheel', onWheel, { passive: true });
+    const observer = new ResizeObserver(() => applyWindow.current());
+    observer.observe(node);
     return () => {
+      node.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', keepGesture);
+      window.removeEventListener('pointercancel', keepGesture);
+      node.removeEventListener('wheel', onWheel);
+      observer.disconnect();
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
       handle.current = null;
@@ -226,7 +284,6 @@ export function FxChart(props: FxChartProps) {
     const digits = priceFractionDigits(inverted ? pair.base : pair.quote);
     if (api.kind !== type) {
       api.chart.removeSeries(api.main);
-      if (api.reference) api.chart.removeSeries(api.reference);
       if (api.simulated) api.chart.removeSeries(api.simulated);
       if (api.tail) api.chart.removeSeries(api.tail);
       // The price scale takes its grid step from the oldest series. Drop the
@@ -242,7 +299,6 @@ export function FxChart(props: FxChartProps) {
       api.main = main;
       api.overlay = overlay;
       api.markers = createSeriesMarkers(main, []);
-      api.reference = null;
       api.simulated = null;
       api.tail = null;
       api.entry = null;
@@ -253,23 +309,23 @@ export function FxChart(props: FxChartProps) {
     const change = seriesChange(previous.current, series);
     const spans = overlays.simulatedRanges ?? [];
     const executedAt = overlays.markers.find((marker) => marker.kind === 'EXECUTED')?.time;
+    api.chart.timeScale().applyOptions({
+      timeVisible: step < 86_400,
+      secondsVisible: false,
+      rightOffset: 0,
+      minBarSpacing: MIN_BAR_SPACING,
+      shiftVisibleRangeOnNewBar: false,
+    });
     const first = series[0]?.time ?? overlays.now;
     const lastTime = series[series.length - 1]?.time ?? first;
-    const end = Math.max(whitespaceEnd(first, overlays.dueDate), lastTime + 1);
-    const pad = paddingTimes(lastTime, end, seriesStep(series), [
-      overlays.executionDeadline,
-      overlays.dueDate,
-      overlays.now,
-      overlays.quote?.from ?? 0,
-      overlays.quote?.to ?? 0,
-      ...(overlays.simulatedRanges ?? []).flatMap((span) =>
-        span.to === undefined ? [span.from] : [span.from, span.to],
-      ),
-    ]);
-    const nextAxis = pad.join(',');
+    const horizon = paddingHorizon(range, overlays.now, overlays.dueDate, first);
+    const future = futureTimes(lastTime, horizon, step);
+    const grid = series.map((point) => point.time).concat(future);
+    api.overlay.setGrid(grid, step);
+    const nextAxis = future.join(',');
     if (axisKey.current !== nextAxis) {
       axisKey.current = nextAxis;
-      syncAxis(api, pad, digits);
+      syncAxis(api, future, digits);
     }
     if (change === 'update' && type !== 'candles') {
       const last = series[series.length - 1];
@@ -282,7 +338,6 @@ export function FxChart(props: FxChartProps) {
       replaceSeries(api, series, inverted, type, spans, executedAt, colors);
     }
     previous.current = series;
-    syncReference(api, reference, inverted, colors);
     syncLines(api, {
       colors,
       inverted,
@@ -304,25 +359,58 @@ export function FxChart(props: FxChartProps) {
       }),
       pulse: api.overlay.model.pulse,
     });
-    const view = visibleWindow(range, overlays.now, first, overlays.dueDate);
-    const nextWindow = `${view.from}:${view.to}`;
-    if (windowKey.current !== nextWindow) {
-      windowKey.current = nextWindow;
+    const view = visibleLogical(range, grid, Math.max(overlays.now, lastTime), overlays.dueDate);
+    const nextWindow = `${range}:${view.from}:${view.to}`;
+    const showWindow = () => {
+      if (handle.current !== api) return;
+      const width = api.chart.timeScale().width();
+      if (width <= 0) return;
+      const fitted = range === 'TO_DUE' ? clampLogicalToWidth(view, width) : view;
       try {
-        api.chart.timeScale().setVisibleRange({
-          from: view.from as UTCTimestamp,
-          to: view.to as UTCTimestamp,
-        });
+        api.chart.timeScale().setVisibleLogicalRange(fitted);
       } catch {
         api.chart.timeScale().fitContent();
       }
+    };
+    applyWindow.current = () => {
+      if (gesturing.current || handle.current !== api) return;
+      if (userMoved.current && heldRange.current) {
+        try {
+          api.chart.timeScale().setVisibleLogicalRange(heldRange.current);
+        } catch {
+          api.chart.timeScale().fitContent();
+        }
+        return;
+      }
+      if (range === 'TO_DUE') showWindow();
+    };
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const followUp = (apply: () => void) => {
+      firstFrame = window.requestAnimationFrame(() => {
+        apply();
+        secondFrame = window.requestAnimationFrame(apply);
+      });
+    };
+    if (userMoved.current && heldRange.current) {
+      followUp(() => applyWindow.current());
+    } else if (range === 'TO_DUE') {
+      followUp(() => applyWindow.current());
+    } else if (windowKey.current !== nextWindow) {
+      windowKey.current = nextWindow;
+      followUp(() => {
+        if (handle.current !== api) return;
+        showWindow();
+      });
     }
     const plotted: PlotMarker[] = overlays.markers.flatMap((marker) => {
-      const value = priceAt(series, marker.time);
+      const time = snapToBar(marker.time, series.map((point) => point.time));
+      if (time === undefined) return [];
+      const value = priceAt(series, time);
       if (!value) return [];
       return [
         {
-          time: marker.time,
+          time,
           kind: marker.kind,
           price: chartPrice(value, inverted),
           text: marker.label ?? '',
@@ -363,7 +451,11 @@ export function FxChart(props: FxChartProps) {
           direction === 'favorable' ? colors.up : direction === 'adverse' ? colors.down : colors.fg2,
       });
     }
-    return () => window.cancelAnimationFrame(markerFrame);
+    return () => {
+      window.cancelAnimationFrame(markerFrame);
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
   }, [
     entryLabel,
     interactive,
@@ -374,7 +466,7 @@ export function FxChart(props: FxChartProps) {
     pair,
     range,
     series,
-    reference,
+    step,
     state,
     strategyMode,
     target,
@@ -639,28 +731,6 @@ function replaceSeries(
     {
       color: withAlpha(colors.fg1, 0.4),
       lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    },
-  );
-}
-
-function syncReference(
-  api: Handle,
-  reference: readonly ChartSeriesPoint[] | undefined,
-  inverted: boolean,
-  colors: ChartColors,
-): void {
-  api.reference = lineSeries(
-    api,
-    'reference',
-    api.reference,
-    (reference ?? []).map((point) => linePoint(point, inverted)),
-    {
-      color: withAlpha(colors.info, 0.4),
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      title: 'Reference (ECB)',
       priceLineVisible: false,
       lastValueVisible: false,
     },

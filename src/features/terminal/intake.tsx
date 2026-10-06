@@ -64,6 +64,7 @@ export function BillIntake({
   const [target, setTarget] = useState('');
   const [maxCost, setMaxCost] = useState('');
   const [problem, setProblem] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
   const [priced, setPriced] = useState('');
   const [chartNow] = useState(() => Math.floor(Date.now() / 1000));
   const id = ids[index];
@@ -115,6 +116,7 @@ export function BillIntake({
         return;
       }
     }
+    setBusy(true);
     try {
       const patch: PatchBillBody = {};
       if (vendor.trim() && vendor !== bill.vendorName) patch.vendorName = vendor.trim();
@@ -145,16 +147,21 @@ export function BillIntake({
     } catch (error) {
       setProblem(messageOf(error));
       onError(error);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function changeMethod(method: 'LOCAL' | 'SWIFT') {
-    if (!bill || method === bill.transferMethod) return;
+    if (!bill || method === bill.transferMethod || busy) return;
+    setBusy(true);
     try {
       await actions.patch(bill.id, { transferMethod: method });
     } catch (error) {
       setProblem(messageOf(error));
       onError(error);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -164,6 +171,7 @@ export function BillIntake({
       setProblem('Set a target before arming');
       return;
     }
+    setBusy(true);
     try {
       await actions.putStrategy(
         bill.id,
@@ -190,6 +198,8 @@ export function BillIntake({
     } catch (error) {
       setProblem(messageOf(error));
       onError(error);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -269,6 +279,7 @@ export function BillIntake({
                 <p className="text-fg-2">Choose a foreign currency before adding the bank account.</p>
               )
             }
+            continuing={busy}
             onSave={() => onOpenChange(false)}
             onContinue={() => void saveReview()}
           />
@@ -307,6 +318,7 @@ export function BillIntake({
             onMaxCostChange={setMaxCost}
             homeCurrency={bill.pair.quote}
             series={historyPending ? [] : (chart.data?.series ?? [])}
+            step={chart.data?.step}
             state={historyPending ? 'loading' : 'ready'}
             overlays={{
               ...(bill.lastPrice ? { entry: bill.lastPrice } : {}),
@@ -331,6 +343,7 @@ export function BillIntake({
           {mode === 'edit-target' ? (
             <Button
               disabled={modeChoice === 'MAX_COST' ? maxCost.trim().length === 0 : target.trim().length === 0}
+              loading={busy}
               onClick={() => void saveTarget()}
             >
               Save target
@@ -339,6 +352,7 @@ export function BillIntake({
             <ArmConfirm
               bill={{ ...bill, targetPrice: target || bill.targetPrice }}
               cutoffLabel={cutoffLabel}
+              loading={busy}
               onArm={() => void saveTarget()}
             />
           )}

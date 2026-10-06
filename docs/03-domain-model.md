@@ -270,12 +270,19 @@ type BillAction =
 // ExecutionSummary, QuoteSummary, BalanceSummary, CurrencyInfo, BeneficiarySummary,
 // BeneficiaryFormSchema, FieldError and ApiError are field-mapped from Airwallex in 13 §8.
 
-interface ChartSeriesPoint { time: number; value: string }       // unix seconds
+interface ChartSeriesPoint { time: number; value: string }       // unix seconds, on the range step
 interface ChartOverlays {
   entry?: string; target?: string; quote?: { price: string; from: number; to: number };
   executionDeadline: number; dueDate: number; now: number;
   markers: Array<{ time: number; kind: 'ARMED'|'NEAR_MISS'|'TARGET_HIT'|'EXECUTED'|'AUTOSETTLE'|'SIM_START'|'SIM_END'; label?: string }>;
   simulatedRanges?: Array<{ from: number; to?: number }>;   // demo: segments drawn in the simulated style
+}
+interface ChartResponse {
+  series: ChartSeriesPoint[];
+  overlays: ChartOverlays;
+  reference?: ChartSeriesPoint[];          // unscaled ECB daily mids; kept for the history fallback, not drawn
+  step: number;                            // seconds between bars
+  historyPending?: boolean;
 }
 ```
 
@@ -298,7 +305,7 @@ interface ChartOverlays {
 | `POST` | `/api/bills/:id/pause` / `resume` / `rearm` | Pause, resume, or return a failed bill to ready |
 | `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
-| `GET` | `/api/bills/:id/chart?range=1D` | Merged series (ECB daily history plus shared ticks) + `ChartOverlays` + the reference series. The bill's live Airwallex mark is appended when that timestamp is not already a tick. `historyPending` is set when Frankfurter and the ECB data API both fail; the series is then empty and the chart waits. Simulate ticks (`simId`) are appended only for the bill that owns them, with `simulatedRanges`. When `flags.simulated` is set, the chart header reads Simulated and the header price stays on the last point inside those ranges. `TO_DUE` looks back 90 days. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
+| `GET` | `/api/bills/:id/chart?range=1D` | Series on a uniform trading grid (`step` seconds) + `ChartOverlays`. The response may include an unscaled ECB `reference` series; the chart does not draw it. `1D` is 5-minute bars (5 days loaded, 24 hours shown), `5D` is 15-minute bars (1 month loaded, 5 trading days shown), `1M` and `TO_DUE` are hourly (`1M` loads 6 months and shows 30 days; `TO_DUE` loads 90 days and shows through the due date plus 10%). `3M`, `6M`, `YTD`, and `1Y` are daily ECB bars with one shared year loaded. Intraday bars come from Yahoo and are scaled so the last bar equals the bill's Airwallex rate. If Yahoo fails, daily ECB is carried onto the same grid. The FX weekend is not a bar, so a new tick replaces the current bar instead of pushing the deadline right. Older loaded bars stay to the left for scrolling. `historyPending` is set when intraday and both daily hosts fail; the series is then empty and the chart waits. Simulate ticks (`simId`) replace bars only for the bill that owns them, with `simulatedRanges`. When `flags.simulated` is set, the chart header reads Simulated and the header price stays on the last point inside those ranges. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
 | `GET` | `/api/bills/:id/events` | Activity log |
 | `GET` | `/api/balances` | Proxy of Airwallex balances (cached 30 s) |
 | `POST` | `/api/bills/:id/validate-transfer` | `transfers/validate` dry run (also run by `arm`); returns `FieldError[]` |

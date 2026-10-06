@@ -1,13 +1,22 @@
-import { chartResponseSchema, type ChartRange, type ChartResponse, type ChartSeriesPoint } from '@/contracts/chart';
+import {
+  CHART_INTRADAY,
+  CHART_STEP_SEC,
+  chartResponseSchema,
+  type ChartRange,
+  type ChartResponse,
+  type ChartSeriesPoint,
+} from '@/contracts/chart';
 import type { ChartMarkerKind } from '@/contracts/chart';
 import { decimalString } from '@/contracts/money';
 import { instant, type Clock } from '@/server/adapters/clock';
+import { loadYahooBars } from '@/server/adapters/history/yahoo';
 import { fromDecimal128 } from '@/server/db/decimal';
 import { Bill, BillEvent, Quote, RateTick } from '@/server/db/models';
 import type { Env } from '@/server/env';
 import { notFound } from '@/server/services/errors';
-import { appendSpot, mergeHistory, sessionSpans } from '@/server/services/chartHistory';
+import { composeSeries, sessionSpans } from '@/server/services/chartHistory';
 import { referenceSeries } from '@/server/services/history';
+import { getLogger } from '@/server/logging/logger';
 import { sharedPairTicks } from '@/server/services/pairPrice';
 import mongoose from 'mongoose';
 
@@ -32,18 +41,20 @@ export async function billChart(input: {
   const bill = await Bill.findById(input.billId).lean();
   if (!bill) throw notFound();
   const now = input.clock.now();
-  const span = rangeWindow(input.range, bill.dueDate, now);
+  const step = CHART_STEP_SEC[input.range];
+  const span = loadWindow(input.range, now);
   const pair = { base: bill.billCurrency, quote: bill.homeCurrency };
-  const [ticks, session] = await Promise.all([
-    seriesFor(pair.base, pair.quote, span.from, span.to, span.unit),
+  const [ticks, session, history, intraday] = await Promise.all([
+    seriesFor(pair.base, pair.quote, span.from, span.to, bucketUnit(step)),
     sessionSeries(bill._id, span.from, span.to),
+    referenceSeries(
+      input.env,
+      pair,
+      span.from.toISOString().slice(0, 10),
+      span.to.toISOString().slice(0, 10),
+    ),
+    readIntraday(input.env, input.range, pair),
   ]);
-  const history = await referenceSeries(
-    input.env,
-    pair,
-    span.from.toISOString().slice(0, 10),
-    span.to.toISOString().slice(0, 10),
-  );
   const reference = history.points;
   const events = await BillEvent.find({ billId: bill._id }).sort({ ts: 1 }).lean();
   const quote = await Quote.findOne({ billId: bill._id, validToAt: { $gt: now } }).sort({ validToAt: -1 }).lean();
@@ -78,40 +89,78 @@ export async function billChart(input: {
     }),
     ...(spans.length > 0 ? { simulatedRanges: spans } : {}),
   };
-  if (history.pending) {
-    return chartResponseSchema.parse({
-      series: [],
-      overlays,
-      historyPending: true,
-    });
-  }
-  const merged = mergeHistory(mergeHistory(reference, ticks), session);
   const spot = bill.last
     ? { time: seconds(bill.last.at), value: decimalString(fromDecimal128(bill.last.price)) }
     : undefined;
+  if (history.pending && !intraday) {
+    return chartResponseSchema.parse({
+      series: [],
+      overlays,
+      step,
+      historyPending: true,
+    });
+  }
+  const series = composeSeries({
+    history: history.pending ? [] : reference,
+    intraday,
+    ticks,
+    session,
+    spot,
+    from: seconds(span.from),
+    to: seconds(now),
+    step,
+  });
   return chartResponseSchema.parse({
-    series: reference.length > 0 ? appendSpot(merged, spot) : merged,
+    series,
     overlays,
-    ...(reference.length > 0 ? { reference } : {}),
+    step,
+    ...(!history.pending && reference.length > 0 ? { reference } : {}),
   });
 }
 
-function rangeWindow(
-  range: ChartRange,
-  due: Date,
-  now: Date,
-): { from: Date; to: Date; unit: 'minute' | 'hour' | 'day' } {
+/** How far back a range loads. Daily ranges share one year so shorter views can scroll. */
+function loadWindow(range: ChartRange, now: Date): { from: Date; to: Date } {
   const day = 86_400_000;
-  if (range === 'TO_DUE') {
-    const from = instant(now.getTime() - 90 * day);
-    const end = due.getTime() < now.getTime() ? due : now;
-    return { from, to: end.getTime() < from.getTime() ? now : end, unit: 'day' };
+  if (range === 'TO_DUE') return { from: instant(now.getTime() - 90 * day), to: now };
+  if (range === '1D') return { from: instant(now.getTime() - 5 * day), to: now };
+  if (range === '5D') return { from: instant(now.getTime() - 30 * day), to: now };
+  if (range === '1M') return { from: instant(now.getTime() - 183 * day), to: now };
+  return { from: instant(now.getTime() - 365 * day), to: now };
+}
+
+function bucketUnit(step: number): 'minute' | 'hour' | 'day' {
+  if (step >= 86_400) return 'day';
+  if (step >= 3_600) return 'hour';
+  return 'minute';
+}
+
+/** Yahoo intraday bars, or nothing when the source is off, the pair is unknown, or the host fails. */
+async function readIntraday(
+  env: Env,
+  range: ChartRange,
+  pair: { base: string; quote: string },
+): Promise<ChartSeriesPoint[] | undefined> {
+  const spec = CHART_INTRADAY[range];
+  if (!spec || env.INTRADAY_SOURCE !== 'yahoo' || env.HISTORY_SOURCE !== 'frankfurter') return undefined;
+  try {
+    const bars = await loadYahooBars({
+      redisUrl: env.REDIS_URL,
+      base: pair.base,
+      quote: pair.quote,
+      interval: spec.interval,
+      range: spec.range,
+      step: CHART_STEP_SEC[range],
+    });
+    if (bars === 'unknown' || bars.length === 0) return undefined;
+    getLogger().info(
+      { base: pair.base, quote: pair.quote, interval: spec.interval, points: bars.length },
+      'intraday history',
+    );
+    return bars.map((bar) => ({ time: bar.time, value: bar.close }));
+  } catch (error) {
+    getLogger().warn({ err: error, base: pair.base, quote: pair.quote }, 'yahoo history failed');
+    return undefined;
   }
-  if (range === '1D') return { from: instant(now.getTime() - day), to: now, unit: 'minute' };
-  if (range === '5D') return { from: instant(now.getTime() - 5 * day), to: now, unit: 'minute' };
-  if (range === '1M') return { from: instant(now.getTime() - 30 * day), to: now, unit: 'hour' };
-  if (range === '3M') return { from: instant(now.getTime() - 90 * day), to: now, unit: 'day' };
-  return { from: instant(now.getTime() - day), to: now, unit: 'minute' };
 }
 
 async function seriesFor(

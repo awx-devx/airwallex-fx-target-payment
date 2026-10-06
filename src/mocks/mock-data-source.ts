@@ -15,12 +15,14 @@ import type {
   TransferStatus,
 } from '@/contracts/airwallex';
 import type { BillAction, BillState, BillSummary } from '@/contracts/bill';
-import type {
-  ChartMarkerKind,
-  ChartRange,
-  ChartResponse,
-  ChartSeriesPoint,
+import {
+  CHART_STEP_SEC,
+  type ChartMarkerKind,
+  type ChartRange,
+  type ChartResponse,
+  type ChartSeriesPoint,
 } from '@/contracts/chart';
+import { tradingTimes } from '@/contracts/chartGrid';
 import { requireCurrency } from '@/contracts/currencies';
 import {
   DataSourceError,
@@ -199,6 +201,7 @@ export class MockDataSource implements DataSource {
     const now = Math.floor(this.clock.now().getTime() / 1000);
     return {
       series: this.series(bill, now, query.range),
+      step: CHART_STEP_SEC[query.range],
       overlays: {
         ...(bill.entryPrice ? { entry: bill.entryPrice } : {}),
         ...(bill.targetPrice ? { target: bill.targetPrice } : {}),
@@ -865,32 +868,19 @@ export class MockDataSource implements DataSource {
     nowSec: number,
     range: ChartRange,
   ): ChartSeriesPoint[] {
-    const dueSec = Math.floor(
-      Date.parse(`${bill.dueDate}T00:00:00.000Z`) / 1000,
-    );
-    const span =
-      range === '1D'
-        ? 86_400
-        : range === '5D'
-          ? 5 * 86_400
-          : range === '1M'
-            ? 30 * 86_400
-            : range === '3M'
-              ? 90 * 86_400
-              : Math.max(dueSec - nowSec + 86_400, 86_400);
+    const step = CHART_STEP_SEC[range];
+    const from = nowSec - mockLookback(range);
+    const times = tradingTimes(from, nowSec, step);
+    if (times.length === 0) return [];
+    const seeded = seededSeries(bill, times);
     const history = this.market.history(bill.pair.base, bill.pair.quote);
-    const byTime = new Map<number, string>();
-    for (const point of seededSeries(bill, nowSec, span)) {
-      byTime.set(point.time, point.value);
-    }
+    const byTime = new Map(seeded.map((point) => [point.time, point.value]));
     for (const tick of history) {
-      const time = Math.floor(tick.time / 1000);
-      if (time < nowSec - span) continue;
+      const time = Math.floor(Math.floor(tick.time / 1000) / step) * step;
+      if (!byTime.has(time)) continue;
       byTime.set(time, tick.price);
     }
-    return [...byTime.entries()]
-      .sort((left, right) => left[0] - right[0])
-      .map(([time, value]) => ({ time, value }));
+    return times.map((time) => ({ time, value: byTime.get(time) ?? seeded[0]?.value ?? '1' }));
   }
 
   private summary(bill: BillDetail): BillSummary {
@@ -966,29 +956,30 @@ function nextTransferStatus(
   return undefined;
 }
 
-function seededSeries(
-  bill: BillDetail,
-  nowSec: number,
-  spanSec: number,
-): ChartSeriesPoint[] {
-  const span = Math.min(Math.max(spanSec, 3_600), 90 * 86_400);
-  const count = 96;
-  const step = Math.max(60, Math.floor(span / count));
+function mockLookback(range: ChartRange): number {
+  const day = 86_400;
+  if (range === '1D') return 5 * day;
+  if (range === '5D') return 30 * day;
+  if (range === '1M') return 183 * day;
+  if (range === 'TO_DUE') return 90 * day;
+  return 365 * day;
+}
+
+function seededSeries(bill: BillDetail, times: readonly number[]): ChartSeriesPoint[] {
   const rng = createRng(hash(bill.id));
   const last = D(bill.lastPrice ?? '1');
-  const walked = [last];
+  const walked: Decimal[] = [];
   let cursor = last;
-  for (let i = 0; i < count; i += 1) {
+  for (let index = times.length - 1; index >= 0; index -= 1) {
+    walked.push(cursor);
     const wobble = new Decimal(rng.int(-8, 8)).div(10000);
     cursor = cursor.mul(D('1').plus(wobble));
     if (cursor.lessThanOrEqualTo(0)) cursor = last;
-    walked.push(cursor);
   }
   walked.reverse();
-  const start = nowSec - count * step;
-  return walked.map((value, index) => ({
-    time: start + index * step,
-    value: significantPrice(index === count ? last : value),
+  return times.map((time, index) => ({
+    time,
+    value: significantPrice(index === times.length - 1 ? last : (walked[index] ?? last)),
   }));
 }
 

@@ -5,10 +5,11 @@ import type {
   IPrimitivePaneView,
   ISeriesApi,
   ISeriesPrimitive,
+  Logical,
   SeriesAttachedParameter,
   Time,
-  UTCTimestamp,
 } from 'lightweight-charts';
+import { gridOffset } from '@/ui/chart/scale';
 import type { ChartColors } from '@/ui/chart/theme';
 import { withAlpha } from '@/ui/chart/theme';
 
@@ -43,12 +44,22 @@ export class OverlayPrimitive implements ISeriesPrimitive {
   private readonly paneView: IPrimitivePaneView;
   private readonly renderer: OverlayRenderer;
 
+  private times: readonly number[] = [];
+  private step = 0;
+
   constructor(public model: OverlayModel) {
     this.renderer = new OverlayRenderer(this);
     this.paneView = {
       zOrder: () => 'bottom',
       renderer: () => this.renderer,
     };
+  }
+
+  /** Grid the deadline, due, and now lines interpolate across. A weekend gap uses the next bar. */
+  setGrid(times: readonly number[], step: number): void {
+    this.times = times;
+    this.step = step;
+    this.requestUpdate();
   }
 
   attached(param: SeriesAttachedParameter<Time>): void {
@@ -85,7 +96,11 @@ export class OverlayPrimitive implements ISeriesPrimitive {
   }
 
   x(time: number): number | null {
-    const coordinate = this.chart?.timeScale().timeToCoordinate(time as UTCTimestamp);
+    const scale = this.chart?.timeScale();
+    if (!scale) return null;
+    const logical = gridOffset(time, this.times, this.step);
+    if (logical === undefined) return null;
+    const coordinate = scale.logicalToCoordinate(logical as Logical);
     return coordinate === null || coordinate === undefined ? null : coordinate;
   }
 
@@ -107,7 +122,7 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
       this.hatchSpans(ctx, model, height);
       this.deadlineHatch(ctx, model, width, height);
       this.dueShade(ctx, model, width, height);
-      this.verticals(ctx, model, height);
+      this.verticals(ctx, model, width, height);
       this.targetGlow(ctx, model, width);
     });
   }
@@ -174,6 +189,7 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
   private verticals(
     ctx: CanvasRenderingContext2D,
     model: OverlayModel,
+    width: number,
     height: number,
   ): void {
     const deadline = this.primitive.x(model.deadline);
@@ -194,7 +210,6 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
           1,
         );
       }
-      label(ctx, model.deadlineLabel, deadline, model.colors.warn);
     }
     const due = this.primitive.x(model.due);
     if (due !== null) {
@@ -209,7 +224,26 @@ class OverlayRenderer implements IPrimitivePaneRenderer {
       ctx.stroke();
       ctx.restore();
       strokeVertical(ctx, due, height, withAlpha(model.colors.down, 0.7), true, model.dueToday ? 2 : 1);
-      label(ctx, model.dueLabel, due, model.colors.down);
+    }
+    ctx.save();
+    ctx.font = '11px sans-serif';
+    const deadlineWidth = model.deadlineLabel ? ctx.measureText(model.deadlineLabel).width : 0;
+    const dueWidth = model.dueLabel ? ctx.measureText(model.dueLabel).width : 0;
+    const rows = dateLabelRows(
+      deadline ?? 0,
+      due ?? 0,
+      deadlineWidth,
+      dueWidth,
+      deadline !== null && due !== null,
+    );
+    ctx.restore();
+    if (deadline !== null && model.deadlineLabel) {
+      const place = labelAnchor(deadline, deadlineWidth, width, rows.deadlineY);
+      label(ctx, model.deadlineLabel, place.x, place.y, model.colors.warn);
+    }
+    if (due !== null && model.dueLabel) {
+      const place = labelAnchor(due, dueWidth, width, rows.dueY);
+      label(ctx, model.dueLabel, place.x, place.y, model.colors.down);
     }
     const now = this.primitive.x(model.now);
     if (now !== null) {
@@ -259,11 +293,41 @@ function strokeVertical(
   ctx.restore();
 }
 
-function label(ctx: CanvasRenderingContext2D, text: string, x: number, color: string): void {
+const LABEL_TOP = 14;
+const LABEL_ROW = 14;
+
+/** Rows for the execute-by and due captions. Close dates use two rows so the words do not cover each other. */
+export function dateLabelRows(
+  deadlineX: number,
+  dueX: number,
+  deadlineWidth: number,
+  dueWidth: number,
+  both: boolean,
+): { deadlineY: number; dueY: number } {
+  const close = both && Math.abs(dueX - deadlineX) < Math.max(deadlineWidth, dueWidth) + 8;
+  return { deadlineY: LABEL_TOP, dueY: close ? LABEL_TOP + LABEL_ROW : LABEL_TOP };
+}
+
+/** Place a caption to the right of its line, or to the left when the right side would leave the pane. */
+export function labelAnchor(
+  lineX: number,
+  textWidth: number,
+  paneWidth: number,
+  y: number,
+): { x: number; y: number } {
+  const gap = 6;
+  const edge = 4;
+  let x = lineX + gap;
+  if (x + textWidth > paneWidth - edge) x = lineX - textWidth - gap;
+  if (x < edge) x = edge;
+  return { x, y };
+}
+
+function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string): void {
   ctx.save();
   ctx.fillStyle = color;
   ctx.font = '11px sans-serif';
-  ctx.fillText(text, x + 6, 14);
+  ctx.fillText(text, x, y);
   ctx.restore();
 }
 

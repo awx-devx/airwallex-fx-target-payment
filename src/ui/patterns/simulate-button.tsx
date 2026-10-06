@@ -30,6 +30,7 @@ export function SimulateButton({
   onDurationChange,
   eta,
   error,
+  pending,
   onStart,
   onStop,
 }: {
@@ -38,6 +39,7 @@ export function SimulateButton({
   onDurationChange?: (seconds: number) => void;
   eta?: string;
   error?: string;
+  pending?: 'start' | 'stop';
   onStart?: () => void;
   onStop?: () => void;
 }) {
@@ -58,7 +60,7 @@ export function SimulateButton({
             onValueChange={(value) => onDurationChange?.(value)}
           />
           <p className="num text-xs text-fg-2">{duration}s</p>
-          <Button size="sm" onClick={onStart}>
+          <Button size="sm" loading={pending === 'start'} onClick={onStart}>
             Start
           </Button>
         </div>
@@ -87,7 +89,7 @@ export function SimulateButton({
       {phase === 'aborted' ? <p className="text-xs text-fg-3">Stopped.</p> : null}
       {phase === 'paid' ? <p className="text-xs text-up">Paid</p> : null}
       {running ? (
-        <Button size="sm" variant="secondary" onClick={onStop}>
+        <Button size="sm" variant="secondary" loading={pending === 'stop'} onClick={onStop}>
           Stop
         </Button>
       ) : null}

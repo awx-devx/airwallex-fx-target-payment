@@ -20,12 +20,16 @@ export function UploadBody({
   onFiles,
   onSamples,
   onReview,
+  sampling,
+  reviewing = false,
 }: {
   phase: UploadPhase;
   files?: readonly DropFile[];
   onFiles?: (files: File[]) => void;
   onSamples?: (count: number) => void;
   onReview?: () => void;
+  sampling?: number;
+  reviewing?: boolean;
 }) {
   const reviewable = files.filter((file) => !file.error).length;
   const ready = phase === 'extracting' && reviewable > 0 && files.every((file) => !file.error && (file.progress ?? 0) >= 100);
@@ -43,14 +47,20 @@ export function UploadBody({
       {/* DEMO-ONLY: sample invoices are generated. PROD: only uploaded documents are extracted. */}
       <div className="flex flex-wrap gap-2">
         {[1, 3, 5].map((count) => (
-          <Button key={count} size="sm" variant="secondary" onClick={() => onSamples?.(count)}>
+          <Button
+            key={count}
+            size="sm"
+            variant="secondary"
+            loading={sampling === count}
+            onClick={() => onSamples?.(count)}
+          >
             Add {count} sample {count === 1 ? 'invoice' : 'invoices'}
           </Button>
         ))}
       </div>
       {phase === 'samples' ? <p className="text-xs text-orange-300">Generating sample invoices.</p> : null}
       {ready || (phase === 'partial' && reviewable > 0) ? (
-        <Button onClick={onReview}>Review {reviewable} bills</Button>
+        <Button loading={reviewing} onClick={onReview}>Review {reviewable} bills</Button>
       ) : null}
     </div>
   );
@@ -78,6 +88,8 @@ export function UploadModal({
   onFiles,
   onSamples,
   onReview,
+  sampling,
+  reviewing = false,
   trigger = <Button>Upload bills</Button>,
 }: {
   open: boolean;
@@ -87,6 +99,8 @@ export function UploadModal({
   onFiles?: (files: File[]) => void;
   onSamples?: (count: number) => void;
   onReview?: () => void;
+  sampling?: number;
+  reviewing?: boolean;
   trigger?: ReactNode | null;
 }) {
   return (
@@ -97,7 +111,15 @@ export function UploadModal({
       description="PDF, image, or XML"
       trigger={trigger ?? undefined}
     >
-      <UploadBody phase={phase} files={files} onFiles={onFiles} onSamples={onSamples} onReview={onReview} />
+      <UploadBody
+        phase={phase}
+        files={files}
+        onFiles={onFiles}
+        onSamples={onSamples}
+        onReview={onReview}
+        sampling={sampling}
+        reviewing={reviewing}
+      />
     </Dialog>
   );
 }

@@ -32,13 +32,6 @@ export function seriesEnding(
   return points;
 }
 
-export function referenceOf(series: readonly ChartSeriesPoint[]): ChartSeriesPoint[] {
-  return series.map((point) => ({
-    time: point.time,
-    value: significantPrice(D(point.value).plus('0.0014')),
-  }));
-}
-
 export function baseOverlays(
   series: readonly ChartSeriesPoint[],
   patch: Partial<ChartOverlays> = {},

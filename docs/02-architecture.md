@@ -163,6 +163,7 @@ Adapters are selected by environment:
 | `RATE_SOURCE` | `airwallex` \| `simulated` | `airwallex` in the demo. Unset falls back to `simulated` |
 | `PAYMENTS_GATEWAY` | `airwallex` \| `mock` | `airwallex` (sandbox) |
 | `HISTORY_SOURCE` | `frankfurter` \| `none` \| `simulated` | `frankfurter` |
+| `INTRADAY_SOURCE` | `yahoo` \| `none` | `yahoo`. Ignored when `HISTORY_SOURCE` is `none` or `simulated` |
 | `BILL_EXTRACTOR` | `anthropic` \| `ollama` \| `mock` | `anthropic` |
 | `CLOCK` | `system` \| `warp` | `system` |
 | `DEADLINE_SAFETY_NET` | `none` \| `airwallex` | `none` |
