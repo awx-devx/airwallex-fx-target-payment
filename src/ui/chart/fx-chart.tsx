@@ -131,6 +131,7 @@ export function FxChart(props: FxChartProps) {
   const previous = useRef<ChartSeriesPoint[]>([]);
   const windowKey = useRef('');
   const axisKey = useRef('');
+  const timeShown = useRef<boolean | null>(null);
   const userMoved = useRef(false);
   const gesturing = useRef(false);
   const gestureStart = useRef<{ from: number; to: number } | null>(null);
@@ -160,6 +161,7 @@ export function FxChart(props: FxChartProps) {
     interactive,
     onTargetDrag,
   });
+  latest.current = { series, overlays, pair, inverted, target, interactive, onTargetDrag };
   useEffect(() => {
     const node = host.current;
     if (!node || state === 'loading' || state === 'empty') return;
@@ -272,6 +274,7 @@ export function FxChart(props: FxChartProps) {
       previous.current = [];
       windowKey.current = '';
       axisKey.current = '';
+      timeShown.current = null;
     };
   }, [state]);
 
@@ -279,7 +282,6 @@ export function FxChart(props: FxChartProps) {
     const api = handle.current;
     const node = host.current;
     if (!api || !node || state === 'loading' || state === 'empty') return;
-    latest.current = { series, overlays, pair, inverted, target, interactive, onTargetDrag };
     const colors = readChartColors();
     const digits = priceFractionDigits(inverted ? pair.base : pair.quote);
     if (api.kind !== type) {
@@ -309,13 +311,24 @@ export function FxChart(props: FxChartProps) {
     const change = seriesChange(previous.current, series);
     const spans = overlays.simulatedRanges ?? [];
     const executedAt = overlays.markers.find((marker) => marker.kind === 'EXECUTED')?.time;
-    api.chart.timeScale().applyOptions({
-      timeVisible: step < 86_400,
-      secondsVisible: false,
-      rightOffset: 0,
-      minBarSpacing: MIN_BAR_SPACING,
-      shiftVisibleRangeOnNewBar: false,
-    });
+    const timeVisible = step < 86_400;
+    // applyOptions scrolls to the last bar. Only call it when the axis labels change.
+    let reposition = false;
+    if (timeShown.current !== timeVisible) {
+      const previous = timeShown.current;
+      timeShown.current = timeVisible;
+      // The chart is created with time hidden. Skip the call when that already matches.
+      if (previous !== null || timeVisible) {
+        api.chart.timeScale().applyOptions({
+          timeVisible,
+          secondsVisible: false,
+          rightOffset: 0,
+          minBarSpacing: MIN_BAR_SPACING,
+          shiftVisibleRangeOnNewBar: false,
+        });
+        reposition = true;
+      }
+    }
     const first = series[0]?.time ?? overlays.now;
     const lastTime = series[series.length - 1]?.time ?? first;
     const horizon = paddingHorizon(range, overlays.now, overlays.dueDate, first);
@@ -326,6 +339,7 @@ export function FxChart(props: FxChartProps) {
     if (axisKey.current !== nextAxis) {
       axisKey.current = nextAxis;
       syncAxis(api, future, digits);
+      reposition = true;
     }
     if (change === 'update' && type !== 'candles') {
       const last = series[series.length - 1];
@@ -333,9 +347,11 @@ export function FxChart(props: FxChartProps) {
         api.main.update(linePoint(last, inverted));
       } else if (last) {
         replaceSeries(api, series, inverted, type, spans, executedAt, colors);
+        reposition = true;
       }
     } else if (change !== 'same') {
       replaceSeries(api, series, inverted, type, spans, executedAt, colors);
+      reposition = true;
     }
     previous.current = series;
     syncLines(api, {
@@ -392,11 +408,11 @@ export function FxChart(props: FxChartProps) {
         secondFrame = window.requestAnimationFrame(apply);
       });
     };
-    if (userMoved.current && heldRange.current) {
+    if (reposition && userMoved.current && heldRange.current) {
       followUp(() => applyWindow.current());
-    } else if (range === 'TO_DUE') {
+    } else if (reposition && range === 'TO_DUE') {
       followUp(() => applyWindow.current());
-    } else if (windowKey.current !== nextWindow) {
+    } else if (reposition && windowKey.current !== nextWindow) {
       windowKey.current = nextWindow;
       followUp(() => {
         if (handle.current !== api) return;
@@ -461,7 +477,6 @@ export function FxChart(props: FxChartProps) {
     interactive,
     inverted,
     maxCost,
-    onTargetDrag,
     overlays,
     pair,
     range,
