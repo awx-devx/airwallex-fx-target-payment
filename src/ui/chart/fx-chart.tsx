@@ -11,6 +11,7 @@ import { ChartHeader, type ChartType, type FeedState } from '@/ui/chart/chart-he
 import { CrosshairTooltip, DragPreview } from '@/ui/chart/crosshair-tooltip';
 import { clusterMarkers, type PlotMarker } from '@/ui/chart/markers';
 import { OverlayPrimitive, type OverlayModel } from '@/ui/chart/primitives/overlays';
+import { headerQuote } from '@/ui/chart/header-quote';
 import { candles, covers, linePoint, priceAt, type Span } from '@/ui/chart/plot';
 import {
   canonicalFromChart,
@@ -64,6 +65,8 @@ export interface FxChartProps {
   onRangeChange?: (range: ChartRange) => void;
   onTypeChange?: (type: ChartType) => void;
   connection?: FeedState;
+  /** This bill has a recorded Simulate run (running or triggered). */
+  simulated?: boolean;
   notional?: { amount: string; currency: string };
   quoteTone?: 'target' | 'deadline';
   targetPulse?: boolean;
@@ -107,6 +110,7 @@ export function FxChart(props: FxChartProps) {
     onRangeChange,
     onTypeChange,
     connection = 'live',
+    simulated = false,
     notional,
     targetPulse = false,
     maxCost,
@@ -438,10 +442,13 @@ export function FxChart(props: FxChartProps) {
     setDrag(null);
   }
 
-  const lastPoint = series[series.length - 1];
-  const last = lastPoint?.value;
-  const priceSimulated =
-    lastPoint !== undefined && covers(lastPoint.time, overlays.simulatedRanges ?? []);
+  const header = headerQuote({
+    series,
+    simulated,
+    ranges: overlays.simulatedRanges ?? [],
+    stale: state === 'stale',
+    connection,
+  });
   const fill = height === 'fill';
   const cost = (price: string) =>
     notional
@@ -456,13 +463,11 @@ export function FxChart(props: FxChartProps) {
       {showHeader ? (
         <ChartHeader
           pair={pair}
-          price={state === 'empty' ? undefined : last}
+          price={state === 'empty' ? undefined : header.price}
           entry={overlays.entry}
           inverted={inverted}
           stale={state === 'stale'}
-          connection={
-            priceSimulated ? 'simulated' : state === 'stale' ? 'delayed' : connection
-          }
+          connection={header.connection}
           range={range}
           onRangeChange={(next) => onRangeChange?.(next)}
           type={type}

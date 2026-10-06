@@ -84,7 +84,7 @@ Each component ships with: a typed props interface, all variants, a `*.fixtures.
 | `DeadlineMeter` | Horizontal timeline: armed → now → execute-by → due | normal, final day, overdue, with skipped non-conversion day ("Skipped Dec 25: Christmas Day"); compact (list) / full (ticket) |
 | `StateBadge` | Bill state badge (see [03 §1](./03-domain-model.md#state-reference)) | every `BillState`, with pulse for `WATCHING` |
 | `TransferStatusPill` | Airwallex status with step dots `Scheduled → Processing → Sent → Paid` | every `TransferStatus` ([13 §4.3](./13-airwallex-contracts.md#43-status-maps)) incl. `OVERDUE`, `FAILED` with category, "Failed after paid" (late failure), "Awaiting Airwallex approval" (`IN_APPROVAL` family) |
-| `ConnectionIndicator` | Feed health dot | live (green pulse), delayed (warn), offline (down), simulated (orange "Simulated") |
+| `ConnectionIndicator` | Feed health dot | live (green pulse), delayed (warn), offline (down). simulated (orange "Simulated") is the whole feed when `RATE_SOURCE=simulated` or mock mode, and a bill's chart header when that bill's simulation is running or triggered |
 | `EnvBadge` | `SANDBOX` / `PRODUCTION` / `DEMO · SIMULATED MARKET` | — |
 | `BalancePill` | Wallet balance (`available`) for a currency; tooltip with pending / reserved / total | normal, low (warn), insufficient for selected bill (down) |
 | `Sparkline` | Tiny line with the target line + last dot | favourable/adverse; with target hit dot; loading |

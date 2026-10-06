@@ -7,6 +7,7 @@ import {
 import { BILL_STATES } from '@/contracts/bill';
 import { BILL_EVENT_TYPES } from '@/contracts/events';
 import { RATE_SOURCES } from '@/contracts/sse';
+import { SIMULATION_OUTCOMES } from '@/server/domain/simulation';
 import { Schema, model, models } from 'mongoose';
 import { collection } from '@/server/db/models/options';
 
@@ -122,6 +123,16 @@ const billSchema = new Schema(
     safetyNet: {
       type: new Schema(
         { transferId: { type: String, required: true } },
+        { _id: false },
+      ),
+    },
+    simulation: {
+      type: new Schema(
+        {
+          simId: { type: String, required: true },
+          startedAt: { type: Date, required: true },
+          outcome: { type: String, enum: SIMULATION_OUTCOMES, required: true },
+        },
         { _id: false },
       ),
     },

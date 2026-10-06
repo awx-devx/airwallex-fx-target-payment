@@ -29,7 +29,7 @@ POST /api/demo/reset
 
 The API and the worker are separate processes. Clock speed, market nudges, and Simulate runs are Redis records (`demo:clock`, `demo:market`, `demo:sim:{billId}`) so the worker applies them. The worker clock reads `demo:clock`. Simulate pacing stays on the wall clock.
 
-The **`ConnectionIndicator` reads `Simulated`** beside a price from a Simulate session, and whenever the shared feed itself is simulated. Quote and transfer IDs shown in the UI are real sandbox IDs.
+The top bar **`ConnectionIndicator`** shows feed health: Live, Delayed, or Offline. It reads Simulated only when the whole feed is simulated (`RATE_SOURCE=simulated` or mock mode). The server sends that choice as the `hello` event when the stream connects. A bill's chart header reads Simulated when that bill has a recorded simulation (`bills.simulation.outcome` of `RUNNING` or `TRIGGERED`), and the header price stays on the last session price through In Flight and Paid. Stop sets `ABORTED` and the header returns to the feed label. The dashed session stays on the chart. Quote and transfer IDs shown in the UI are real sandbox IDs.
 
 ### 1.1 Simulate button
 
@@ -41,22 +41,22 @@ The **`ConnectionIndicator` reads `Simulated`** beside a price from a Simulate s
 
 | t | Phase (`demo.sim` SSE) | What happens | What the audience sees |
 | --- | --- | --- | --- |
-| 0 s | `RAMPING` | `demo:sim:{billId}` is written to Redis; `SIM_STARTED` bill event; the bill's cooldown is cleared | "SIM" marker on the chart; the line style changes to simulated; the ticket shows "Simulating · target in 12 s" + Stop |
+| 0 s | `RAMPING` | `demo:sim:{billId}` is written to Redis; `bills.simulation` is `{ simId, startedAt, outcome: 'RUNNING' }`; `SIM_STARTED` bill event; the bill's cooldown is cleared | "SIM" marker on the chart; the line style changes to simulated; the header reads Simulated; the ticket shows "Simulating · target in 12 s" + Stop |
 | 0–12 s | `RAMPING` | 1 s simulated ticks for this bill only, easing from the last real price to `target × (1 − overshootBps)` with shrinking noise | Price slides into the orange target zone |
 | ~13 s | `TRIGGERED` | The normal trigger rules pass (2 confirm ticks) → real sandbox quote → `EXECUTING`, event `QUOTE_LOCKED` | Target-hit pulse + toast "Target hit · paying" |
 | ~16 s | `EXECUTING` | The same job creates the sandbox transfer with the quote | `TransferTracker` shows the real transfer ID |
 | ~19 / 22 / 25 s | `SETTLING` | Every `advanceEverySec` (3 s): simulation transition to `PROCESSING` → `SENT` → `PAID`, then an immediate `GET /transfers/{id}` applied through `applyTransferStatus` (no waiting for webhooks) | Tracker steps through to **Paid** |
-| ~26 s | `DONE` | Redis key deleted; `SIM_ENDED` bill event | Receipt |
+| ~26 s | `DONE` | Redis key deleted; `simulation.outcome` becomes `TRIGGERED`; `SIM_ENDED` bill event | Receipt. The header stays Simulated and keeps the last session price |
 
-**Price path:** `p(t) = from + (to − from) × easeInOutCubic(t / T) + noise(t)`. `from` is the bill's last real price (so the chart doesn't jump), `to = target × (1 − overshootBps / 10 000)` (default 5 bps past the target), and noise is seeded GBM noise whose amplitude falls to 0 near `T`. After `T` the price holds just past the target (mean-reverting, never back above it) until the bill leaves `WATCHING`. Ticks are stored with `meta.source = 'SIMULATED'`, `meta.billId`, and `meta.simId`. They are drawn only on that bill, as `simulatedRanges`, and the header reads Simulated beside that price. Other bills on the pair keep the shared history and their own mark.
+**Price path:** `p(t) = from + (to − from) × easeInOutCubic(t / T) + noise(t)`. `from` is the bill's last real price (so the chart doesn't jump), `to = target × (1 − overshootBps / 10 000)` (default 5 bps past the target), and noise is seeded GBM noise whose amplitude falls to 0 near `T`. After `T` the price holds just past the target (mean-reverting, never back above it) until the bill leaves `WATCHING`. Ticks are stored with `meta.source = 'SIMULATED'`, `meta.billId`, and `meta.simId`. They are drawn only on that bill, as `simulatedRanges`. The header reads Simulated beside the last session price, and stays that way after the run triggers. Other bills on the pair keep the shared history, their own mark, and the Live label.
 
 **One demo-only relaxation** (tagged `DEMO-ONLY:` in code, listed in §5):
 
-**Quote check.** Normally a target hit requires the real quote price ≤ target ([03 §3](./03-domain-model.md#3-trigger-rules)). The real sandbox quote tracks the real market, not our simulated one, so it would always be a near miss. When the triggering tick is simulated (a Simulate run, or `RATE_SOURCE=simulated` in hybrid mode), the check compares the **simulated** price instead. The `QUOTE_LOCKED` event and the receipt show both numbers: "Triggered at 1.07952 (simulated) · Airwallex quote 1.08810 (actual)". The transfer always executes at the real quote. The payment itself is the normal execute path: the same job locks the quote and creates the transfer.
+**Quote check.** Normally a target hit requires the real quote price ≤ target ([03 §3](./03-domain-model.md#3-trigger-rules)). The real sandbox quote tracks the real market, not a scripted path, so a Simulate tick would always be a near miss. When the triggering tick is simulated (a Simulate run, or the whole feed when `RATE_SOURCE=simulated`), the check compares the **simulated** price instead. The `QUOTE_LOCKED` event and the receipt show both numbers: "Triggered at 1.07952 (simulated) · Airwallex quote 1.08810 (actual)". The transfer always executes at the real quote. The payment itself is the normal execute path: the same job locks the quote and creates the transfer. On the demo feed (`RATE_SOURCE=airwallex`) a bill that was not simulated triggers only when the real quote is at or below the target.
 
 **Where it runs:** a `demoSim` loop in the worker (1 s, only while any `demo:sim:*` key exists, and only on the leader). It produces the ticks and advances the transfer. The trigger pays through the normal execute path. It uses wall-clock seconds even under a time warp, so the on-stage pacing stays the same. A per-bill `RoutingRateSource` gives the simulated ticks for sim bills and the configured source for everything else, so other bills (including ones on the same pair) stay live.
 
-**Stop and failure:** "Stop" (or `/simulate/stop`) deletes the key, writes `SIM_ENDED { aborted: true }`, and returns the bill to the live feed on the next poll; the chart shows the jump back at the marker. If the quote, the balance check or the transfer fails, the sim stops and the normal error UI takes over. The Redis key has a 10-minute TTL, so an orphaned sim can't linger.
+**Stop and failure:** "Stop" (or `/simulate/stop`) while the bill is still `WATCHING` or `PAUSED` deletes the key, sets `simulation.outcome` to `ABORTED`, writes `SIM_ENDED { aborted: true }`, and returns the bill to the live feed on the next poll. The header reads Live again. The chart shows the jump back at the marker, and the dashed session stays as history. Stop after the run has already triggered does not clear that record: the outcome stays `TRIGGERED` and the header stays Simulated through In Flight and Paid. If the quote, the balance check or the transfer create fails, the sim stops with `ABORTED` and the normal error UI takes over. A failed sandbox status transition while the bill is already in flight is retried on the next advance interval and leaves the outcome at `TRIGGERED`. The Redis key has a 10-minute TTL, so an orphaned sim can't linger.
 
 **Mock mode:** with `NEXT_PUBLIC_DATA_SOURCE=mock`, the mock `DataSource` runs the same timeline in the browser (a mock quote at the simulated price, mock transfer statuses), so the button can be built and reviewed on the UI track before the backend exists.
 
@@ -100,7 +100,7 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 
 | Shortcut | Tag | Where | Production approach |
 | --- | --- | --- | --- |
-| Simulated market drives the chart and triggers (`RATE_SOURCE=simulated`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/rates/simulated` | Poll bill-sized `rates/current`; triggers only from real ticks |
+| Simulated market is the offline feed (`RATE_SOURCE=simulated`). The demo uses Airwallex rates. A recorded Simulate run is per bill | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/rates`, `bills.simulation` | Poll bill-sized `rates/current`; triggers only from real ticks |
 | Warp clock (`CLOCK=warp`) | `DEMO-ONLY` | `src/mocks/market`, `server/adapters/clock` | System clock; demo endpoints removed |
 | Demo clock, market nudges, and Simulate runs are shared through Redis | `DEMO-ONLY` | `src/server/adapters/demo/store.ts`, `src/server/adapters/clock/demo.ts` | System clock; demo endpoints removed |
 | Jump to deadline pays that bill immediately | `DEMO-ONLY` | `src/mocks/mock-data-source.ts` `jumpToDeadline` | The sweeper pays from the stored cutoff |

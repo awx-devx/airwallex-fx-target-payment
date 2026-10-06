@@ -60,6 +60,8 @@ export const billFlagsSchema = z.object({
   amountLimit: z.boolean().optional(),
   routeUnsupported: z.boolean().optional(),
   nameMismatch: z.boolean().optional(),
+  /** Set while a Simulate run is going, and after it triggers. Stop clears it. */
+  simulated: z.boolean().optional(),
 });
 export type BillFlags = z.infer<typeof billFlagsSchema>;
 

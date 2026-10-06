@@ -160,14 +160,14 @@ Adapters are selected by environment:
 
 | Env var | Values | Default |
 | --- | --- | --- |
-| `RATE_SOURCE` | `airwallex` \| `simulated` | `simulated` in demo mode |
+| `RATE_SOURCE` | `airwallex` \| `simulated` | `airwallex` in the demo. Unset falls back to `simulated` |
 | `PAYMENTS_GATEWAY` | `airwallex` \| `mock` | `airwallex` (sandbox) |
 | `HISTORY_SOURCE` | `frankfurter` \| `none` \| `simulated` | `frankfurter` |
 | `BILL_EXTRACTOR` | `anthropic` \| `ollama` \| `mock` | `anthropic` |
 | `CLOCK` | `system` \| `warp` | `system` |
 | `DEADLINE_SAFETY_NET` | `none` \| `airwallex` | `none` |
 
-**Hybrid demo mode** (recommended for the live demo): `RATE_SOURCE=simulated`, `PAYMENTS_GATEWAY=airwallex`. The simulated market drives the chart and triggers, while quotes and transfers are real sandbox calls. The receipt and the `QUOTE_LOCKED` event show both the simulated trigger rate and the real Airwallex quote rate, and we are transparent that the market feed is simulated. Because a real quote won't follow a simulated price, the quote check compares the simulated price for simulated ticks ([03 §3](./03-domain-model.md#3-trigger-rules)). See [08](./08-demo-plan.md).
+**Demo feed:** `RATE_SOURCE=airwallex`, `PAYMENTS_GATEWAY=airwallex`. The poller reads sandbox `rates/current` for every bill that is not in a Simulate run. Quotes and transfers are real sandbox calls. A bill's chart reads Simulated only when that bill has a recorded simulation (`RUNNING` or `TRIGGERED`). `RATE_SOURCE=simulated` remains for offline development and the in-browser mock: the shared walk drives every bill, and the top bar reads Simulated. A simulated tick still compares the simulated price with the target, because a sandbox quote will not follow it ([03 §3](./03-domain-model.md#3-trigger-rules)). See [08](./08-demo-plan.md).
 
 **Per-bill simulation (Simulate button):** the worker reads rates through a `RoutingRateSource`. A bill with an active `demo:sim:{billId}` key is left out of the shared poll. The `demoSim` loop writes that bill's ticks through `RoutingRateSource` every wall-clock second, and every other bill keeps the configured source. Clock changes and market nudges are Redis records (`demo:clock`, `demo:market`) because the API and the worker are separate processes. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
 
@@ -255,6 +255,7 @@ A single stream at `/api/stream` carries all events. Clients filter by `billId`.
 | `bill.updated` | `BillSummary` | Any bill field or state change |
 | `execution.updated` | `Execution` | Transfer status changed |
 | `notification` | `Notification` | Something should be toasted |
+| `hello` | `{ feed: 'AIRWALLEX'\|'SIMULATED', now, warp }` | Once, when the stream connects. `feed` is `RATE_SOURCE`. The top bar uses it and does not infer the feed from ticks |
 | `clock` | `{ now, warp }` | Demo mode only |
 | `demo.sim` | `{ billId, simId, phase: 'RAMPING'\|'TRIGGERED'\|'EXECUTING'\|'SETTLING'\|'DONE'\|'ABORTED', etaSec? }` | Demo mode only: Simulate run progress |
 | `extraction.progress` | `{ billId, documentId, filename, stage: 'working'\|'searching'\|'solving', status: 'PENDING'\|'RUNNING'\|'DONE'\|'FAILED' }` | Upload queued a file, or the extraction job moved to the next reader |
@@ -292,7 +293,7 @@ REDIS_URL=redis://localhost:6379
 HOME_CURRENCY=USD
 DEMO_MODE=true
 NEXT_PUBLIC_DATA_SOURCE=api               # mock | api (build-time; mock runs the UI with no backend)
-RATE_SOURCE=simulated
+RATE_SOURCE=airwallex                 # airwallex | simulated (simulated is offline dev and mock only)
 PAYMENTS_GATEWAY=airwallex
 HISTORY_SOURCE=frankfurter
 BILL_EXTRACTOR=anthropic                  # anthropic | ollama | mock (see 12 §4)

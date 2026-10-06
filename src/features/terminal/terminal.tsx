@@ -70,7 +70,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const queryClient = useQueryClient();
   const bills = useBills();
   const balances = useBalances();
-  const { connection, notices, now } = useStream();
+  const { connection, feed, notices, now } = useStream();
   const actions = useBillActions();
   const toasts = useToasts();
   const quietFeed = useRef<string | null>(null);
@@ -532,6 +532,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                       .catch(showError);
                   }}
                   connection={connection}
+                  simulated={selected.flags.simulated === true}
                   targetPulse={hitPulse}
                   notional={{ amount: selected.amount, currency: selected.pair.base }}
                   subject={{ vendor: selected.vendorName, amount: selected.amount, currency: selected.pair.base }}
@@ -553,6 +554,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                   onTypeChange={ui.setChartType}
                   state={bills.isLoading || chart.isLoading ? 'loading' : 'empty'}
                   connection={connection}
+                  simulated={selected?.flags.simulated === true}
                   height="fill"
                   subject={
                     selected
@@ -588,6 +590,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
             <DemoControlBar
               expanded={ui.demoOpen}
               onExpandedChange={ui.setDemoOpen}
+              showMarket={feed === 'SIMULATED'}
               speed={ui.marketSpeed}
               onSpeedChange={(speed) => ui.setMarketSpeed(speed as '1' | '10' | '60')}
               warp={ui.warp}

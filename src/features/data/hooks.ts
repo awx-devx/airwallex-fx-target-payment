@@ -10,11 +10,12 @@ import type { AppEvent } from '@/contracts/sse';
 import { billWithState, billWithStrategy } from '@/features/data/optimistic';
 import { dataSource, getDataSource, isApiDataSource } from '@/features/data/source';
 import { qk } from '@/features/data/keys';
+import { feedLabel, noteStreamEvent, noteStreamHealth, type FeedLabelState } from '@/features/data/feed';
 import { connectStream } from '@/features/data/stream';
 import { applyAppEvent } from '@/features/data/stream-cache';
 import { useUiStore } from '@/features/ui-store';
 
-export type FeedConnection = 'live' | 'simulated' | 'delayed' | 'offline';
+export type { FeedConnection, FeedKind } from '@/features/data/feed';
 
 function patchBill(list: BillSummary[] | undefined, bill: BillSummary) {
   if (!list) return list;
@@ -72,9 +73,12 @@ export function useStream() {
   const client = useQueryClient();
   const speed = useUiStore((state) => state.marketSpeed);
   const api = isApiDataSource();
-  // Start live. "Reconnecting" is for a socket that has actually failed, not the
-  // moment before the first EventSource open.
-  const [connection, setConnection] = useState<FeedConnection>(api ? 'live' : 'simulated');
+  // API mode starts on the Airwallex feed. The hello event corrects it when the
+  // server is actually on the simulated walk. Mock mode is simulated throughout.
+  const [label, setLabel] = useState<FeedLabelState>({
+    feed: api ? 'AIRWALLEX' : 'SIMULATED',
+    health: 'live',
+  });
   const [notices, setNotices] = useState<AppEvent[]>([]);
   // Display clock only. The API path uses the browser until the first clock event.
   const [now, setNow] = useState(() =>
@@ -85,15 +89,13 @@ export function useStream() {
     if (isApiDataSource()) {
       return connectStream({
         onEvent: (event) => {
-          if (event.type === 'tick' && !event.simId) {
-            setConnection(event.source === 'SIMULATED' ? 'simulated' : 'live');
-          }
-          if (event.type === 'clock') setNow(event.now);
+          setLabel((current) => noteStreamEvent(current, event));
+          if (event.type === 'hello' || event.type === 'clock') setNow(event.now);
           rememberNotice(setNotices, event);
           applyAppEvent(client, event);
         },
         onStatus: (status) => {
-          setConnection((current) => (status === 'live' && current === 'simulated' ? current : status));
+          setLabel((current) => noteStreamHealth(current, status));
         },
         onPoll: () => {
           void client.invalidateQueries({ queryKey: qk.bills });
@@ -106,7 +108,7 @@ export function useStream() {
     const unsub = source.subscribe((event) => {
       if (event.type === 'tick') {
         lastTick = Date.now();
-        setConnection('simulated');
+        setLabel((current) => noteStreamHealth(current, 'live'));
       }
       if (event.type === 'clock') setNow(event.now);
       rememberNotice(setNotices, event);
@@ -116,7 +118,7 @@ export function useStream() {
       source.stepMarket();
       source.pump();
       setNow(source.clock.now().toISOString());
-      if (Date.now() - lastTick > 2_000) setConnection('delayed');
+      if (Date.now() - lastTick > 2_000) setLabel((current) => noteStreamHealth(current, 'delayed'));
     }, 500 / Number(speed));
     return () => {
       unsub();
@@ -124,7 +126,7 @@ export function useStream() {
     };
   }, [client, speed]);
 
-  return { connection, notices, now };
+  return { connection: feedLabel(label), feed: label.feed, notices, now };
 }
 
 export function useBillActions() {

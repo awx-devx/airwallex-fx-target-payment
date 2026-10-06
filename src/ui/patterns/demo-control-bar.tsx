@@ -17,6 +17,7 @@ export function DemoControlBar({
   onJump,
   onAdvance,
   onSimulate,
+  showMarket = true,
 }: {
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
@@ -28,6 +29,8 @@ export function DemoControlBar({
   onJump?: () => void;
   onAdvance?: () => void;
   onSimulate?: () => void;
+  /** Speed and nudge only move the simulated walk. Hide them on the Airwallex feed. */
+  showMarket?: boolean;
 }) {
   return (
     <div className="inline-flex flex-wrap items-center gap-2 rounded-md border border-orange-500/40 bg-bg-1 px-2 py-1.5">
@@ -36,17 +39,19 @@ export function DemoControlBar({
       </Button>
       {expanded ? (
         <>
-          <SegmentedControl
-            label="Market speed"
-            size="sm"
-            value={speed}
-            onValueChange={(next) => onSpeedChange?.(next)}
-            options={[
-              { value: '1', label: '1×' },
-              { value: '10', label: '10×' },
-              { value: '60', label: '60×' },
-            ]}
-          />
+          {showMarket ? (
+            <SegmentedControl
+              label="Market speed"
+              size="sm"
+              value={speed}
+              onValueChange={(next) => onSpeedChange?.(next)}
+              options={[
+                { value: '1', label: '1×' },
+                { value: '10', label: '10×' },
+                { value: '60', label: '60×' },
+              ]}
+            />
+          ) : null}
           <SegmentedControl
             label="Time warp"
             size="sm"
@@ -58,9 +63,11 @@ export function DemoControlBar({
               { value: '1440', label: '1d' },
             ]}
           />
-          <Button size="sm" variant="secondary" onClick={onNudge}>
-            Nudge price
-          </Button>
+          {showMarket ? (
+            <Button size="sm" variant="secondary" onClick={onNudge}>
+              Nudge price
+            </Button>
+          ) : null}
           <Button size="sm" variant="secondary" onClick={onJump}>
             Jump to deadline
           </Button>

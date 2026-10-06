@@ -6,6 +6,7 @@ const EVENT_TYPES = [
   'execution.updated',
   'notification',
   'clock',
+  'hello',
   'demo.sim',
   'extraction.progress',
 ] as const;

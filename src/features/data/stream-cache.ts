@@ -83,6 +83,10 @@ export function applyAppEvent(client: QueryClient, event: AppEvent): void {
     void client.invalidateQueries({ queryKey: qk.events(event.bill.id) });
     return;
   }
+  if (event.type === 'demo.sim' && (event.phase === 'DONE' || event.phase === 'ABORTED')) {
+    void client.invalidateQueries({ queryKey: ['chart', event.billId] });
+    return;
+  }
   if (event.type === 'extraction.progress') {
     void client.invalidateQueries({ queryKey: qk.bill(event.billId) });
     void client.invalidateQueries({ queryKey: qk.bills });

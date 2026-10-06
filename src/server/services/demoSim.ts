@@ -1,5 +1,6 @@
 import { decimalString, significantPrice } from '@/contracts/money';
 import type { SimPhase } from '@/contracts/sse';
+import type { SimulationOutcome } from '@/server/domain/simulation';
 import type { Clock } from '@/server/adapters/clock';
 import {
   deleteSim,
@@ -7,13 +8,17 @@ import {
   writeSim,
   type SimRecord,
 } from '@/server/adapters/demo/store';
-import type { RateSource } from '@/server/adapters/rates';
+import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import type { SimulationStatus } from '@/server/adapters/airwallex/endpoints/simulation';
+import type { RateSource } from '@/server/adapters/rates';
 import { transferGateway } from '@/server/adapters/transfers';
 import { fromDecimal128, toDecimal128 } from '@/server/db/decimal';
 import { Bill, BillEvent, Execution, RateTick } from '@/server/db/models';
 import type { Env } from '@/server/env';
+import { accountDate } from '@/server/domain/deadline';
 import { getLogger } from '@/server/logging/logger';
+import { billReadContext, getBill } from '@/server/services/bills';
+import { ServiceError } from '@/server/services/errors';
 import { applyTransferStatus } from '@/server/services/executionStatus';
 import { considerTick } from '@/server/services/strategy';
 import type { EventPublisher } from '@/server/services/transitionBill';
@@ -38,6 +43,32 @@ export function nextTransferStatus(status: string): SimulationStatus | null {
   const index = ADVANCE_ORDER.indexOf(status as (typeof ADVANCE_ORDER)[number]);
   if (index < 0 || index >= ADVANCE_ORDER.length - 1) return null;
   return ADVANCE_ORDER[index + 1] ?? null;
+}
+
+export async function recordSimulation(
+  input:
+    | { billId: string; simId: string; outcome: 'RUNNING'; startedAt: Date }
+    | { billId: string; simId: string; outcome: Exclude<SimulationOutcome, 'RUNNING'> },
+): Promise<void> {
+  if (input.outcome === 'RUNNING') {
+    await Bill.updateOne(
+      { _id: input.billId },
+      {
+        $set: {
+          simulation: {
+            simId: input.simId,
+            startedAt: input.startedAt,
+            outcome: 'RUNNING',
+          },
+        },
+      },
+    );
+    return;
+  }
+  await Bill.updateOne(
+    { _id: input.billId, 'simulation.simId': input.simId },
+    { $set: { 'simulation.outcome': input.outcome } },
+  );
 }
 
 export async function publishSim(
@@ -246,21 +277,32 @@ async function advanceIfDue(
   if (!next) return;
   const gateway = transferGateway(input.env, input.clock);
   if (!gateway.transitionTo) return;
-  const summary = await gateway.transitionTo(
-    execution.airwallexTransferId,
-    next,
-    execution.mode,
-  );
-  await applyTransferStatus({
-    summary,
-    clock: input.clock,
-    demoMode: input.env.DEMO_MODE,
-    actor: 'system',
-    publisher: input.publisher,
-    executionId: String(execution._id),
-  });
+  try {
+    const summary = await gateway.transitionTo(
+      execution.airwallexTransferId,
+      next,
+      execution.mode,
+    );
+    await applyTransferStatus({
+      summary,
+      clock: input.clock,
+      demoMode: input.env.DEMO_MODE,
+      actor: 'system',
+      publisher: input.publisher,
+      executionId: String(execution._id),
+    });
+    record.phase = next === 'PAID' ? 'DONE' : 'SETTLING';
+  } catch (error) {
+    // A sandbox transition can 500 while the transfer is still in flight.
+    // Retry on the next interval. Do not mark the run ABORTED: the bill
+    // already triggered, so the chart stays Simulated through Paid.
+    if (!(error instanceof AirwallexError)) throw error;
+    getLogger().warn(
+      { err: error, billId: record.billId, next },
+      'demo sim advance failed',
+    );
+  }
   record.lastAdvanceRealMs = input.nowRealMs;
-  record.phase = next === 'PAID' ? 'DONE' : 'SETTLING';
   await writeSim(input.env.REDIS_URL, record);
 }
 
@@ -324,6 +366,11 @@ async function finish(
 ): Promise<void> {
   await deleteSim(input.env.REDIS_URL, record.billId);
   const phase: SimPhase = aborted ? 'ABORTED' : 'DONE';
+  await recordSimulation({
+    billId: record.billId,
+    simId: record.simId,
+    outcome: aborted ? 'ABORTED' : 'TRIGGERED',
+  });
   await writeSimEvent({
     billId: record.billId,
     clock: input.clock,
@@ -335,4 +382,24 @@ async function finish(
     simId: record.simId,
     phase,
   });
+  await publishBill(input, record.billId);
+}
+
+async function publishBill(
+  input: { env: Env; clock: Clock; publisher?: EventPublisher },
+  billId: string,
+): Promise<void> {
+  if (!input.publisher) return;
+  try {
+    const detail = await getBill(
+      billId,
+      input.env.DEMO_MODE,
+      accountDate(input.clock.now(), input.env.AIRWALLEX_ACCOUNT_TZ),
+      billReadContext(input.env, input.clock),
+    );
+    await input.publisher.publish({ type: 'bill.updated', bill: detail });
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === 'NOT_FOUND') return;
+    throw error;
+  }
 }

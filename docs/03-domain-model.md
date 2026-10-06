@@ -109,7 +109,7 @@ Evaluated by the strategy engine on every tick for `WATCHING` bills:
    - `p_quote ≤ p_target` → `EXECUTING` in the same job. The activity log records `QUOTE_LOCKED`; the chart marks it `TARGET_HIT`.
    - Otherwise → `NEAR_MISS` event (shown on the chart as a hollow marker) and stay `WATCHING`.
    - If the wallet balance in H is short, stay `WATCHING`, raise `insufficientBalance`, and retry until the cutoff.
-   - **Demo exception:** when the triggering tick is simulated (`source = 'SIMULATED'`: a Simulate run or `RATE_SOURCE=simulated`), a real sandbox quote can't be expected to follow it. The check then compares the simulated price with the target instead of `p_quote`, and records both on the `QUOTE_LOCKED` event. The transfer still executes at the real quote. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
+   - **Demo exception:** when the triggering tick is simulated (`source = 'SIMULATED'`). That is a Simulate run, or the whole feed when `RATE_SOURCE=simulated` (offline development and mock mode). The demo feed is `RATE_SOURCE=airwallex`, so a shared tick is a real sandbox rate and the quote check uses `p_quote`. A real sandbox quote can't be expected to follow a scripted price, so a Simulate tick compares the simulated price with the target instead of `p_quote`, and records both on the `QUOTE_LOCKED` event. The transfer still executes at the real quote. See [08 §1.1](./08-demo-plan.md#11-simulate-button).
    - If `valid_to_at` has already passed, stay `WATCHING`, record `QUOTE_EXPIRED`, and enqueue `quote-retry.{billId}`.
 
 A ready tick enqueues `trigger.{billId}.{tickId}`. That job locks `quoteValidityTarget`. Pay now (`POST /api/bills/:id/pay-now`, `WATCHING` only) locks `MIN_1` and enqueues execution with mode `MANUAL`. A strategy edit while `WATCHING` recomputes the target, re-evaluates immediately, and logs `STRATEGY_UPDATED`.
@@ -185,6 +185,7 @@ erDiagram
   },
   trigger: { consecutiveHits: number, lastEvaluatedTickAt?: Date },
   last?: { price: D128, at: Date, source: RateSourceKind },  // denormalised mark price for list views
+  simulation?: { simId: string, startedAt: Date, outcome: 'RUNNING'|'TRIGGERED'|'ABORTED' },  // demo: recorded Simulate run
   activeExecutionId?: ObjectId,
   recentEvents: BillEventLite[],          // capped at 20 via $slice, for fast ticket rendering
   displayInverted: boolean,
@@ -256,7 +257,8 @@ interface BillSummary {
   execution?: ExecutionSummary;
   safetyNetTransferId?: string;            // Layer B scheduled transfer, only when the flag is on
   flags: { stale?: boolean; insufficientBalance?: boolean; noReferenceHistory?: boolean;
-           overdue?: boolean; awxApproval?: boolean; amountLimit?: boolean; routeUnsupported?: boolean; nameMismatch?: boolean };
+           overdue?: boolean; awxApproval?: boolean; amountLimit?: boolean; routeUnsupported?: boolean; nameMismatch?: boolean;
+           simulated?: boolean };  // true while simulation.outcome is RUNNING or TRIGGERED
   allowedActions: BillAction[];            // from the bill state; see below
 }
 
@@ -296,7 +298,7 @@ interface ChartOverlays {
 | `POST` | `/api/bills/:id/pause` / `resume` / `rearm` | Pause, resume, or return a failed bill to ready |
 | `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
-| `GET` | `/api/bills/:id/chart?range=1D` | Merged series (ECB daily history plus shared ticks) + `ChartOverlays` + the reference series. Simulate ticks (`simId`) are appended only for the bill that owns them, with `simulatedRanges`. `TO_DUE` looks back 90 days. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
+| `GET` | `/api/bills/:id/chart?range=1D` | Merged series (ECB daily history plus shared ticks) + `ChartOverlays` + the reference series. Simulate ticks (`simId`) are appended only for the bill that owns them, with `simulatedRanges`. When `flags.simulated` is set, the chart header reads Simulated and the header price stays on the last point inside those ranges. `TO_DUE` looks back 90 days. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
 | `GET` | `/api/bills/:id/events` | Activity log |
 | `GET` | `/api/balances` | Proxy of Airwallex balances (cached 30 s) |
 | `POST` | `/api/bills/:id/validate-transfer` | `transfers/validate` dry run (also run by `arm`); returns `FieldError[]` |
@@ -305,7 +307,7 @@ interface ChartOverlays {
 | `POST` | `/api/beneficiaries/validate` · `/api/beneficiaries/verify` | Validate before create · account/name verification |
 | `GET` | `/api/reference/currencies` · `/api/reference/non-conversion-days?pair=` | Currency capability + precision · FX holidays |
 | `GET` | `/api/health` | `HealthReport`. `200` when Mongo, Redis, the worker heartbeat, and the Airwallex token are ok; `503` otherwise. The body still lists feed freshness and queue depths |
-| `GET` | `/api/stream` | SSE |
+| `GET` | `/api/stream` | SSE. The first event is `hello` `{ feed, now, warp }`. `feed` is `AIRWALLEX` or `SIMULATED` from `RATE_SOURCE` |
 | `POST` | `/api/webhooks/airwallex` | Airwallex webhooks |
 | `POST` | `/api/demo/*` | Demo controls (see [08](./08-demo-plan.md)) |
 

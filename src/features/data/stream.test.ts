@@ -141,6 +141,18 @@ describe('applyAppEvent', () => {
     expect(client.getQueryData(qk.chart(other.id, 'TO_DUE'))).toBeUndefined();
   });
 
+  it('refetches the chart when a simulation ends', () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    applyAppEvent(client, {
+      type: 'demo.sim',
+      billId: bill.id,
+      simId: 'sim-1',
+      phase: 'DONE',
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chart', bill.id] });
+  });
+
   it('refetches the bill when extraction finishes', () => {
     const client = new QueryClient();
     const invalidate = vi.spyOn(client, 'invalidateQueries');

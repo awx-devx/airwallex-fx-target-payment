@@ -41,6 +41,7 @@ import {
 import {
   nextTransferStatus,
   publishSim,
+  recordSimulation,
   writeSimEvent,
 } from '@/server/services/demoSim';
 import { applyTransferStatus } from '@/server/services/executionStatus';
@@ -251,7 +252,15 @@ export async function startSimulation(
   await Bill.updateOne(
     { _id: bill._id, state: 'WATCHING' },
     {
-      $set: { insufficientBalance: false, 'trigger.consecutiveHits': 0 },
+      $set: {
+        insufficientBalance: false,
+        'trigger.consecutiveHits': 0,
+        simulation: {
+          simId,
+          startedAt: input.clock.now(),
+          outcome: 'RUNNING',
+        },
+      },
       $unset: { 'timers.cooldownUntil': 1, 'timers.nearMissPrice': 1 },
     },
   );
@@ -279,18 +288,33 @@ export async function stopSimulation(input: {
   assertSimulate(input.env);
   const existing = await readSim(input.env.REDIS_URL, input.billId);
   if (existing) {
-    await deleteSim(input.env.REDIS_URL, input.billId);
-    await writeSimEvent({
-      billId: input.billId,
-      clock: input.clock,
-      type: 'SIM_ENDED',
-      payload: { simId: existing.simId, aborted: true },
-    });
-    await publishSim(eventPublisher(input.env.REDIS_URL), {
-      billId: input.billId,
-      simId: existing.simId,
-      phase: 'ABORTED',
-    });
+    const bill = await Bill.findById(input.billId);
+    const stillWatching = bill?.state === 'WATCHING' || bill?.state === 'PAUSED';
+    if (stillWatching) {
+      await deleteSim(input.env.REDIS_URL, input.billId);
+      await recordSimulation({
+        billId: input.billId,
+        simId: existing.simId,
+        outcome: 'ABORTED',
+      });
+      await writeSimEvent({
+        billId: input.billId,
+        clock: input.clock,
+        type: 'SIM_ENDED',
+        payload: { simId: existing.simId, aborted: true },
+      });
+      await publishSim(eventPublisher(input.env.REDIS_URL), {
+        billId: input.billId,
+        simId: existing.simId,
+        phase: 'ABORTED',
+      });
+    } else {
+      await recordSimulation({
+        billId: input.billId,
+        simId: existing.simId,
+        outcome: 'TRIGGERED',
+      });
+    }
   }
   return requireBill(input.env, input.clock, input.billId);
 }

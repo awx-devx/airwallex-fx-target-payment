@@ -59,6 +59,26 @@ describe('app events', () => {
     await reader.cancel();
   });
 
+  it('sends the feed on connect', async () => {
+    const hub = getEventHub();
+    const abort = new AbortController();
+    const stream = openEventStream({
+      hub,
+      signal: abort.signal,
+      hello: {
+        type: 'hello',
+        feed: 'AIRWALLEX',
+        now: '2026-10-06T00:00:00.000Z',
+        warp: { speed: 1 },
+      },
+    });
+    const reader = stream.getReader();
+    const text = await readUntil(reader, (value) => value.includes('event: hello'));
+    expect(text).toContain('"feed":"AIRWALLEX"');
+    abort.abort();
+    await reader.cancel();
+  });
+
   it('writes a heartbeat comment', async () => {
     const hub = getEventHub();
     const abort = new AbortController();

@@ -105,6 +105,7 @@ export function openEventStream(options: {
   hub: EventHub;
   signal: AbortSignal;
   heartbeatMs?: number;
+  hello?: Extract<AppEvent, { type: 'hello' }>;
 }): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const heartbeatMs = options.heartbeatMs ?? 15_000;
@@ -138,6 +139,7 @@ export function openEventStream(options: {
           // The client already went away.
         }
       });
+      if (options.hello) send(formatSseEvent(options.hello));
       send(formatSseComment('ping'));
     },
   });

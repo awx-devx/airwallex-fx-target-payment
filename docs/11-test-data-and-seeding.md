@@ -135,7 +135,7 @@ With `--gateway mock` (and always in `stress`), the same steps run against the m
 - **`seedKey`** on each generated bill: `gen:v{generatorVersion}:{seed}:{index}` (unique, sparse). Re-running the same seed skips existing bills. `--fresh` picks a new random seed and prints it so a run can be reproduced.
 - Beneficiaries are keyed by `gen:bf:{corridor}:{poolSlot}` and reused. Airwallex `request_id`s are deterministic from these keys (`seedbf:{seedKey}`), so a retried run never creates duplicates.
 - Generated bills are marked `generated: true`, and demo mode shows a small "GEN" chip on them.
-- **Cleanup:** `pnpm seed:reset --generated` removes generated bills, their events, executions and files, and keeps beneficiaries. `/api/demo/reset` (full reset) also removes them. In-flight sandbox transfers are cancelled first when still cancellable.
+- **Cleanup:** `pnpm seed:reset --generated` removes generated bills, their events, executions and files, and keeps beneficiaries. `pnpm seed:reset --shared-sim` deletes shared ticks from `RATE_SOURCE=simulated` (no `simId`) and leaves Simulate-session ticks in place. `/api/demo/reset` (full reset) also removes generated bills. In-flight sandbox transfers are cancelled first when still cancellable.
 
 ---
 
@@ -159,6 +159,7 @@ pnpm seed:generate --profile deadline --gateway mock
 pnpm seed:generate --count 20 --currencies EUR,INR --states WATCHING --due-in 3..10 --via upload
 pnpm seed:generate --dry-run                        # print the plan table, change nothing
 pnpm seed:reset --generated
+pnpm seed:reset --shared-sim                       # drop the old shared random-walk ticks
 pnpm test:extraction --seed 7
 ```
 

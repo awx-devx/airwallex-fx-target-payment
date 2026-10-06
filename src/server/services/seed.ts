@@ -15,6 +15,7 @@ import {
   BillEvent,
   Execution,
   Quote,
+  RateTick,
 } from '@/server/db/models';
 import { accountDate, defaultLeadDays, executionSchedule, utcDateOnly } from '@/server/domain/deadline';
 import type { Env } from '@/server/env';
@@ -317,6 +318,18 @@ function hashSeed(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+/**
+ * Shared ticks from `RATE_SOURCE=simulated` (no `simId`). A Simulate session
+ * tick keeps its `simId` and stays on that bill.
+ */
+export async function clearSharedSimulatedTicks(): Promise<number> {
+  const result = await RateTick.deleteMany({
+    'meta.source': 'SIMULATED',
+    'meta.simId': { $exists: false },
+  });
+  return result.deletedCount ?? 0;
 }
 
 export async function resetGenerated(): Promise<number> {

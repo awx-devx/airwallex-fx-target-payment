@@ -1,11 +1,13 @@
 import { connectMongo, disconnectMongo } from '@/server/db/connection';
 import { EnvError, parseEnv } from '@/server/env';
-import { resetGenerated } from '@/server/services/seed';
+import { clearSharedSimulatedTicks, resetGenerated } from '@/server/services/seed';
 
 async function main(): Promise<number> {
-  if (!process.argv.includes('--generated')) {
+  const generated = process.argv.includes('--generated');
+  const sharedSim = process.argv.includes('--shared-sim');
+  if (!generated && !sharedSim) {
     process.stderr.write(
-      'Pass --generated to remove bills created by seed:generate.\n',
+      'Pass --generated to remove bills created by seed:generate, or --shared-sim to delete shared simulated ticks.\n',
     );
     return 1;
   }
@@ -16,8 +18,14 @@ async function main(): Promise<number> {
       return 1;
     }
     await connectMongo(env.MONGODB_URI);
-    const removed = await resetGenerated();
-    process.stdout.write(`Removed ${removed} generated bills\n`);
+    if (generated) {
+      const removed = await resetGenerated();
+      process.stdout.write(`Removed ${removed} generated bills\n`);
+    }
+    if (sharedSim) {
+      const ticks = await clearSharedSimulatedTicks();
+      process.stdout.write(`Removed ${ticks} shared simulated ticks\n`);
+    }
     return 0;
   } catch (error) {
     if (error instanceof EnvError) process.stderr.write(`${error.message}\n`);

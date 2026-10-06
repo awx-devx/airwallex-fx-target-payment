@@ -7,6 +7,10 @@ import {
 import { billSummarySchema, pairSchema } from '@/contracts/bill';
 import { extractionStageSchema, extractionStatusSchema } from '@/contracts/extraction';
 
+export const FEED_KINDS = ['AIRWALLEX', 'SIMULATED'] as const;
+export const feedKindSchema = z.enum(FEED_KINDS);
+export type FeedKind = z.infer<typeof feedKindSchema>;
+
 export const RATE_SOURCES = ['AIRWALLEX', 'SIMULATED', 'REFERENCE'] as const;
 export const rateSourceSchema = z.enum(RATE_SOURCES);
 export type RateSourceKind = z.infer<typeof rateSourceSchema>;
@@ -61,6 +65,12 @@ export const appEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('clock'),
+    now: isoDateTimeSchema,
+    warp: z.object({ speed: z.number().positive() }),
+  }),
+  z.object({
+    type: z.literal('hello'),
+    feed: feedKindSchema,
     now: isoDateTimeSchema,
     warp: z.object({ speed: z.number().positive() }),
   }),

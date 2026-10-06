@@ -16,6 +16,7 @@ import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel, Execution
 import { formatUtcDate } from '@/server/domain/deadline';
 import { extractedBillSchema, extractionStatusSchema } from '@/contracts/extraction';
 import { checkBill } from '@/server/domain/billChecks';
+import { showsSimulated, type SimulationOutcome } from '@/server/domain/simulation';
 import { distanceBps, estimatedCost, homePrecision, savings, savingsPercent } from '@/server/domain/rateMath';
 
 export interface BillListQuery {
@@ -131,7 +132,12 @@ function toSummary(
         beneficiary,
         ...(execution ? { execution } : {}),
       },
-      { demoMode },
+      {
+        demoMode,
+        simulationRunning:
+          bill.simulation?.outcome === 'RUNNING' &&
+          (bill.state === 'WATCHING' || bill.state === 'PAUSED'),
+      },
     ),
   });
 }
@@ -168,6 +174,7 @@ function flagsFor(
   ) {
     flags.stale = true;
   }
+  if (showsSimulated(bill.simulation?.outcome)) flags.simulated = true;
   return flags;
 }
 
@@ -298,6 +305,7 @@ interface LoadedBill {
   lastSource?: RateSourceKind;
   insufficientBalance?: boolean;
   safetyNetTransferId?: string;
+  simulation?: { outcome: SimulationOutcome };
   strategy?: StrategyDetail;
 }
 
@@ -321,6 +329,7 @@ function asBill(doc: {
   last?: { price: { toString(): string }; at: Date; source: RateSourceKind } | null;
   insufficientBalance?: boolean | null;
   safetyNet?: { transferId?: string | null } | null;
+  simulation?: { outcome: SimulationOutcome } | null;
   strategy?: {
     mode: StrategyDetail['mode'];
     targetPrice: { toString(): string };
@@ -368,6 +377,7 @@ function asBill(doc: {
       : {}),
     ...(doc.insufficientBalance ? { insufficientBalance: true } : {}),
     ...(doc.safetyNet?.transferId ? { safetyNetTransferId: doc.safetyNet.transferId } : {}),
+    ...(doc.simulation ? { simulation: { outcome: doc.simulation.outcome } } : {}),
     ...(strategy ? { strategy } : {}),
   };
 }
