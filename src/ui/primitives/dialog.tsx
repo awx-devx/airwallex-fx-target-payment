@@ -12,8 +12,11 @@ export type DialogSize = 'sm' | 'md' | 'lg';
 const WIDTH: Record<DialogSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
-  lg: 'max-w-lg',
+  lg: 'max-w-3xl',
 };
+
+/** Grow with the content. Scroll only once the panel reaches the screen. */
+const PANEL = 'flex max-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden';
 
 export function Dialog({
   open,
@@ -63,7 +66,8 @@ export function Dialog({
               <DialogPrimitive.Content asChild forceMount>
                 <motion.div
                   className={cx(
-                    'relative z-10 w-full rounded-lg border border-line-1 bg-bg-1 p-5',
+                    'relative z-10 rounded-lg border border-line-1 bg-bg-1 p-5',
+                    PANEL,
                     WIDTH[size],
                     tone === 'glow' && 'glow-lg',
                     tone === 'danger' && 'border-down',
@@ -73,22 +77,24 @@ export function Dialog({
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ duration: dur3, ease: easeOut }}
                 >
-                  <DialogPrimitive.Title className="text-base font-medium">
-                    {title}
-                  </DialogPrimitive.Title>
-                  {description ? (
-                    <DialogPrimitive.Description className="mt-1 text-fg-2">
-                      {description}
-                    </DialogPrimitive.Description>
-                  ) : (
-                    <DialogPrimitive.Description className="sr-only">
+                  <div className="shrink-0">
+                    <DialogPrimitive.Title className="text-base font-medium">
                       {title}
-                    </DialogPrimitive.Description>
-                  )}
-                  <div className={cx('mt-4', scroll && 'max-h-40 overflow-auto')}>
-                    {children}
+                    </DialogPrimitive.Title>
+                    {description ? (
+                      <DialogPrimitive.Description className="mt-1 text-fg-2">
+                        {description}
+                      </DialogPrimitive.Description>
+                    ) : (
+                      <DialogPrimitive.Description className="sr-only">
+                        {title}
+                      </DialogPrimitive.Description>
+                    )}
                   </div>
-                  {footer ? <div className="mt-5 flex justify-end gap-2">{footer}</div> : null}
+                  <div className={cx('mt-4 min-h-0', scroll && 'overflow-y-auto')}>{children}</div>
+                  {footer ? (
+                    <div className="mt-5 flex shrink-0 justify-end gap-2">{footer}</div>
+                  ) : null}
                 </motion.div>
               </DialogPrimitive.Content>
             </div>
@@ -186,16 +192,19 @@ export function DialogPreview({
   return (
     <div
       className={cx(
-        'w-full rounded-lg border border-line-1 bg-bg-1 p-5',
+        'rounded-lg border border-line-1 bg-bg-1 p-5',
+        PANEL,
         WIDTH[size],
         tone === 'glow' && 'glow-lg',
         tone === 'danger' && 'border-down',
       )}
     >
-      <p className="text-base font-medium">{title}</p>
-      {description ? <p className="mt-1 text-fg-2">{description}</p> : null}
-      <div className={cx('mt-4', scroll && 'max-h-40 overflow-auto')}>{children}</div>
-      {footer ? <div className="mt-5 flex justify-end gap-2">{footer}</div> : null}
+      <div className="shrink-0">
+        <p className="text-base font-medium">{title}</p>
+        {description ? <p className="mt-1 text-fg-2">{description}</p> : null}
+      </div>
+      <div className={cx('mt-4 min-h-0', scroll && 'overflow-y-auto')}>{children}</div>
+      {footer ? <div className="mt-5 flex shrink-0 justify-end gap-2">{footer}</div> : null}
     </div>
   );
 }

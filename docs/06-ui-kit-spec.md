@@ -50,7 +50,7 @@ Each component ships with: a typed props interface, all variants, a `*.fixtures.
 | `Tooltip` | text, rich (title + body). 4px corner, hairline, no drop shadow. | — | delay variants |
 | `Popover` | with arrow, without. 4px corner, hairline, no drop shadow. | — | — |
 | `DropdownMenu` | items, icons, shortcuts, separators, destructive item, submenu. 4px corner, hairline, no drop shadow. | — | — |
-| `Dialog` / `Modal` | `default`, `glow` (target-hit, `--glow-lg`), `danger`. 4px corner, hairline, no drop shadow. | `sm` `md` `lg` | with footer actions, scrolling body |
+| `Dialog` / `Modal` | `default`, `glow` (target-hit, `--glow-lg`), `danger`. 4px corner, hairline, no drop shadow. The panel grows with its content up to `100dvh` minus the inset; the body scrolls only past that. | `sm` `md` `lg` (`max-w-3xl`) | with footer actions, scrolling body |
 | `Drawer` / `Sheet` | right, bottom | `md` `lg` | — |
 | `Tabs` | underline (terminal bottom panel), square | `sm` `md` | with count badge, disabled |
 | `Card` / `Panel` | `flat`, `raised` (no shadow), `glow-border` (flat orange rule), `interactive` | — | hover (surface only), selected (orange rule + wash) |
