@@ -102,7 +102,7 @@ Many bill currencies are **buy-only**, and "Pure Conversion (hold in wallet)" is
 
 The chart combines three layers:
 
-1. **Backfill** (context only): a daily reference series from a third-party source (default: ECB reference rates through the free Frankfurter API; coverage is about 30 majors). It is labelled "reference mid", not executable.
+1. **Backfill** (context only): about 90 days of ECB daily fixings, fetched from Frankfurter and, when that call fails, from the ECB data API. Both are cached in `reference_rates`. The series is labelled "reference mid", not executable. The Airwallex rate is appended as the current point. While both hosts are down the chart stays loading and does not draw a line that starts at the first tick of this session.
 2. **Live ticks**: our own polling of `fx/rates/current` (CLIENT level, bill-sized), stored in `rate_ticks`. This is what the entry and target lines compare against.
 3. **Demo mode**: a seeded market simulator replaces layer 2 so movement is visible within minutes (see [08](./08-demo-plan.md)).
 

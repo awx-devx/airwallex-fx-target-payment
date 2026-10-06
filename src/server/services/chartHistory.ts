@@ -31,3 +31,14 @@ export function mergeHistory(
     .sort((left, right) => left[0] - right[0])
     .map(([time, value]) => ({ time, value }));
 }
+
+/** The live Airwallex mark on the right edge, when that timestamp is not already a tick. */
+export function appendSpot(
+  series: readonly ChartSeriesPoint[],
+  spot: { time: number; value: string } | undefined,
+): ChartSeriesPoint[] {
+  if (!spot || series.some((point) => point.time === spot.time)) return [...series];
+  return [...series, { time: spot.time, value: spot.value }].sort(
+    (left, right) => left.time - right.time,
+  );
+}

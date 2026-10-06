@@ -6,7 +6,7 @@ import { fromDecimal128 } from '@/server/db/decimal';
 import { Bill, BillEvent, Quote, RateTick } from '@/server/db/models';
 import type { Env } from '@/server/env';
 import { notFound } from '@/server/services/errors';
-import { mergeHistory, sessionSpans } from '@/server/services/chartHistory';
+import { appendSpot, mergeHistory, sessionSpans } from '@/server/services/chartHistory';
 import { referenceSeries } from '@/server/services/history';
 import { sharedPairTicks } from '@/server/services/pairPrice';
 import mongoose from 'mongoose';
@@ -38,12 +38,13 @@ export async function billChart(input: {
     seriesFor(pair.base, pair.quote, span.from, span.to, span.unit),
     sessionSeries(bill._id, span.from, span.to),
   ]);
-  const reference = await referenceSeries(
+  const history = await referenceSeries(
     input.env,
     pair,
     span.from.toISOString().slice(0, 10),
     span.to.toISOString().slice(0, 10),
   );
+  const reference = history.points;
   const events = await BillEvent.find({ billId: bill._id }).sort({ ts: 1 }).lean();
   const quote = await Quote.findOne({ billId: bill._id, validToAt: { $gt: now } }).sort({ validToAt: -1 }).lean();
   const spans = sessionSpans(
@@ -77,8 +78,19 @@ export async function billChart(input: {
     }),
     ...(spans.length > 0 ? { simulatedRanges: spans } : {}),
   };
+  if (history.pending) {
+    return chartResponseSchema.parse({
+      series: [],
+      overlays,
+      historyPending: true,
+    });
+  }
+  const merged = mergeHistory(mergeHistory(reference, ticks), session);
+  const spot = bill.last
+    ? { time: seconds(bill.last.at), value: decimalString(fromDecimal128(bill.last.price)) }
+    : undefined;
   return chartResponseSchema.parse({
-    series: mergeHistory(mergeHistory(reference, ticks), session),
+    series: reference.length > 0 ? appendSpot(merged, spot) : merged,
     overlays,
     ...(reference.length > 0 ? { reference } : {}),
   });

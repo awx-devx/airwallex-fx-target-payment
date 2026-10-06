@@ -69,6 +69,7 @@ export function BillIntake({
   const id = ids[index];
   const billQuery = useBill(open ? id : undefined);
   const chart = useChart(step === 'strategy' ? id : undefined, 'TO_DUE');
+  const historyPending = chart.isPending || chart.data?.historyPending === true;
   const actions = useBillActions();
   const bill = billQuery.data;
   const extraction = bill?.documents?.[0]?.extraction;
@@ -305,7 +306,8 @@ export function BillIntake({
             maxCost={maxCost}
             onMaxCostChange={setMaxCost}
             homeCurrency={bill.pair.quote}
-            series={chart.data?.series ?? []}
+            series={historyPending ? [] : (chart.data?.series ?? [])}
+            state={historyPending ? 'loading' : 'ready'}
             overlays={{
               ...(bill.lastPrice ? { entry: bill.lastPrice } : {}),
               ...(target ? { target } : {}),

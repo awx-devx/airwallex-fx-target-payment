@@ -1,4 +1,4 @@
-import { mergeHistory, sessionSpans } from '@/server/services/chartHistory';
+import { appendSpot, mergeHistory, sessionSpans } from '@/server/services/chartHistory';
 import { describe, expect, it } from 'vitest';
 
 describe('mergeHistory', () => {
@@ -15,6 +15,20 @@ describe('mergeHistory', () => {
       { time: day, value: '1.10' },
       { time: day * 2, value: '1.15' },
     ]);
+  });
+});
+
+describe('appendSpot', () => {
+  it('adds the live mark when that time is not already on the series', () => {
+    expect(appendSpot([{ time: 10, value: '1.10' }], { time: 20, value: '1.12' })).toEqual([
+      { time: 10, value: '1.10' },
+      { time: 20, value: '1.12' },
+    ]);
+  });
+
+  it('leaves a series that already has that timestamp', () => {
+    const series = [{ time: 10, value: '1.10' }];
+    expect(appendSpot(series, { time: 10, value: '1.12' })).toEqual(series);
   });
 });
 

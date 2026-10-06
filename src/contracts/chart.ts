@@ -58,5 +58,7 @@ export const chartResponseSchema = z.object({
   series: z.array(chartSeriesPointSchema),
   overlays: chartOverlaysSchema,
   reference: z.array(chartSeriesPointSchema).optional(),
+  /** Daily history could not be loaded. The chart waits instead of drawing ticks from this session. */
+  historyPending: z.boolean().optional(),
 });
 export type ChartResponse = z.infer<typeof chartResponseSchema>;

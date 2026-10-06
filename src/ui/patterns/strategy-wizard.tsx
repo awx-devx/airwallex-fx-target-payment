@@ -22,6 +22,7 @@ export function StrategyWizardStep({
   homeCurrency,
   series,
   overlays,
+  state,
 }: {
   pair: Pair;
   amount: string;
@@ -34,6 +35,7 @@ export function StrategyWizardStep({
   homeCurrency: string;
   series: ChartSeriesPoint[];
   overlays: ChartOverlays;
+  state?: 'ready' | 'loading';
 }) {
   const [range, setRange] = useState<ChartRange>('TO_DUE');
   const cost = formatMoney(homeCurrency, decimalString(D(amount).mul(D(target))));
@@ -67,6 +69,7 @@ export function StrategyWizardStep({
         interactive
         onTargetDrag={onTargetChange}
         showHeader={false}
+        state={state}
         height={220}
         notional={{ amount, currency: homeCurrency }}
       />

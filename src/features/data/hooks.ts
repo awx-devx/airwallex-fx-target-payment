@@ -46,6 +46,7 @@ export function useChart(id: string | undefined, range: ChartRange) {
     queryKey: qk.chart(id ?? '', range),
     queryFn: () => dataSource().getChart(id ?? '', { range }),
     enabled: Boolean(id),
+    refetchInterval: (query) => (query.state.data?.historyPending ? 15_000 : false),
   });
 }
 

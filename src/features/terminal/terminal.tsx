@@ -503,7 +503,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                     <Button onClick={() => ui.setUpload(true)}>Upload bills</Button>
                   }
                 />
-              ) : selected && chart.data ? (
+              ) : selected && chart.data && !chart.data.historyPending ? (
                 <FxChart
                   pair={selected.pair}
                   series={chart.data.series}
@@ -552,7 +552,11 @@ export function TerminalScreen({ billId }: { billId?: string }) {
                   onRangeChange={ui.setRange}
                   type={ui.chartType}
                   onTypeChange={ui.setChartType}
-                  state={bills.isLoading || chart.isLoading ? 'loading' : 'empty'}
+                  state={
+                    bills.isLoading || chart.isLoading || chart.data?.historyPending
+                      ? 'loading'
+                      : 'empty'
+                  }
                   connection={connection}
                   simulated={selected?.flags.simulated === true}
                   height="fill"

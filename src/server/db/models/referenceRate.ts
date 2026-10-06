@@ -8,7 +8,7 @@ const referenceRateSchema = new Schema(
     quote: { type: String, required: true },
     date: { type: Date, required: true },
     mid: { type: Schema.Types.Decimal128, required: true },
-    source: { type: String, enum: ['FRANKFURTER'], required: true },
+    source: { type: String, enum: ['FRANKFURTER', 'ECB'], required: true },
   },
   collection('reference_rates'),
 );
