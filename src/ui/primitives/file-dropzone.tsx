@@ -1,6 +1,6 @@
 'use client';
 
-import type { DragEvent, ReactNode } from 'react';
+import { useRef, type DragEvent, type ReactNode } from 'react';
 import { cx } from '@/ui/primitives/cx';
 import { ProgressBar } from '@/ui/primitives/progress';
 
@@ -30,6 +30,7 @@ export function FileDropzone({
   /** Per-file mark rendered by the caller. Upload uses it for the extraction orb. */
   mark?: (file: DropFile) => ReactNode;
 }) {
+  const input = useRef<HTMLInputElement>(null);
   function drop(event: DragEvent) {
     event.preventDefault();
     onFiles?.([...event.dataTransfer.files]);
@@ -38,6 +39,13 @@ export function FileDropzone({
     <div
       onDragOver={(event) => event.preventDefault()}
       onDrop={drop}
+      onClick={() => input.current?.click()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') input.current?.click();
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label="Choose invoices"
       className={cx(
         'rounded-md border border-dashed px-4 text-center',
         size === 'lg' ? 'py-10' : 'py-6',
@@ -45,6 +53,20 @@ export function FileDropzone({
         error && 'border-down',
       )}
     >
+      <input
+        ref={input}
+        type="file"
+        className="sr-only"
+        multiple
+        accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg"
+        aria-label="Invoice files"
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          const chosen = event.target.files;
+          if (chosen && chosen.length > 0) onFiles?.([...chosen]);
+          event.target.value = '';
+        }}
+      />
       <p className="text-fg-2">Drop invoices here, or choose files</p>
       {error ? <p className="mt-2 text-down">{error}</p> : null}
       <ul className="mt-3 space-y-2 text-left">

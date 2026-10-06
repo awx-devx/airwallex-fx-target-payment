@@ -12,7 +12,7 @@ import type { RateSourceKind } from '@/contracts/sse';
 import { decimalString } from '@/contracts/money';
 import { allowedActions } from '@/contracts/permissions';
 import { fromDecimal128 } from '@/server/db/decimal';
-import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel, Execution } from '@/server/db/models';
+import { Beneficiary, Bill, BillDocument, BillEvent as BillEventModel, Execution, RateTick } from '@/server/db/models';
 import { formatUtcDate } from '@/server/domain/deadline';
 import { extractedBillSchema, extractionStatusSchema } from '@/contracts/extraction';
 import { checkBill } from '@/server/domain/billChecks';
@@ -43,7 +43,9 @@ export async function listBills(
   const docs = await Bill.find(filter).sort({ createdAt: -1 }).lean();
   const beneficiaries = await loadBeneficiaries(docs.map((doc) => doc.beneficiaryId).filter(Boolean));
   const executions = await loadExecutions(docs.map((doc) => String(doc._id)));
-  return docs.map((doc) => toSummary(asBill(doc), beneficiaries, demoMode, today, read, executions.get(String(doc._id))));
+  const loaded = docs.map((doc) => asBill(doc));
+  await clearCopiedSessionMarks(loaded);
+  return loaded.map((bill) => toSummary(bill, beneficiaries, demoMode, today, read, executions.get(bill.id)));
 }
 
 export async function billDetail(
@@ -55,6 +57,7 @@ export async function billDetail(
   const doc = await Bill.findById(id).lean();
   if (!doc) return null;
   const bill = asBill(doc);
+  await clearCopiedSessionMarks([bill]);
   const [beneficiaries, documents, events] = await Promise.all([
     loadBeneficiaries(bill.beneficiaryId ? [bill.beneficiaryId] : []),
     BillDocument.find({ billId: doc._id }).sort({ createdAt: 1 }).lean(),
@@ -371,6 +374,66 @@ function asBill(doc: {
 
 function money(value: { toString(): string }): string {
   return decimalString(fromDecimal128(value));
+}
+
+/**
+ * A sample copies the latest pair tick onto the bill. When that tick was another
+ * bill's Simulate session, drop it and show the shared pair mark instead.
+ */
+async function clearCopiedSessionMarks(bills: LoadedBill[]): Promise<void> {
+  const session = await RateTick.find({ 'meta.simId': { $exists: true } })
+    .select({ price: 1, 'meta.billId': 1 })
+    .lean();
+  if (session.length === 0) return;
+  const owners = new Set(session.map((tick) => String(tick.meta.billId)));
+  const prices = new Set(session.map((tick) => decimalString(fromDecimal128(tick.price))));
+  const copied = bills.filter((bill) => bill.lastPrice && !owners.has(bill.id) && prices.has(bill.lastPrice));
+  if (copied.length === 0) return;
+  const market = await latestSharedMarks();
+  for (const bill of copied) {
+    const tick = market.get(`${bill.billCurrency}:${bill.homeCurrency}`);
+    if (!tick) {
+      bill.lastPrice = undefined;
+      bill.lastTickAt = undefined;
+      bill.lastSource = undefined;
+      continue;
+    }
+    bill.lastPrice = tick.price;
+    bill.lastTickAt = tick.at;
+    bill.lastSource = tick.source;
+  }
+}
+
+async function latestSharedMarks(): Promise<
+  Map<string, { price: string; at: string; source: RateSourceKind }>
+> {
+  const rows = (await RateTick.aggregate([
+    { $match: { 'meta.simId': { $exists: false } } },
+    { $sort: { ts: -1 } },
+    {
+      $group: {
+        _id: { base: '$meta.base', quote: '$meta.quote' },
+        price: { $first: '$price' },
+        ts: { $first: '$ts' },
+        source: { $first: '$meta.source' },
+      },
+    },
+  ])) as {
+    _id: { base: string; quote: string };
+    price: { toString(): string };
+    ts: Date;
+    source: RateSourceKind;
+  }[];
+  const marks = new Map<string, { price: string; at: string; source: RateSourceKind }>();
+  for (const row of rows) {
+    const source = row.source === 'AIRWALLEX' || row.source === 'REFERENCE' ? row.source : 'SIMULATED';
+    marks.set(`${row._id.base}:${row._id.quote}`, {
+      price: decimalString(fromDecimal128(row.price)),
+      at: row.ts.toISOString(),
+      source,
+    });
+  }
+  return marks;
 }
 
 export type { LoadedBill };

@@ -85,14 +85,16 @@ export function useStream() {
     if (isApiDataSource()) {
       return connectStream({
         onEvent: (event) => {
-          if (event.type === 'tick') {
+          if (event.type === 'tick' && !event.simId) {
             setConnection(event.source === 'SIMULATED' ? 'simulated' : 'live');
           }
           if (event.type === 'clock') setNow(event.now);
           rememberNotice(setNotices, event);
           applyAppEvent(client, event);
         },
-        onStatus: setConnection,
+        onStatus: (status) => {
+          setConnection((current) => (status === 'live' && current === 'simulated' ? current : status));
+        },
         onPoll: () => {
           void client.invalidateQueries({ queryKey: qk.bills });
           void client.invalidateQueries({ queryKey: qk.balances });

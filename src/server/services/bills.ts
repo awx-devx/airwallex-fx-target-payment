@@ -22,6 +22,7 @@ import { targetPriceFromMaxCost } from '@/server/domain/rateMath';
 import { REARM_IMPROVE_BPS, evaluateTrigger } from '@/server/domain/trigger';
 import mongoose from 'mongoose';
 import { invalid, notFound, ServiceError } from '@/server/services/errors';
+import { currentPairPrice, sharedPairTicks } from '@/server/services/pairPrice';
 import { conversionSkipDates } from '@/server/services/reference';
 import { enqueueStrategy } from '@/server/queue/work';
 import { notePastDeadlinePayment } from '@/server/services/deadline';
@@ -87,15 +88,21 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
   if (!EDITABLE.has(bill.state)) {
     throw new ServiceError('INVALID_STATE', `${bill.state} cannot be edited`, 409);
   }
+  const currencyChange = Boolean(body.billCurrency && body.billCurrency !== bill.billCurrency);
+  if (currencyChange) {
+    if (bill.state !== 'DRAFT') throw invalid('Currency can only change on a draft');
+    if (body.billCurrency === bill.homeCurrency) throw invalid('Choose a foreign bill currency');
+  }
+  const billCurrency = currencyChange && body.billCurrency ? body.billCurrency : bill.billCurrency;
   const transferMethod = body.transferMethod ?? bill.transferMethod;
   const leadDays = body.transferMethod ? defaultLeadDays(body.transferMethod) : bill.leadDays;
   const dueDate = body.dueDate ?? formatUtcDate(bill.dueDate);
   const schedule =
-    body.dueDate || body.transferMethod
+    body.dueDate || body.transferMethod || currencyChange
       ? executionSchedule({
           dueDate,
           leadDays,
-          skip: await conversionSkipDates(ctx, bill.billCurrency, bill.homeCurrency),
+          skip: await conversionSkipDates(ctx, billCurrency, bill.homeCurrency),
           cutoff: bill.strategy?.autosettleCutoff ?? ctx.cutoff,
           timeZone: ctx.accountTz,
         })
@@ -111,6 +118,7 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
         ...(body.reference ? { reference: body.reference } : {}),
         ...(body.transferReason ? { transferReason: body.transferReason } : {}),
         ...(body.transferMethod ? { transferMethod, leadDays } : {}),
+        ...(currencyChange ? { billCurrency } : {}),
         ...(schedule
           ? {
               executionDeadline: utcDateOnly(schedule.executionDeadline),
@@ -121,6 +129,7 @@ export async function patchBill(id: string, body: PatchBillBody, ctx: BillContex
             }
           : {}),
       },
+      ...(currencyChange ? { $unset: { last: '' } } : {}),
       $inc: { version: 1 },
     },
     { returnDocument: 'after' },
@@ -202,6 +211,11 @@ export async function putStrategy(
 export async function reviewBill(id: string, ctx: BillContext): Promise<BillDetail> {
   const bill = await requireDoc(id);
   if (!bill.beneficiaryId) throw invalid('Add the vendor bank account before review');
+  if (!D(moneyOf(bill.billAmount)).gt(0)) throw invalid('Enter the bill amount before review');
+  if (bill.billCurrency === bill.homeCurrency) throw invalid('Choose a foreign bill currency before review');
+  const mark = bill.last
+    ? undefined
+    : await currentPairPrice(ctx.env, { base: bill.billCurrency, quote: bill.homeCurrency });
   const userId = await demoUserId();
   return applyTransition({
     billId: id,
@@ -213,6 +227,13 @@ export async function reviewBill(id: string, ctx: BillContext): Promise<BillDeta
     read: billReadContext(ctx.env, ctx.clock),
     publisher: ctx.publisher,
     today: accountDate(ctx.clock.now(), ctx.accountTz),
+    ...(mark
+      ? {
+          patch: {
+            last: { price: toDecimal128(mark.price), at: ctx.clock.now(), source: mark.source },
+          },
+        }
+      : {}),
   });
 }
 
@@ -220,13 +241,25 @@ export async function armBill(id: string, body: ArmBody, ctx: BillContext): Prom
   const bill = await requireDoc(id);
   if (!bill.beneficiaryId) throw invalid('Resolve a beneficiary before arming');
   if (!bill.strategy) throw invalid('Set a strategy before arming');
-  if (!bill.last) throw invalid('A rate is required to capture the entry');
+  if (!D(moneyOf(bill.billAmount)).gt(0)) throw invalid('Enter the bill amount before review');
+  if (bill.billCurrency === bill.homeCurrency) throw invalid('Choose a foreign bill currency before review');
+  const stored = bill.last
+    ? {
+        price: moneyOf(bill.last.price),
+        at: bill.last.at,
+        source: bill.last.source === 'AIRWALLEX' ? ('AIRWALLEX' as const) : ('SIMULATED' as const),
+      }
+    : await currentPairPrice(ctx.env, { base: bill.billCurrency, quote: bill.homeCurrency }).then((mark) => ({
+        price: mark.price,
+        at: ctx.clock.now(),
+        source: mark.source,
+      }));
   const entry = await armEntry({
     base: bill.billCurrency,
     quote: bill.homeCurrency,
-    price: moneyOf(bill.last.price),
-    at: bill.last.at,
-    source: bill.last.source === 'AIRWALLEX' ? 'AIRWALLEX' : 'SIMULATED',
+    price: stored.price,
+    at: stored.at,
+    source: stored.source,
   });
   await assertTransferValid(ctx, bill, body);
   const leadDays = defaultLeadDays(body.transferMethod);
@@ -387,7 +420,7 @@ async function armEntry(stored: {
   at: Date;
   source: 'AIRWALLEX' | 'SIMULATED';
 }): Promise<{ price: string; at: Date; source: 'AIRWALLEX' | 'SIMULATED' }> {
-  const tick = await RateTick.findOne({ 'meta.base': stored.base, 'meta.quote': stored.quote })
+  const tick = await RateTick.findOne(sharedPairTicks({ base: stored.base, quote: stored.quote }))
     .sort({ ts: -1 })
     .lean();
   if (tick && tick.ts.getTime() > stored.at.getTime()) {

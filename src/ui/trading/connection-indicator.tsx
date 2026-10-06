@@ -4,7 +4,7 @@ const VIEW = {
   live: { label: 'Live', dot: 'bg-up glow-pulse', text: 'text-up' },
   delayed: { label: 'Delayed', dot: 'bg-warn', text: 'text-warn' },
   offline: { label: 'Offline', dot: 'bg-down', text: 'text-down' },
-  simulated: { label: 'SIM', dot: 'bg-orange-500', text: 'text-orange-300' },
+  simulated: { label: 'Simulated', dot: 'bg-orange-500', text: 'text-orange-300' },
 } as const;
 
 export function ConnectionIndicator({

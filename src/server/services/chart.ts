@@ -6,8 +6,9 @@ import { fromDecimal128 } from '@/server/db/decimal';
 import { Bill, BillEvent, Quote, RateTick } from '@/server/db/models';
 import type { Env } from '@/server/env';
 import { notFound } from '@/server/services/errors';
-import { mergeHistory } from '@/server/services/chartHistory';
+import { mergeHistory, sessionSpans } from '@/server/services/chartHistory';
 import { referenceSeries } from '@/server/services/history';
+import { sharedPairTicks } from '@/server/services/pairPrice';
 import mongoose from 'mongoose';
 
 const MARKERS: Partial<Record<string, ChartMarkerKind>> = {
@@ -32,15 +33,28 @@ export async function billChart(input: {
   if (!bill) throw notFound();
   const now = input.clock.now();
   const span = rangeWindow(input.range, bill.dueDate, now);
-  const ticks = await seriesFor(bill.billCurrency, bill.homeCurrency, span.from, span.to, span.unit);
+  const pair = { base: bill.billCurrency, quote: bill.homeCurrency };
+  const [ticks, session] = await Promise.all([
+    seriesFor(pair.base, pair.quote, span.from, span.to, span.unit),
+    sessionSeries(bill._id, span.from, span.to),
+  ]);
   const reference = await referenceSeries(
     input.env,
-    { base: bill.billCurrency, quote: bill.homeCurrency },
+    pair,
     span.from.toISOString().slice(0, 10),
     span.to.toISOString().slice(0, 10),
   );
   const events = await BillEvent.find({ billId: bill._id }).sort({ ts: 1 }).lean();
   const quote = await Quote.findOne({ billId: bill._id, validToAt: { $gt: now } }).sort({ validToAt: -1 }).lean();
+  const spans = sessionSpans(
+    events
+      .filter((event) => event.type === 'SIM_STARTED' || event.type === 'SIM_ENDED')
+      .map((event) => ({ type: event.type, time: seconds(event.ts) })),
+  );
+  if (spans.length === 0 && session.length > 0) {
+    const last = session[session.length - 1];
+    if (last) spans.push({ from: session[0]?.time ?? last.time, to: last.time });
+  }
   const overlays = {
     ...(bill.entry ? { entry: decimalString(fromDecimal128(bill.entry.price)) } : {}),
     ...(bill.strategy ? { target: decimalString(fromDecimal128(bill.strategy.targetPrice)) } : {}),
@@ -61,9 +75,10 @@ export async function billChart(input: {
       if (!kind) return [];
       return [{ time: seconds(event.ts), kind }];
     }),
+    ...(spans.length > 0 ? { simulatedRanges: spans } : {}),
   };
   return chartResponseSchema.parse({
-    series: mergeHistory(reference, ticks),
+    series: mergeHistory(mergeHistory(reference, ticks), session),
     overlays,
     ...(reference.length > 0 ? { reference } : {}),
   });
@@ -95,7 +110,12 @@ async function seriesFor(
   unit: 'minute' | 'hour' | 'day',
 ): Promise<ChartSeriesPoint[]> {
   const rows = (await RateTick.aggregate([
-    { $match: { 'meta.base': base, 'meta.quote': quote, ts: { $gte: from, $lte: to } } },
+    {
+      $match: {
+        ...sharedPairTicks({ base, quote }),
+        ts: { $gte: from, $lte: to },
+      },
+    },
     { $sort: { ts: 1 } },
     {
       $group: {
@@ -108,6 +128,25 @@ async function seriesFor(
   return rows.map((row) => ({
     time: seconds(row._id),
     value: decimalString(fromDecimal128(row.value)),
+  }));
+}
+
+/** Simulate ticks for this bill only, kept at their own timestamps so they do not replace the pair's daily close. */
+async function sessionSeries(
+  billId: mongoose.Types.ObjectId,
+  from: Date,
+  to: Date,
+): Promise<ChartSeriesPoint[]> {
+  const rows = await RateTick.find({
+    'meta.billId': billId,
+    'meta.simId': { $exists: true },
+    ts: { $gte: from, $lte: to },
+  })
+    .sort({ ts: 1 })
+    .lean();
+  return rows.map((row) => ({
+    time: seconds(row.ts),
+    value: decimalString(fromDecimal128(row.price)),
   }));
 }
 

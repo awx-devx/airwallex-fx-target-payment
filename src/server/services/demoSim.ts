@@ -162,6 +162,7 @@ async function stepOne(
       type: 'tick',
       pair: { base: bill.billCurrency, quote: bill.homeCurrency },
       billId: record.billId,
+      simId: record.simId,
       ts: at.toISOString(),
       price: rate.price,
       source: 'SIMULATED',

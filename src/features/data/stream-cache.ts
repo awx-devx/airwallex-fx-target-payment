@@ -12,35 +12,66 @@ function patchBill(list: BillSummary[] | undefined, bill: BillSummary) {
   return next;
 }
 
+type CachedChart = {
+  series: { time: number; value: string }[];
+  overlays: { simulatedRanges?: { from: number; to?: number }[] };
+};
+
+function tickHits(bill: BillSummary, event: Extract<AppEvent, { type: 'tick' }>): boolean {
+  if (event.billId) return bill.id === event.billId;
+  return bill.pair.base === event.pair.base && bill.pair.quote === event.pair.quote && Boolean(bill.lastPrice);
+}
+
+function upsertPoint(
+  series: { time: number; value: string }[],
+  time: number,
+  value: string,
+): { time: number; value: string }[] {
+  const index = series.findIndex((point) => point.time === time);
+  if (index >= 0) {
+    const next = series.slice();
+    next[index] = { time, value };
+    return next;
+  }
+  const last = series[series.length - 1];
+  if (last && last.time > time) return series;
+  return series.concat({ time, value });
+}
+
+function extendSession<T extends { simulatedRanges?: { from: number; to?: number }[] }>(
+  overlays: T,
+  time: number,
+): T {
+  const ranges = overlays.simulatedRanges ?? [];
+  const covered = ranges.some((span) => time >= span.from && (span.to === undefined || time <= span.to));
+  if (covered) return overlays;
+  return { ...overlays, simulatedRanges: [...ranges, { from: time }] };
+}
+
 export function applyAppEvent(client: QueryClient, event: AppEvent): void {
   if (event.type === 'tick') {
     const bills = client.getQueryData<BillSummary[]>(qk.bills);
     if (!bills) return;
     const next = bills.map((bill) =>
-      bill.pair.base === event.pair.base && bill.pair.quote === event.pair.quote && bill.lastPrice
+      tickHits(bill, event)
         ? { ...bill, lastPrice: event.price, flags: { ...bill.flags, stale: false } }
         : bill,
     );
     client.setQueryData(qk.bills, next);
+    const time = Math.floor(Date.parse(event.ts) / 1000);
     for (const bill of next) {
-      if (bill.pair.base !== event.pair.base || bill.pair.quote !== event.pair.quote) continue;
-      if (bill.lastPrice !== event.price) continue;
+      if (!tickHits(bill, event)) continue;
       client.setQueryData(qk.bill(bill.id), (detail: { lastPrice?: string } | undefined) =>
         detail ? { ...detail, lastPrice: event.price } : detail,
       );
-      client.setQueryData(
-        qk.chart(bill.id, 'TO_DUE'),
-        (chart: { series: { time: number; value: string }[] } | undefined) => {
-          if (!chart) return chart;
-          const last = chart.series[chart.series.length - 1];
-          const time = (last?.time ?? 0) + 1;
-          const series =
-            last && last.time >= time
-              ? chart.series.slice(0, -1).concat({ time: last.time, value: event.price })
-              : chart.series.concat({ time, value: event.price });
-          return { ...chart, series: series.slice(-400) };
-        },
-      );
+      client.setQueriesData({ queryKey: ['chart', bill.id] }, (chart: CachedChart | undefined) => {
+        if (!chart) return chart;
+        return {
+          ...chart,
+          series: upsertPoint(chart.series, time, event.price).slice(-400),
+          overlays: event.simId ? extendSession(chart.overlays, time) : chart.overlays,
+        };
+      });
     }
     return;
   }
@@ -50,6 +81,11 @@ export function applyAppEvent(client: QueryClient, event: AppEvent): void {
       detail && typeof detail === 'object' ? { ...detail, ...event.bill } : detail,
     );
     void client.invalidateQueries({ queryKey: qk.events(event.bill.id) });
+    return;
+  }
+  if (event.type === 'extraction.progress') {
+    void client.invalidateQueries({ queryKey: qk.bill(event.billId) });
+    void client.invalidateQueries({ queryKey: qk.bills });
     return;
   }
   if (event.type === 'execution.updated') {

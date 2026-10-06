@@ -70,6 +70,13 @@ export function createApiDataSource(): DataSource {
         onPoll: () => undefined,
       });
     },
+    async uploadFiles(files: File[]): Promise<BillSummary[]> {
+      const form = new FormData();
+      for (const file of files) form.append('files', file);
+      const uploaded = z.object({ bills: summaries });
+      const body = await apiRequest('/api/uploads', uploaded, { method: 'POST', body: form });
+      return body.bills;
+    },
     async resolveBeneficiary(id: string, body: ResolveBeneficiaryBody): Promise<BillSummary> {
       await apiRequest(
         billPath(id, '/beneficiary'),

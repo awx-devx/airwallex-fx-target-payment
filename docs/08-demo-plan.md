@@ -29,7 +29,7 @@ POST /api/demo/reset
 
 The API and the worker are separate processes. Clock speed, market nudges, and Simulate runs are Redis records (`demo:clock`, `demo:market`, `demo:sim:{billId}`) so the worker applies them. The worker clock reads `demo:clock`. Simulate pacing stays on the wall clock.
 
-The **`ConnectionIndicator` shows `SIM`** whenever the feed is simulated, so it is clear which parts are simulated. Quote and transfer IDs shown in the UI are real sandbox IDs.
+The **`ConnectionIndicator` reads `Simulated`** beside a price from a Simulate session, and whenever the shared feed itself is simulated. Quote and transfer IDs shown in the UI are real sandbox IDs.
 
 ### 1.1 Simulate button
 
@@ -48,7 +48,7 @@ The **`ConnectionIndicator` shows `SIM`** whenever the feed is simulated, so it 
 | ~19 / 22 / 25 s | `SETTLING` | Every `advanceEverySec` (3 s): simulation transition to `PROCESSING` → `SENT` → `PAID`, then an immediate `GET /transfers/{id}` applied through `applyTransferStatus` (no waiting for webhooks) | Tracker steps through to **Paid** |
 | ~26 s | `DONE` | Redis key deleted; `SIM_ENDED` bill event | Receipt |
 
-**Price path:** `p(t) = from + (to − from) × easeInOutCubic(t / T) + noise(t)`. `from` is the bill's last real price (so the chart doesn't jump), `to = target × (1 − overshootBps / 10 000)` (default 5 bps past the target), and noise is seeded GBM noise whose amplitude falls to 0 near `T`. After `T` the price holds just past the target (mean-reverting, never back above it) until the bill leaves `WATCHING`. Ticks are stored with `meta.source = 'SIMULATED'` and `meta.simId`, so the chart can style that segment.
+**Price path:** `p(t) = from + (to − from) × easeInOutCubic(t / T) + noise(t)`. `from` is the bill's last real price (so the chart doesn't jump), `to = target × (1 − overshootBps / 10 000)` (default 5 bps past the target), and noise is seeded GBM noise whose amplitude falls to 0 near `T`. After `T` the price holds just past the target (mean-reverting, never back above it) until the bill leaves `WATCHING`. Ticks are stored with `meta.source = 'SIMULATED'`, `meta.billId`, and `meta.simId`. They are drawn only on that bill, as `simulatedRanges`, and the header reads Simulated beside that price. Other bills on the pair keep the shared history and their own mark.
 
 **One demo-only relaxation** (tagged `DEMO-ONLY:` in code, listed in §5):
 

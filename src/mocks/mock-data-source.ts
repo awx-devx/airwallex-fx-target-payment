@@ -245,13 +245,96 @@ export class MockDataSource implements DataSource {
     if (body.reference) bill.reference = body.reference;
     if (body.transferReason) bill.transferReason = body.transferReason;
     if (body.transferMethod) bill.transferMethod = body.transferMethod;
+    if (body.billCurrency && body.billCurrency !== bill.pair.base) {
+      if (bill.state !== 'DRAFT') fail(409, 'INVALID_STATE', 'Currency can only change on a draft');
+      if (body.billCurrency === bill.pair.quote) fail(400, 'VALIDATION_FAILED', 'Choose a foreign bill currency');
+      bill.pair = { base: body.billCurrency, quote: bill.pair.quote };
+      delete bill.lastPrice;
+    }
     return this.publish(bill, undefined, 'user');
+  }
+
+  async uploadFiles(files: File[]): Promise<BillSummary[]> {
+    if (files.length === 0) fail(400, 'VALIDATION_FAILED', 'Choose at least one file');
+    const template = this.store.get('bill-draft') ?? [...this.store.values()][0];
+    if (!template) fail(404, 'NOT_FOUND', 'Sample bill is not loaded');
+    const created: BillSummary[] = [];
+    for (const file of files) {
+      const name = file.name || 'invoice';
+      const mime = file.type || (name.toLowerCase().endsWith('.png') ? 'image/png' : 'application/pdf');
+      const ok = mime === 'application/pdf' || mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/jpg';
+      if (!ok) fail(400, 'VALIDATION_FAILED', `${name} must be a PDF, PNG, or JPG`);
+      if (file.size > 20 * 1024 * 1024) fail(400, 'VALIDATION_FAILED', `${name} must be under 20 MB`);
+      const id = `bill-upload-${this.nextId()}`;
+      const detail: BillDetail = {
+        ...structuredClone(template),
+        id,
+        state: 'DRAFT',
+        vendorName: name.replace(/\.[^.]+$/, '').slice(0, 120) || 'Invoice',
+        invoiceNumber: `pending-${id.slice(-6)}`,
+        amount: '0.00',
+        pair: { base: template.pair.quote, quote: template.pair.quote },
+        reference: `pending-${id.slice(-6)}`,
+        events: [],
+        documents: [
+          {
+            id: `doc-${id}`,
+            filename: name,
+            mime,
+            size: file.size,
+            sha256: id.padEnd(64, 'a').slice(0, 64),
+            extraction: { status: 'PENDING' },
+          },
+        ],
+      };
+      delete detail.beneficiary;
+      delete detail.strategy;
+      delete detail.strategyMode;
+      delete detail.targetPrice;
+      delete detail.maxCost;
+      delete detail.entryPrice;
+      delete detail.lastPrice;
+      delete detail.execution;
+      this.refresh(detail);
+      this.store.set(id, detail);
+      created.push(this.summary(detail));
+      const failRead = /fail/i.test(name);
+      setTimeout(() => {
+        const current = this.store.get(id);
+        if (!current || current.state !== 'DRAFT') return;
+        const document = current.documents[0];
+        if (failRead) {
+          if (document) document.extraction = { status: 'FAILED', error: 'Could not read this invoice' };
+        } else {
+          current.vendorName = 'Northwind Ltd';
+          current.invoiceNumber = `UP-${id.slice(-4)}`;
+          current.amount = '1200.00';
+          current.pair = { base: 'GBP', quote: current.pair.quote };
+          current.lastPrice = '1.27000';
+          current.reference = current.invoiceNumber;
+          if (document) document.extraction = { status: 'DONE' };
+        }
+        this.refresh(current);
+        this.emit({
+          type: 'extraction.progress',
+          billId: id,
+          documentId: document?.id ?? id,
+          filename: name,
+          stage: 'solving',
+          status: failRead ? 'FAILED' : 'DONE',
+        });
+      }, 400);
+    }
+    return created;
   }
 
   async review(id: string): Promise<BillSummary> {
     const bill = this.requireBill(id);
     this.guard(bill, 'REVIEW');
     if (!bill.beneficiary) fail(400, 'VALIDATION_FAILED', 'Add the vendor bank account before review');
+    if (!D(bill.amount).gt(0)) fail(400, 'VALIDATION_FAILED', 'Enter the bill amount before review');
+    if (bill.pair.base === bill.pair.quote) fail(400, 'VALIDATION_FAILED', 'Choose a foreign bill currency before review');
+    if (!bill.lastPrice) bill.lastPrice = '1.100000';
     bill.state = 'READY';
     return this.publish(bill, undefined, 'user');
   }
@@ -283,6 +366,9 @@ export class MockDataSource implements DataSource {
     this.guard(bill, 'RESOLVE_BENEFICIARY');
     const account = (body.iban ?? body.accountNumber ?? '').replaceAll(/\s+/g, '');
     if (account.length < 4) fail(400, 'VALIDATION_FAILED', 'An IBAN or account number is required');
+    if (body.accountCurrency !== bill.pair.base) {
+      fail(400, 'VALIDATION_FAILED', 'The bank account currency has to match the bill');
+    }
     bill.beneficiary = beneficiary({
       id: `ben-${bill.id}`,
       name: body.name,
@@ -297,8 +383,9 @@ export class MockDataSource implements DataSource {
   async arm(id: string, body: ArmBody): Promise<BillSummary> {
     const bill = this.requireBill(id);
     this.guard(bill, 'ARM');
-    if (!bill.lastPrice)
-      fail(409, 'INVALID_STATE', 'Bill has no price to arm against');
+    if (!D(bill.amount).gt(0)) fail(400, 'VALIDATION_FAILED', 'Enter the bill amount before review');
+    if (bill.pair.base === bill.pair.quote) fail(400, 'VALIDATION_FAILED', 'Choose a foreign bill currency before review');
+    if (!bill.lastPrice) bill.lastPrice = '1.100000';
     bill.state = 'WATCHING';
     bill.entryPrice = bill.lastPrice;
     bill.transferMethod = body.transferMethod;
@@ -466,6 +553,7 @@ export class MockDataSource implements DataSource {
         type: 'tick',
         pair: bill.pair,
         billId: bill.id,
+        simId: run.simId,
         ts: this.iso(),
         price,
         source: 'SIMULATED',

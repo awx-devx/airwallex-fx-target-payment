@@ -204,7 +204,7 @@ Indexes: `{ state: 1, 'timers.autosettleAt': 1 }`, `{ state: 1, billCurrency: 1,
 ```ts
 { ts: Date, meta: { base: string, quote: string, billId?: ObjectId, source: 'AIRWALLEX'|'SIMULATED'|'REFERENCE', simId?: string }, price: D128, raw?: Mixed }
 ```
-Secondary index `{ 'meta.base': 1, 'meta.quote': 1, ts: 1 }`. Chart candles come from an aggregation with `$dateTrunc` (1m, 5m, 1h). A repeatable job writes 1-minute rollups into **`rate_candles_1m`** (`{ base, quote, t, o, h, l, c }`, unique `{ base, quote, t }`) for fast long-range charts, kept indefinitely.
+Secondary index `{ 'meta.base': 1, 'meta.quote': 1, ts: 1 }`. Chart candles come from an aggregation with `$dateTrunc` (1m, 5m, 1h). A tick with `simId` is one Simulate session for `meta.billId`: the pair aggregation, the pair mark, and the arm snapshot skip it. That bill's chart appends those ticks at their own timestamps and returns them as `simulatedRanges`. A repeatable job writes 1-minute rollups into **`rate_candles_1m`** (`{ base, quote, t, o, h, l, c }`, unique `{ base, quote, t }`) for fast long-range charts, kept indefinitely.
 
 **`reference_rates`**: third-party daily history cache `{ base, quote, date, mid: D128, source: 'FRANKFURTER' }`, unique `{ base, quote, date, source }`.
 
@@ -288,15 +288,15 @@ interface ChartOverlays {
 | `POST` | `/api/uploads` | Multipart, many files → creates `DRAFT` bills + starts extraction. Returns `429` `RATE_LIMITED` when the uncached files would exceed the Anthropic window, and writes nothing |
 | `GET` | `/api/bills` | List `BillSummary[]` (filters: state, pair) |
 | `GET` | `/api/bills/:id` | Bill detail (summary + documents + strategy + beneficiary) |
-| `PATCH` | `/api/bills/:id` | Edit reviewed fields (DRAFT/READY/FAILED only) |
+| `PATCH` | `/api/bills/:id` | Edit reviewed fields (DRAFT/READY/FAILED only). `billCurrency` is accepted on a draft only, and clears the stored mark so the next review reads the shared pair price |
 | `POST` | `/api/bills/:id/beneficiary` | Resolve/create the Airwallex beneficiary |
-| `PUT` | `/api/bills/:id/strategy` | Set/update strategy (allowed in WATCHING; re-evaluates) |
-| `POST` | `/api/bills/:id/review` | Mark a draft reviewed once the beneficiary is stored. Moves it to `READY` |
+| `PUT` | `/api/bills/:id/strategy` | Set or update the strategy (`READY`, `WATCHING`, or `PAUSED`). A watching bill re-evaluates the trigger. It does not arm |
+| `POST` | `/api/bills/:id/review` | Mark a draft reviewed. Requires a beneficiary, an amount above zero, and a bill currency other than the home currency. If the bill has no mark yet, `last` is set from the shared pair price (never a Simulate session). Moves it to `READY` |
 | `POST` | `/api/bills/:id/arm` | Capture entry, consent, schedule deadline jobs |
 | `POST` | `/api/bills/:id/pause` / `resume` / `rearm` | Pause, resume, or return a failed bill to ready |
 | `POST` | `/api/bills/:id/pay-now` | Lock a quote and pay at market immediately (`mode: MANUAL`) |
 | `POST` | `/api/bills/:id/cancel` | |
-| `GET` | `/api/bills/:id/chart?range=1D` | Merged series (ECB daily history plus our ticks) + `ChartOverlays` + the reference series. `TO_DUE` looks back 90 days. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
+| `GET` | `/api/bills/:id/chart?range=1D` | Merged series (ECB daily history plus shared ticks) + `ChartOverlays` + the reference series. Simulate ticks (`simId`) are appended only for the bill that owns them, with `simulatedRanges`. `TO_DUE` looks back 90 days. `flags.stale` is set when a watching or paused bill's last tick is older than two poll intervals. `flags.noReferenceHistory` is set when `HISTORY_SOURCE=none` |
 | `GET` | `/api/bills/:id/events` | Activity log |
 | `GET` | `/api/balances` | Proxy of Airwallex balances (cached 30 s) |
 | `POST` | `/api/bills/:id/validate-transfer` | `transfers/validate` dry run (also run by `arm`); returns `FieldError[]` |

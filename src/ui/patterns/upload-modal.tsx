@@ -27,7 +27,8 @@ export function UploadBody({
   onSamples?: (count: number) => void;
   onReview?: () => void;
 }) {
-  const ready = phase === 'extracting' && files.every((file) => !file.error && (file.progress ?? 0) >= 100);
+  const reviewable = files.filter((file) => !file.error).length;
+  const ready = phase === 'extracting' && reviewable > 0 && files.every((file) => !file.error && (file.progress ?? 0) >= 100);
   return (
     <div className="space-y-3">
       <FileDropzone
@@ -48,8 +49,8 @@ export function UploadBody({
         ))}
       </div>
       {phase === 'samples' ? <p className="text-xs text-orange-300">Generating sample invoices.</p> : null}
-      {ready || phase === 'partial' ? (
-        <Button onClick={onReview}>Review {files.filter((file) => !file.error).length} bills</Button>
+      {ready || (phase === 'partial' && reviewable > 0) ? (
+        <Button onClick={onReview}>Review {reviewable} bills</Button>
       ) : null}
     </div>
   );

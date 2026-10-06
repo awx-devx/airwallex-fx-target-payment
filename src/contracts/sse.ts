@@ -40,6 +40,8 @@ export const appEventSchema = z.discriminatedUnion('type', [
     type: z.literal('tick'),
     pair: pairSchema,
     billId: z.string().optional(),
+    // Set only for a Simulate session. That price belongs to `billId`.
+    simId: z.string().min(1).optional(),
     ts: isoDateTimeSchema,
     price: decimalStringSchema,
     source: rateSourceSchema,

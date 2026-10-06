@@ -111,4 +111,48 @@ describe('applyAppEvent', () => {
     });
     expect(client.getQueryData<typeof bill[]>(qk.bills)?.[0]?.lastPrice).toBe('1.08');
   });
+
+  it('keeps a Simulate tick on the bill that owns it', () => {
+    const client = new QueryClient();
+    const other = buildBill({ ...bill, id: 'bill-2', invoiceNumber: 'INV-2', lastPrice: '1.120000' });
+    client.setQueryData(qk.bills, [bill, other]);
+    client.setQueryData(qk.chart(bill.id, 'TO_DUE'), {
+      series: [{ time: 1_700_000_000, value: '1.120000' }],
+      overlays: { simulatedRanges: [] as { from: number; to?: number }[] },
+    });
+    applyAppEvent(client, {
+      type: 'tick',
+      pair: { base: 'EUR', quote: 'USD' },
+      billId: bill.id,
+      simId: 'sim-1',
+      ts: '2026-10-06T03:42:00.000Z',
+      price: '1.073612925',
+      source: 'SIMULATED',
+    });
+    const listed = client.getQueryData<typeof bill[]>(qk.bills);
+    expect(listed?.[0]?.lastPrice).toBe('1.073612925');
+    expect(listed?.[1]?.lastPrice).toBe('1.120000');
+    const chart = client.getQueryData<{
+      series: { value: string }[];
+      overlays: { simulatedRanges: { from: number }[] };
+    }>(qk.chart(bill.id, 'TO_DUE'));
+    expect(chart?.series.at(-1)?.value).toBe('1.073612925');
+    expect(chart?.overlays.simulatedRanges).toEqual([{ from: Math.floor(Date.parse('2026-10-06T03:42:00.000Z') / 1000) }]);
+    expect(client.getQueryData(qk.chart(other.id, 'TO_DUE'))).toBeUndefined();
+  });
+
+  it('refetches the bill when extraction finishes', () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    applyAppEvent(client, {
+      type: 'extraction.progress',
+      billId: bill.id,
+      documentId: 'doc-1',
+      filename: 'invoice.pdf',
+      stage: 'solving',
+      status: 'DONE',
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: qk.bill(bill.id) });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: qk.bills });
+  });
 });

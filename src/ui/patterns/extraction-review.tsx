@@ -1,7 +1,7 @@
 'use client';
 
 import type { BeneficiarySummary, FieldError, TransferReason } from '@/contracts/airwallex';
-import type { ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 import { Banner } from '@/ui/primitives/banner';
 import { Button } from '@/ui/primitives/button';
 import { Input } from '@/ui/primitives/input';
@@ -24,6 +24,10 @@ export interface ExtractedField {
   confidence?: 'high' | 'medium' | 'low';
   edited?: boolean;
   missing?: boolean;
+  onChange?: (value: string) => void;
+  type?: InputHTMLAttributes<HTMLInputElement>['type'];
+  inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode'];
+  maxLength?: number;
 }
 
 export function ExtractionReview({

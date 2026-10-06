@@ -45,6 +45,7 @@ export interface DataSource {
   getFormSchema(body: BeneficiarySchemaBody): Promise<BeneficiaryFormSchema>;
   subscribe(listener: (event: AppEvent) => void): () => void;
 
+  uploadFiles(files: File[]): Promise<BillSummary[]>;
   patchBill(id: string, body: PatchBillBody): Promise<BillSummary>;
   review(id: string): Promise<BillSummary>;
   resolveBeneficiary(id: string, body: ResolveBeneficiaryBody): Promise<BillSummary>;

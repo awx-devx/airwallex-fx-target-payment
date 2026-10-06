@@ -84,7 +84,7 @@ Each component ships with: a typed props interface, all variants, a `*.fixtures.
 | `DeadlineMeter` | Horizontal timeline: armed → now → execute-by → due | normal, final day, overdue, with skipped non-conversion day ("Skipped Dec 25: Christmas Day"); compact (list) / full (ticket) |
 | `StateBadge` | Bill state badge (see [03 §1](./03-domain-model.md#state-reference)) | every `BillState`, with pulse for `WATCHING` |
 | `TransferStatusPill` | Airwallex status with step dots `Scheduled → Processing → Sent → Paid` | every `TransferStatus` ([13 §4.3](./13-airwallex-contracts.md#43-status-maps)) incl. `OVERDUE`, `FAILED` with category, "Failed after paid" (late failure), "Awaiting Airwallex approval" (`IN_APPROVAL` family) |
-| `ConnectionIndicator` | Feed health dot | live (green pulse), delayed (warn), offline (down), simulated (orange "SIM") |
+| `ConnectionIndicator` | Feed health dot | live (green pulse), delayed (warn), offline (down), simulated (orange "Simulated") |
 | `EnvBadge` | `SANDBOX` / `PRODUCTION` / `DEMO · SIMULATED MARKET` | — |
 | `BalancePill` | Wallet balance (`available`) for a currency; tooltip with pending / reserved / total | normal, low (warn), insufficient for selected bill (down) |
 | `Sparkline` | Tiny line with the target line + last dot | favourable/adverse; with target hit dot; loading |
@@ -93,8 +93,9 @@ Each component ships with: a typed props interface, all variants, a `*.fixtures.
 | `CostBreakdown` | Bill amount × price, fee (paid by), SWIFT-charges note, total you pay, "vendor receives", vs entry, vs target ([13 §4.2](./13-airwallex-contracts.md#42-response--executions--executionsummary--transfertracker)) | estimated, **tentative** (transfer created, not yet `SCHEDULED`), locked; fee-unknown note; vendor receives less than invoice (warn) |
 | `ActivityItem` | One `bill_event` row (icon, text, ts, actor) | one variant per event type |
 | `KeyValueList` | Dense label/value rows | — |
-| `ExtractionField` | Extracted field with confidence dot + edit | high / medium / low confidence; edited; missing |
+| `ExtractionField` | Extracted field with confidence dot + edit | high / medium / low confidence; edited; missing; editable (`onChange` renders an input and keeps the dot) |
 | `BeneficiaryCard` | Vendor bank display (masked), bank name, methods, verification badge | every `AccountVerification` result ([13 §5.4](./13-airwallex-contracts.md#54-bank-search-validate-verify)): name matches, partial match / incorrect type (confirm checkbox), not matched (danger), account invalid (blocks arming), not verified; missing fields; error |
+| `BankDetailsForm` | Account name, country, IBAN or account number, BIC, local bank code | empty (no account yet); filled; validation error; submit hidden when the review step sends the values with Continue |
 | `ShortcutHint` | Floating hint for keyboard shortcuts | — |
 
 ---

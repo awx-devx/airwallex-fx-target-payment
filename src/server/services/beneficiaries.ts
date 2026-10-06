@@ -46,6 +46,9 @@ export async function resolveBeneficiary(input: {
   if (bill.state !== 'DRAFT' && bill.state !== 'READY' && bill.state !== 'FAILED') {
     throw new ServiceError('INVALID_STATE', `${bill.state} cannot change beneficiary`, 409);
   }
+  if (input.body.accountCurrency !== bill.billCurrency) {
+    throw invalid('The bank account currency has to match the bill');
+  }
   const matched = await matchExisting(input.body);
   const summary = matched ?? (await createResolved(input));
   await Bill.findOneAndUpdate(

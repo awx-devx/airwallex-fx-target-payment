@@ -12,7 +12,8 @@ import { presentApiError } from '@/features/data/errors';
 import { qk } from '@/features/data/keys';
 import { addSampleBills } from '@/features/data/samples';
 import { BillIntake } from '@/features/terminal/intake';
-import { demoControls } from '@/features/data/source';
+import { intakeModeFor, shortcutIntake, splitUploadFiles, type IntakeMode } from '@/features/terminal/flow';
+import { dataSource, demoControls } from '@/features/data/source';
 import { useKitReducedMotion } from '@/ui/motion/freeze';
 import { targetHitTiming } from '@/ui/motion/target-hit';
 import { useReducedMotion } from 'motion/react';
@@ -75,7 +76,9 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const quietFeed = useRef<string | null>(null);
   const quietBills = useRef(false);
   const quietBalances = useRef(false);
-  const reduced = Boolean(useReducedMotion()) || useKitReducedMotion();
+  const motionReduced = useReducedMotion();
+  const kitReduced = useKitReducedMotion();
+  const reduced = Boolean(motionReduced) || kitReduced;
   const [hitPulse, setHitPulse] = useState(false);
   const [ticketNotice, setTicketNotice] = useState<{ tone: 'error' | 'warn' | 'info'; text: string } | null>(
     null,
@@ -110,7 +113,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const chart = useChart(selectedId, ui.range);
   const events = useEvents(selectedId);
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
-  const [intakeIds, setIntakeIds] = useState<string[]>([]);
+  const [intake, setIntake] = useState<{ ids: string[]; mode: IntakeMode } | null>(null);
   const [uploadFiles, setUploadFiles] = useState<DropFile[]>([]);
   const toasted = useRef(0);
 
@@ -153,14 +156,18 @@ export function TerminalScreen({ billId }: { billId?: string }) {
     ui.setTicketOpen(true);
   }
 
-  function onRowAction(bill: BillSummary, action: BillAction) {
+  function openIntake(bill: BillSummary, action: string) {
+    const mode = intakeModeFor(action, bill.state, Boolean(bill.targetPrice));
+    if (!mode) return false;
     select(bill.id);
-    const opensTicket =
-      action === 'REVIEW' ||
-      action === 'EDIT' ||
-      action === 'EDIT_STRATEGY' ||
-      (action === 'RESOLVE_BENEFICIARY' && bill.state !== 'FAILED');
-    if (opensTicket) {
+    setIntake({ ids: [bill.id], mode });
+    return true;
+  }
+
+  function onRowAction(bill: BillSummary, action: BillAction) {
+    if (openIntake(bill, action)) return;
+    select(bill.id);
+    if (action === 'RESOLVE_BENEFICIARY' && bill.state !== 'FAILED') {
       ui.setTicketOpen(true);
       return;
     }
@@ -169,6 +176,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
 
   async function onAction(action: string, bill: BillSummary | undefined = selected) {
     if (!bill) return;
+    if (openIntake(bill, action)) return;
     setTicketNotice(null);
     try {
       if (action === 'ARM') {
@@ -312,7 +320,9 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         void onAction(selected?.state === 'PAUSED' ? 'RESUME' : 'PAUSE');
       } else if (key === 't') {
         event.preventDefault();
-        document.querySelector<HTMLInputElement>('[aria-label="Target rate"]')?.focus();
+        if (!selected) return;
+        const mode = shortcutIntake(selected.state);
+        if (mode) setIntake({ ids: [selected.id], mode });
       } else if (key === 'g') ui.setGrouped(!ui.grouped);
       else if (key === '?') ui.setShortcuts(true);
       else if (key === '`') ui.setDemoOpen(!ui.demoOpen);
@@ -608,6 +618,42 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         files={uploadFiles}
         trigger={null}
         onSamples={startSamples}
+        onFiles={(files) => {
+          const split = splitUploadFiles(files);
+          if (split.rejected.length > 0) {
+            toasts.push({
+              tone: 'warning',
+              title: 'Some files were skipped',
+              body: split.rejected.map((file) => file.message).join(' · '),
+            });
+          }
+          const accepted = files.filter((file) => split.accepted.some((item) => item.name === file.name && item.size === file.size));
+          setUploadFiles([
+            ...accepted.map((file) => ({ name: file.name, progress: 40, extraction: 'working' as const })),
+            ...split.rejected.map((file) => ({ name: file.name, error: file.message })),
+          ]);
+          if (accepted.length === 0) {
+            setUploadPhase('partial');
+            return;
+          }
+          setUploadPhase('uploading');
+          void (async () => {
+            try {
+              const created = await dataSource().uploadFiles(accepted);
+              await queryClient.invalidateQueries({ queryKey: qk.bills });
+              ui.setUpload(false);
+              setUploadPhase('idle');
+              setUploadFiles([]);
+              setIntake({ ids: created.map((bill) => bill.id), mode: 'arm' });
+            } catch (error) {
+              setUploadPhase('partial');
+              setUploadFiles((current) =>
+                current.map((file) => (file.error ? file : { ...file, error: 'Upload failed', extraction: undefined })),
+              );
+              showError(error);
+            }
+          })();
+        }}
         onReview={() => {
           const count = Math.max(1, uploadFiles.filter((file) => !file.error).length);
           void (async () => {
@@ -616,7 +662,7 @@ export function TerminalScreen({ billId }: { billId?: string }) {
               await queryClient.invalidateQueries({ queryKey: qk.bills });
               ui.setUpload(false);
               setUploadPhase('idle');
-              setIntakeIds(ids);
+              setIntake({ ids, mode: 'arm' });
             } catch (error) {
               showError(error);
             }
@@ -624,14 +670,16 @@ export function TerminalScreen({ billId }: { billId?: string }) {
         }}
       />
       <BillIntake
-        ids={intakeIds}
-        open={intakeIds.length > 0}
+        key={intake ? `${intake.mode}:${intake.ids.join(',')}` : 'closed'}
+        ids={intake?.ids ?? []}
+        mode={intake?.mode ?? 'arm'}
+        open={Boolean(intake && intake.ids.length > 0)}
         cutoffLabel="14:00 Los Angeles"
         onOpenChange={(next) => {
-          if (!next) setIntakeIds([]);
+          if (!next) setIntake(null);
         }}
         onFinished={(id) => {
-          setIntakeIds([]);
+          setIntake(null);
           select(id);
           ui.setTicketOpen(true);
         }}

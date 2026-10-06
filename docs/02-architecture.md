@@ -251,7 +251,7 @@ A single stream at `/api/stream` carries all events. Clients filter by `billId`.
 
 | Event | Payload | Emitted when |
 | --- | --- | --- |
-| `tick` | `{ pair, billId?, ts, price, source }` | A new rate tick is stored |
+| `tick` | `{ pair, billId?, simId?, ts, price, source }` | A new rate tick is stored. `simId` marks a Simulate session and is applied only to that bill |
 | `bill.updated` | `BillSummary` | Any bill field or state change |
 | `execution.updated` | `Execution` | Transfer status changed |
 | `notification` | `Notification` | Something should be toasted |

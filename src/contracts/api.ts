@@ -65,6 +65,8 @@ export const patchBillBodySchema = z.object({
   reference: z.string().min(1).optional(),
   transferReason: transferReasonSchema.optional(),
   transferMethod: transferMethodSchema.optional(),
+  /** DRAFT only. The bank account currency follows this. */
+  billCurrency: currencyCodeSchema.optional(),
 });
 export type PatchBillBody = z.infer<typeof patchBillBodySchema>;
 

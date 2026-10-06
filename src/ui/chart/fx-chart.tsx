@@ -438,7 +438,10 @@ export function FxChart(props: FxChartProps) {
     setDrag(null);
   }
 
-  const last = series[series.length - 1]?.value;
+  const lastPoint = series[series.length - 1];
+  const last = lastPoint?.value;
+  const priceSimulated =
+    lastPoint !== undefined && covers(lastPoint.time, overlays.simulatedRanges ?? []);
   const fill = height === 'fill';
   const cost = (price: string) =>
     notional
@@ -457,7 +460,9 @@ export function FxChart(props: FxChartProps) {
           entry={overlays.entry}
           inverted={inverted}
           stale={state === 'stale'}
-          connection={state === 'stale' ? 'delayed' : connection}
+          connection={
+            priceSimulated ? 'simulated' : state === 'stale' ? 'delayed' : connection
+          }
           range={range}
           onRangeChange={(next) => onRangeChange?.(next)}
           type={type}

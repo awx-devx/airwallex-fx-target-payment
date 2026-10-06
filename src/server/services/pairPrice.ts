@@ -7,17 +7,24 @@ import { RateTick } from '@/server/db/models';
 import type { Env } from '@/server/env';
 import { createLogger } from '@/server/logging/logger';
 
+/** Pair history. A Simulate session tick carries `meta.simId` and belongs to one bill. */
+export function sharedPairTicks(pair: { base: string; quote: string }) {
+  return {
+    'meta.base': pair.base,
+    'meta.quote': pair.quote,
+    'meta.simId': { $exists: false },
+  };
+}
+
 /**
- * The price the chart is actually showing: the latest tick for the pair,
+ * The shared price for the pair: the latest tick that is not a Simulate session,
  * otherwise the sandbox indicative rate. The static demo anchor is only a fallback.
  */
 export async function currentPairPrice(
   env: Env,
   pair: { base: string; quote: string },
 ): Promise<{ price: string; source: 'SIMULATED' | 'AIRWALLEX' }> {
-  const tick = await RateTick.findOne({ 'meta.base': pair.base, 'meta.quote': pair.quote })
-    .sort({ ts: -1 })
-    .lean();
+  const tick = await RateTick.findOne(sharedPairTicks(pair)).sort({ ts: -1 }).lean();
   if (tick) {
     return {
       price: decimalString(fromDecimal128(tick.price)),
