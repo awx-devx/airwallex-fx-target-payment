@@ -238,7 +238,7 @@ How `failure_type` shows up in the real `failure` object is not documented. **V1
 
 ### 5.1 Stored summary → `BeneficiarySummary` → `BeneficiaryCard`
 
-From `POST /beneficiaries/create` and `GET /beneficiaries/{id}`: `id` → `airwallexBeneficiaryId`; `beneficiary.company_name` (or first/last name) → `name`; `entity_type`; `bank_details.bank_country_code`, `account_currency`, `bank_name`; masked `account_number`/`iban` (last 4); `transfer_methods[]`; `nickname`. Bank fields are never stored unmasked (04 §2.6).
+From `POST /beneficiaries/create` and `GET /beneficiaries/{id}`: `id` → `airwallexBeneficiaryId`; `beneficiary.company_name`, or first/last name, or `nickname`, or `bank_details.account_name` → `name`; `entity_type`; `bank_details.bank_country_code`, `account_currency`, `bank_name`; masked `account_number`/`iban` (last 4); `transfer_methods[]`. A sandbox create on 2026-10-06 omitted `company_name` and returned the name on `nickname` and `account_name`. Bank fields are never stored unmasked (04 §2.6).
 
 ### 5.2 Dynamic form → `BeneficiaryFormSchema` → `SchemaForm`
 
@@ -271,7 +271,7 @@ Rules: the browser never calls Airwallex directly (our server proxies with the t
 | --- | --- | --- |
 | `GET /beneficiary_form_schemas/supported_financial_institutions?account_currency&bank_country_code&entity_type&transfer_method&keyword&bank_identifier` → `items[{label, value}]`, `truncated` | `BankOption { label, routingValue }`, `truncated` | `DYNAMIC_SELECT` combobox; when `truncated`, shows "Keep typing to narrow results" |
 | `POST /beneficiaries/validate` → `200` or `validation_failed` | `FieldError[]` | Inline errors before create |
-| `POST /beneficiaries/verify_account` → `code`, `details.account_name_match_result`, `resolved_account_name`, `resolved_bank_name` | `AccountVerification` | `BeneficiaryCard` verification badge (below) |
+| `POST /beneficiaries/verify_account` with top-level `entity_type`, `transfer_method`, and `bank_details` → `code`, `details.account_name_match_result`, `resolved_account_name`, `resolved_bank_name` | `AccountVerification` | `BeneficiaryCard` verification badge (below) |
 
 Account verification is **LOCAL only** and covers SEPA countries (Verification of Payee), the UK (Confirmation of Payee) and Viet Nam (NAPAS); Australia is upcoming. Elsewhere we set `code: 'NOT_SUPPORTED'` without calling. `BeneficiaryCard` variants:
 

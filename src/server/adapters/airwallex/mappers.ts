@@ -391,8 +391,12 @@ export function mapBeneficiary(payload: unknown): MappedBeneficiary {
   ]
     .filter((part): part is string => part !== undefined)
     .join(' ');
-  const name = company ?? person;
-  if (name.length === 0) bad('beneficiary response has no name');
+  // Sandbox create responses omit company_name and put the name on nickname
+  // and bank_details.account_name.
+  const name = [company, person, optionalString(payload, 'nickname'), optionalString(bank, 'account_name')].find(
+    (value) => value !== undefined && value.length > 0,
+  );
+  if (!name) bad('beneficiary response has no name');
   const account =
     optionalString(bank, 'account_number') ?? optionalString(bank, 'iban');
   if (!account) bad('beneficiary response has no account number');

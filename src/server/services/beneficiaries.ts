@@ -210,7 +210,7 @@ async function createResolved(input: {
   }
   const mapped = await createBeneficiary(client, { billId: input.billId, body: payload });
   const verification = VERIFY_COUNTRIES.has(draft.country)
-    ? await verifyAccount(client, payload)
+    ? await verifyAccount(client, verificationBody(payload, input.body.entityType, draft.transferMethod))
     : { code: 'NOT_SUPPORTED' as const, checkedAt: input.clock.now().toISOString() };
   const created = await Beneficiary.create({
     airwallexBeneficiaryId: mapped.airwallexBeneficiaryId,
@@ -241,6 +241,21 @@ async function createResolved(input: {
     ),
     ...(mapped.bankName ? { bankName: mapped.bankName } : {}),
     verification,
+  };
+}
+
+function verificationBody(
+  payload: Record<string, unknown>,
+  entityType: string,
+  transferMethod: string,
+): Record<string, unknown> {
+  const beneficiary = record(payload.beneficiary);
+  const bank = record(beneficiary?.bank_details);
+  if (!bank) throw invalid('Beneficiary payload has no bank details');
+  return {
+    entity_type: entityType,
+    transfer_method: transferMethod,
+    bank_details: bank,
   };
 }
 

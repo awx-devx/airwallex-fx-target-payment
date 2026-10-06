@@ -5,6 +5,7 @@ import { AirwallexError, toApiError } from '@/server/adapters/airwallex/errors';
 import { airwallexErrorFromBody } from '@/server/adapters/airwallex/errors';
 import {
   mapBalances,
+  mapBeneficiary,
   mapCurrentRate,
   mapFormSchema,
   mapQuote,
@@ -175,6 +176,23 @@ describe('other mappers', () => {
     );
     expect(balances.map((row) => row.currency)).toEqual(['USD']);
     expect(balances[0].available).toBe('10.00');
+
+    const named = mapBeneficiary({
+      id: 'ben-1',
+      nickname: 'Acme GmbH',
+      transfer_methods: ['LOCAL'],
+      beneficiary: {
+        entity_type: 'COMPANY',
+        bank_details: {
+          account_name: 'Acme GmbH',
+          account_currency: 'EUR',
+          bank_country_code: 'DE',
+          iban: 'DE56370400447389841814',
+        },
+      },
+    });
+    expect(named.name).toBe('Acme GmbH');
+    expect(named.maskedAccount).toBe('••••1814');
 
     const schema = mapFormSchema(
       {
