@@ -11,6 +11,8 @@ export interface TransferMethodOption {
   method: TransferMethod;
   flightTime?: { min?: string; max?: string };
   transferLimit?: { min?: MethodLimit; max?: MethodLimit };
+  /** Set when this bank cannot take the method. The picker disables the option. */
+  unavailable?: string;
 }
 
 const FALLBACK_LEAD: Record<TransferMethod, number> = { LOCAL: 1, SWIFT: 3 };

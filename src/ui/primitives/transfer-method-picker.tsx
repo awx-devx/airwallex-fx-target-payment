@@ -26,7 +26,7 @@ export function TransferMethodPicker({
     <div role="radiogroup" aria-label={label} className="grid gap-2">
       {options.map((option) => {
         const other = options.find((item) => item.method !== option.method)?.method;
-        const blocked = overLimitReason(option, amount, other);
+        const blocked = option.unavailable ?? overLimitReason(option, amount, other);
         const selected = option.method === value;
         const detail = [flightLabel(option), limitLabel(option)].filter(Boolean).join(' · ');
         return (
@@ -48,7 +48,9 @@ export function TransferMethodPicker({
           >
             <span className="block font-medium">{option.method}</span>
             <span className="block text-fg-2">{detail}</span>
-            {blocked ? <span className="block text-warn">{blocked}</span> : null}
+            {blocked ? (
+              <span className={option.unavailable ? 'block text-down' : 'block text-warn'}>{blocked}</span>
+            ) : null}
           </button>
         );
       })}

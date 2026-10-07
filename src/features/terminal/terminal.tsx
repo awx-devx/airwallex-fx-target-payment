@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BalanceSummary } from '@/contracts/airwallex';
+import type { BalanceSummary, TransferMethod } from '@/contracts/airwallex';
 import type { BillAction, BillSummary } from '@/contracts/bill';
 import { D } from '@/contracts/money';
 import { CHART_RANGES } from '@/contracts/chart';
@@ -11,6 +11,7 @@ import { DataSourceError } from '@/contracts/data-source';
 import { presentApiError } from '@/features/data/errors';
 import { qk } from '@/features/data/keys';
 import { addSampleBills } from '@/features/data/samples';
+import { armMethodOptions, methodUnavailable, splitArmErrors } from '@/features/terminal/arm-errors';
 import { BillIntake } from '@/features/terminal/intake';
 import { intakeModeFor, shortcutIntake, splitUploadFiles, type IntakeMode } from '@/features/terminal/flow';
 import { dataSource, demoControls } from '@/features/data/source';
@@ -83,6 +84,12 @@ export function TerminalScreen({ billId }: { billId?: string }) {
   const [ticketNotice, setTicketNotice] = useState<{ tone: 'error' | 'warn' | 'info'; text: string } | null>(
     null,
   );
+  const [rejectedMethod, setRejectedMethod] = useState<{
+    billId: string;
+    method: TransferMethod;
+    message: string;
+  } | null>(null);
+  const [armFields, setArmFields] = useState<{ billId: string; messages: string[] } | null>(null);
 
   function showError(error: unknown) {
     if (error instanceof DataSourceError) {
@@ -185,12 +192,21 @@ export function TerminalScreen({ billId }: { billId?: string }) {
     setPending({ billId: bill.id, action });
     try {
       if (action === 'ARM') {
+        const blocked = methodUnavailable(
+          bill.transferMethod,
+          bill.pair.base,
+          bill.beneficiary?.transferMethods,
+          rejectedMethod?.billId === bill.id ? rejectedMethod : null,
+        );
+        if (blocked) return;
         await actions.arm(bill.id, {
           standingInstruction: true,
           transferMethod: bill.transferMethod,
           transferReason: bill.transferReason,
           reference: bill.reference ?? bill.invoiceNumber,
         });
+        setRejectedMethod(null);
+        setArmFields(null);
       } else if (action === 'PAUSE') await actions.pause(bill.id);
       else if (action === 'RESUME') await actions.resume(bill.id);
       else if (action === 'PAY_NOW') await actions.payNow(bill.id);
@@ -201,7 +217,23 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       else if (action === 'STOP_SIMULATION') await actions.stop(bill.id);
       else if (action === 'ADVANCE_TRANSFER') await actions.advance(bill.id);
     } catch (error) {
-      showError(error);
+      if (
+        action === 'ARM' &&
+        error instanceof DataSourceError &&
+        error.error.code === 'VALIDATION_FAILED'
+      ) {
+        const split = splitArmErrors(error.error.fieldErrors ?? []);
+        if (split.method) {
+          setRejectedMethod({ billId: bill.id, method: bill.transferMethod, message: split.method });
+          setArmFields(null);
+        } else if (split.fields.length > 0) {
+          setArmFields({ billId: bill.id, messages: split.fields });
+        } else {
+          showError(error);
+        }
+      } else {
+        showError(error);
+      }
     } finally {
       setPending(null);
     }
@@ -424,7 +456,36 @@ export function TerminalScreen({ billId }: { billId?: string }) {
       notice={ticketNotice ?? undefined}
       pendingAction={pending?.billId === selected.id ? pending.action : undefined}
       savingBank={pending?.billId === selected.id && pending.action === 'SAVE_BANK'}
+      methods={armMethodOptions(
+        selected.pair.base,
+        selected.beneficiary?.transferMethods,
+        rejectedMethod?.billId === selected.id ? rejectedMethod : null,
+      )}
+      armBlocked={Boolean(
+        methodUnavailable(
+          selected.transferMethod,
+          selected.pair.base,
+          selected.beneficiary?.transferMethods,
+          rejectedMethod?.billId === selected.id ? rejectedMethod : null,
+        ),
+      )}
+      armMessages={armFields?.billId === selected.id ? armFields.messages : []}
       onAction={(action) => void onAction(action)}
+      onMethodChange={(method) => {
+        if (pending) return;
+        setPending({ billId: selected.id, action: 'METHOD' });
+        void (async () => {
+          try {
+            await actions.patch(selected.id, { transferMethod: method });
+            setRejectedMethod(null);
+            setArmFields(null);
+          } catch (error) {
+            showError(error);
+          } finally {
+            setPending(null);
+          }
+        })();
+      }}
       onSaveBankDetails={(input) => {
         if (pending) return;
         setPending({ billId: selected.id, action: 'SAVE_BANK' });

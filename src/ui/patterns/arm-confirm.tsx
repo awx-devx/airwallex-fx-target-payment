@@ -15,6 +15,8 @@ export function ArmConfirm({
   cutoffLabel,
   consent,
   loading = false,
+  blocked = false,
+  messages = [],
   onConsentChange,
   onArm,
 }: {
@@ -22,6 +24,10 @@ export function ArmConfirm({
   cutoffLabel: string;
   consent?: boolean;
   loading?: boolean;
+  /** The selected transfer method cannot be used, so Arm does not send. */
+  blocked?: boolean;
+  /** Friendly validate messages, with no Airwallex field paths. */
+  messages?: readonly string[];
   onConsentChange?: (consent: boolean) => void;
   onArm?: () => void;
 }) {
@@ -58,9 +64,18 @@ export function ArmConfirm({
       <p className={cx('text-xs text-down', checked && 'invisible')} aria-hidden={checked}>
         Standing instruction is required.
       </p>
-      <Button disabled={!checked} loading={loading} onClick={onArm}>
+      <Button disabled={!checked || blocked} loading={loading} onClick={onArm}>
         Arm bill
       </Button>
+      {messages.length > 0 ? (
+        <div className="space-y-1">
+          {messages.map((message) => (
+            <p key={message} className="text-xs text-down">
+              {message}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

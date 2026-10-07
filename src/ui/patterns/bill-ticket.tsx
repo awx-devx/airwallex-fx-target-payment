@@ -1,5 +1,6 @@
 'use client';
 
+import type { TransferMethod } from '@/contracts/airwallex';
 import type { BillSummary } from '@/contracts/bill';
 import type { BillEvent } from '@/contracts/events';
 import { useState } from 'react';
@@ -16,6 +17,8 @@ import { StateBadge } from '@/ui/trading/state-badge';
 import { StrategySummary } from '@/ui/trading/strategy-summary';
 import { formatUtcDate } from '@/ui/trading/time-label';
 import { ArmConfirm } from '@/ui/patterns/arm-confirm';
+import { TransferMethodPicker } from '@/ui/primitives/transfer-method-picker';
+import type { TransferMethodOption } from '@/ui/primitives/transfer-method';
 import { BankDetailsForm, bankCountryFor, type BankDetailsInput } from '@/ui/patterns/bank-details-form';
 import { TransferTracker } from '@/ui/patterns/transfer-tracker';
 
@@ -28,7 +31,11 @@ export function BillTicket({
   notice,
   pendingAction,
   savingBank = false,
+  methods,
+  armBlocked = false,
+  armMessages = [],
   onAction,
+  onMethodChange,
   onSaveBankDetails,
 }: {
   bill: BillSummary;
@@ -39,7 +46,11 @@ export function BillTicket({
   notice?: { tone: 'error' | 'warn' | 'info'; text: string };
   pendingAction?: string;
   savingBank?: boolean;
+  methods?: readonly TransferMethodOption[];
+  armBlocked?: boolean;
+  armMessages?: readonly string[];
   onAction?: (action: string) => void;
+  onMethodChange?: (method: TransferMethod) => void;
   onSaveBankDetails?: (input: BankDetailsInput) => void;
 }) {
   const needsBank =
@@ -73,7 +84,11 @@ export function BillTicket({
                 cutoffLabel={cutoffLabel}
                 quoteId={quoteId}
                 pendingAction={pendingAction}
+                methods={methods}
+                armBlocked={armBlocked}
+                armMessages={armMessages}
                 onAction={onAction}
+                onMethodChange={onMethodChange}
               />
             ),
           },
@@ -123,7 +138,11 @@ function StrategyBody({
   cutoffLabel,
   quoteId,
   pendingAction,
+  methods,
+  armBlocked = false,
+  armMessages = [],
   onAction,
+  onMethodChange,
 }: {
   bill: BillSummary;
   now: string;
@@ -132,7 +151,11 @@ function StrategyBody({
   cutoffLabel: string;
   quoteId?: string;
   pendingAction?: string;
+  methods?: readonly TransferMethodOption[];
+  armBlocked?: boolean;
+  armMessages?: readonly string[];
   onAction?: (action: string) => void;
+  onMethodChange?: (method: TransferMethod) => void;
 }) {
   if (bill.state === 'DRAFT') {
     return (
@@ -167,10 +190,20 @@ function StrategyBody({
         <Button size="sm" variant="ghost" loading={pendingAction === 'EDIT_STRATEGY'} onClick={() => onAction?.('EDIT_STRATEGY')}>
           Edit target
         </Button>
+        {methods ? (
+          <TransferMethodPicker
+            value={bill.transferMethod}
+            onValueChange={(method) => onMethodChange?.(method)}
+            options={methods}
+            amount={bill.amount}
+          />
+        ) : null}
         <ArmConfirm
           bill={bill}
           cutoffLabel={cutoffLabel}
           loading={pendingAction === 'ARM'}
+          blocked={armBlocked}
+          messages={armMessages}
           onArm={() => onAction?.('ARM')}
         />
       </div>
