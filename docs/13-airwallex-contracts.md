@@ -230,7 +230,7 @@ Real transfer failures carry `failure { code, message, details.reason_codes }`; 
 | `CLIENT` | `CLIENT_REQUESTED` | "Cancelled at your request" |
 | `SYSTEM` | `SYSTEM_ERROR`, `CHANNEL_TIMEOUT`, `CARD_ISSUER_ERROR`, `UNABLE_TO_APPLY`, `OTHER`, `INBOUND_*` | "Airwallex couldn't process it, so retry" |
 
-How `failure_type` shows up in the real `failure` object is not documented. **V15** records the object for each type in sandbox, and the mapper matches on `failure.details.type`/`reason_codes` first, then `code`, then falls back to `SYSTEM`.
+How `failure_type` shows up in a real (non-simulated) `failure` object is not documented. The 2026-10-07 sandbox re-check ([01 §7](./01-feasibility-airwallex.md#7-verification-checklist-run-in-sandbox-during-b1b2)) got objects only from `SENT` and `PAID`: `details.type` was `INCORRECT_ROUTING` for both `SYSTEM_ERROR` (`code` `91401`, message `System error`) and `INVALID_ACCOUNT_NAME_OR_NUMBER` (`code` `90101`, message `Invalid account name/number`). The mapper matches `failure.details.type` / `reason_codes` first, then `code`, then falls back to `SYSTEM`, so these simulated objects currently fall back to `SYSTEM`.
 
 ---
 

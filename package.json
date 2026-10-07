@@ -16,6 +16,7 @@
     "db:indexes": "node --env-file=.env --import tsx scripts/db-indexes.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
     "airwallex:smoke": "node --env-file=.env --import tsx scripts/airwallex-smoke.ts",
+    "airwallex:failure-spike": "node --env-file=.env --import tsx scripts/airwallex-failure-spike.ts",
     "seed:beneficiaries": "node --env-file=.env --import tsx scripts/seed-beneficiaries.ts",
     "seed:demo": "node --env-file=.env --import tsx scripts/seed-demo.ts",
     "seed:generate": "node --env-file=.env --import tsx scripts/seed-generate.ts",
