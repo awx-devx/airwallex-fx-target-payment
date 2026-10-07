@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AirwallexClient } from '@/server/adapters/airwallex/client';
-import { createScheduledTransfer, createTransfer } from '@/server/adapters/airwallex/endpoints/transfers';
+import {
+  createScheduledTransfer,
+  createTransfer,
+} from '@/server/adapters/airwallex/endpoints/transfers';
 import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import {
   jsonNumber,
@@ -116,6 +119,57 @@ describe('AirwallexClient', () => {
       stringifyAirwallexJson(body),
     ]);
     expect(sleeps).toEqual([1000, 2000]);
+  });
+
+  it('retries a conversion create that carries the same request_id', async () => {
+    let attempts = 0;
+    const { client, calls } = harness(() => {
+      attempts += 1;
+      if (attempts < 2)
+        return json(500, '{"code":"service_unavailable","message":"down"}');
+      return json(200, '{"conversion_id":"cv_1"}');
+    });
+    await client.request({
+      method: 'POST',
+      path: '/fx/conversions/create',
+      body: { request_id: 'cv:bill-1:1', buy_amount: '10.00' },
+    });
+    expect(
+      calls.filter((call) =>
+        call.url.pathname.endsWith('/fx/conversions/create'),
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('does not retry beneficiary create, simulation, or cancel', async () => {
+    const { client, calls } = harness(() =>
+      json(500, '{"code":"operation_failed","message":"down"}'),
+    );
+    await expect(
+      client.request({
+        method: 'POST',
+        path: '/beneficiaries/create',
+        body: { request_id: 'bf:bill-1', nickname: 'Acme' },
+      }),
+    ).rejects.toBeInstanceOf(AirwallexError);
+    await expect(
+      client.request({
+        method: 'POST',
+        path: '/simulation/transfers/t-1/transition',
+        body: { next_status: 'FAILED', failure_type: 'SYSTEM_ERROR' },
+      }),
+    ).rejects.toBeInstanceOf(AirwallexError);
+    await expect(
+      client.request({
+        method: 'POST',
+        path: '/transfers/t-1/cancel',
+      }),
+    ).rejects.toBeInstanceOf(AirwallexError);
+    expect(
+      calls.filter(
+        (call) => call.url.pathname !== '/api/v1/authentication/login',
+      ),
+    ).toHaveLength(3);
   });
 
   it('does not retry a create that has no request_id', async () => {
@@ -247,7 +301,10 @@ describe('AirwallexClient', () => {
       transferDate: '2026-10-19',
     });
     expect(execution.transferId).toBe('t-scheduled');
-    const body = String(calls.find((call) => call.url.pathname.endsWith('/transfers/create'))?.init.body);
+    const body = String(
+      calls.find((call) => call.url.pathname.endsWith('/transfers/create'))
+        ?.init.body,
+    );
     expect(body).toContain('"request_id":"sn:bill-1"');
     expect(body).toContain('"transfer_date":"2026-10-19"');
     expect(body).toContain('"lock_rate_on_create":false');

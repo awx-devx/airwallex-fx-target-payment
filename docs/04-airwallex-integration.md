@@ -36,11 +36,11 @@ airwallex/
 
 **Rules**
 - **Auth:** `POST /authentication/login` with `x-client-id`, `x-api-key` (+ optional `x-login-as`). One `AirwallexClient` per process (`getAirwallexClient`) caches the token and refreshes when `now > expires_at − 60 s`. Callers share that client, so they share one login and one rate limiter. Token expiry and the limiter use the wall clock, not the warp clock. Never log keys or tokens.
-- **Retries:** retry `429` and `5xx` with exponential backoff and jitter (1 s, 2 s, 4 s, 8 s, max 16 s, 5 attempts). **Never retry a `POST` create unless it carries the same `request_id`.** Airwallex dedupes on it.
+- **Retries:** retry `429` and `5xx` with exponential backoff and jitter (1 s, 2 s, 4 s, 8 s, max 16 s, 5 attempts) for `GET` and `POST …/validate`. A create is retried only for `POST /transfers/create` and `POST /fx/conversions/create`, and only when the body carries the same `request_id` (Airwallex dedupes on it). Do not retry simulation transitions, cancel, quote create, or beneficiary create: a `500` on a sandbox `FAILED` transition is the result, and repeating beneficiary create can insert a second beneficiary.
 - **Idempotency keys (`request_id`, max 64 chars):**
   - Transfer: `tr:{billId}:{attemptNo}`
   - Conversion: `cv:{billId}:{attemptNo}`
-  - Beneficiary: `bf:{billId}` (if supported on that endpoint; otherwise dedupe on our side)
+  - Beneficiary create has **no** `request_id`. `bf:{billId}` is only a local label. The app dedupes with `matchExisting` before create.
   - `attemptNo` only increments after a **terminal** failure, never on a network retry.
 - **Money:** send amounts as **decimal strings in major units**, rounded to the payout precision (KES/SAR are 0 dp on Airwallex, unlike ISO). Responses return amounts as JSON **numbers**: parse bodies with a lossless JSON parser (numbers → strings), then `decimal.js`. See [13 §1](./13-airwallex-contracts.md#1-wire-conventions).
 - **Rates:** `client_rate`, `mid_rate` and `conversion.rate` follow the `currency_pair` market convention. Never use them as `p`; derive `p = sell_amount / buy_amount` and orient reference rates with `orient()` (13 §1).

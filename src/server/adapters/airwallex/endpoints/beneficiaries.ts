@@ -12,8 +12,6 @@ import {
   mapVerification,
   type MappedBeneficiary,
 } from '@/server/adapters/airwallex/mappers';
-import { beneficiaryRequestId } from '@/server/adapters/airwallex/requestIds';
-
 export interface BeneficiaryCondition {
   bankCountry: string;
   accountCurrency: string;
@@ -22,6 +20,10 @@ export interface BeneficiaryCondition {
   countryCode?: string;
 }
 
+/**
+ * `billId` is not sent. `POST /beneficiaries/create` has no `request_id`.
+ * Callers dedupe with `matchExisting` before this.
+ */
 export async function createBeneficiary(
   client: AirwallexClient,
   input: { billId: string; body: Record<string, unknown> },
@@ -29,7 +31,7 @@ export async function createBeneficiary(
   const payload = await client.request({
     method: 'POST',
     path: '/beneficiaries/create',
-    body: { ...input.body, request_id: beneficiaryRequestId(input.billId) },
+    body: input.body,
   });
   return mapBeneficiary(payload);
 }

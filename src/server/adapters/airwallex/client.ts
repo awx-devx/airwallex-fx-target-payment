@@ -398,8 +398,19 @@ function sharedClientKey(env: Env): string {
   ].join('\0');
 }
 
+const RETRYABLE_CREATES = new Set([
+  '/transfers/create',
+  '/fx/conversions/create',
+]);
+
+/**
+ * GET and validate are safe to repeat. A create is repeated only when
+ * Airwallex dedupes it on `request_id`. Simulation transitions and cancel
+ * are not: a 500 there is the answer, not a reason to wait out the backoff.
+ */
 function canRetry(input: AirwallexRequest): boolean {
-  if (input.method !== 'POST' || !input.path.endsWith('/create')) return true;
+  if (input.method === 'GET' || input.path.endsWith('/validate')) return true;
+  if (!RETRYABLE_CREATES.has(input.path)) return false;
   return (
     isRecord(input.body) &&
     typeof input.body.request_id === 'string' &&

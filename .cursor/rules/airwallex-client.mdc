@@ -14,10 +14,10 @@ Endpoint reference: `docs/04-airwallex-integration.md` §2. Field, enum and erro
 - Base URL from `AIRWALLEX_BASE_URL`. Every call except login sends `x-api-version: ${AIRWALLEX_API_VERSION}`.
 - Auth: `POST /api/v1/authentication/login` with `x-client-id` + `x-api-key` (+ `x-login-as` when set). Cache the token and refresh 60 s before `expires_at`, single-flight. On 401, re-login once and retry once. Login is rate-limited (100/min per key), so never log in per request.
 - Rate limits: go through `limiter.ts` (sandbox-safe: 15 rps global, 8 rps per endpoint). Retry `429`/`5xx`/timeouts with exponential backoff + jitter (1 → 16 s, 5 attempts).
-- **Never retry a create without the same `request_id`.**
+- **Retry `GET` and `POST …/validate` on `429`/`5xx`.** Retry a create only for `POST /transfers/create` and `POST /fx/conversions/create`, and only with the same `request_id`. Do not retry simulation transitions, cancel, quote create, or beneficiary create.
 
 ## Idempotency
-- `request_id` (max 64 chars) comes from the shared builders only: `tr:{billId}:{attempt}`, `cv:{billId}:{attempt}`, `bf:{billId}`. `attempt` increments only after a **terminal** failure.
+- `request_id` (max 64 chars) comes from the shared builders only: `tr:{billId}:{attempt}`, `cv:{billId}:{attempt}`. `POST /beneficiaries/create` has no `request_id`; `bf:{billId}` is a local label and the app dedupes with `matchExisting`. `attempt` increments only after a **terminal** failure.
 - On `duplicate_request_id` (legacy `request_id_duplicate`), treat it as success: `details.id` is the existing transfer, so retrieve it. On `409 request_pending`, back off and retry with the same `request_id`.
 - `request_id` dedupe on transfers lasts 7 days; conversions reject any reused `request_id`.
 - If the outcome is unknown after retries, leave the execution `EXECUTING` and let the reconciler discover it. Never "just try again" with a new `request_id`.
