@@ -4,7 +4,7 @@ import { D } from '@/contracts/money';
 import { formatMoney } from '@/ui/format';
 import { commitAmount } from '@/ui/primitives/amount';
 import { Button } from '@/ui/primitives/button';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 function grouped(currency: string, value: string): string {
   if (!value) return '';
@@ -31,7 +31,12 @@ export function AmountInput({
   label?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? grouped(currency, value);
+  const seen = useRef(value);
+  const valueChanged = seen.current !== value;
+  if (valueChanged) seen.current = value;
+  const stale = draft !== null && valueChanged && commitAmount(draft, currency) !== value;
+  if (stale) setDraft(null);
+  const shown = draft !== null && !stale ? draft : grouped(currency, value);
   let message: { tone: 'down' | 'warn'; text: string } | null = null;
   if (invalid || (draft !== null && commitAmount(draft, currency) === null && draft !== '')) {
     message = { tone: 'down', text: 'Enter an amount' };
@@ -64,7 +69,12 @@ export function AmountInput({
           inputMode="decimal"
           aria-label={label}
           value={shown}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            const nextDraft = event.target.value;
+            setDraft(nextDraft);
+            const next = commitAmount(nextDraft, currency);
+            if (next) onValueChange(next);
+          }}
           onBlur={() => {
             if (draft === null) return;
             const next = commitAmount(draft, currency);

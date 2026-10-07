@@ -1,11 +1,13 @@
 'use client';
 
-import type { TransferReason } from '@/contracts/airwallex';
+import type { TransferMethod, TransferReason } from '@/contracts/airwallex';
 import type { PatchBillBody } from '@/contracts/api';
 import type { StrategyMode } from '@/contracts/bill';
 import { DataSourceError } from '@/contracts/data-source';
-import { D, significantPrice } from '@/contracts/money';
+import { roundToPayout } from '@/contracts/currencies';
+import { D, decimalString, significantPrice } from '@/contracts/money';
 import { presentApiError } from '@/features/data/errors';
+import { armMethodOptions, methodUnavailable, splitArmErrors } from '@/features/terminal/arm-errors';
 import type { IntakeMode } from '@/features/terminal/flow';
 import { useBill, useBillActions, useChart } from '@/features/data/hooks';
 import { useState } from 'react';
@@ -23,13 +25,7 @@ import { Button } from '@/ui/primitives/button';
 import { Dialog } from '@/ui/primitives/dialog';
 import { Banner } from '@/ui/primitives/banner';
 import { TransferMethodPicker } from '@/ui/primitives/transfer-method-picker';
-import type { TransferMethodOption } from '@/ui/primitives/transfer-method';
 import { formatUtcDate } from '@/ui/trading/time-label';
-
-const METHODS: readonly TransferMethodOption[] = [
-  { method: 'LOCAL', flightTime: { min: 'P0D', max: 'P1D' } },
-  { method: 'SWIFT', flightTime: { min: 'P1D', max: 'P3D' } },
-];
 
 /** Review the scanned fields, then set the target and the pay-by date. */
 export function BillIntake({
@@ -66,6 +62,8 @@ export function BillIntake({
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [priced, setPriced] = useState('');
+  const [rejected, setRejected] = useState<{ method: TransferMethod; message: string } | null>(null);
+  const [armFields, setArmFields] = useState<string[]>([]);
   const [chartNow] = useState(() => Math.floor(Date.now() / 1000));
   const id = ids[index];
   const billQuery = useBill(open ? id : undefined);
@@ -84,6 +82,8 @@ export function BillIntake({
       const previousMode = seen.split(':').at(-1);
       setSeen(key);
       setProblem(undefined);
+      setRejected(null);
+      setArmFields([]);
       if (!sameBill || previousMode !== mode) {
         setStep(mode === 'edit-target' || bill.state !== 'DRAFT' ? 'strategy' : 'review');
         setBank(null);
@@ -171,7 +171,15 @@ export function BillIntake({
       setProblem('Set a target before arming');
       return;
     }
+    const blocked = methodUnavailable(
+      bill.transferMethod,
+      bill.pair.base,
+      bill.beneficiary?.transferMethods,
+      rejected,
+    );
+    if (blocked) return;
     setBusy(true);
+    setArmFields([]);
     try {
       await actions.putStrategy(
         bill.id,
@@ -196,6 +204,18 @@ export function BillIntake({
       }
       onFinished(ids[0] ?? bill.id);
     } catch (error) {
+      if (error instanceof DataSourceError && error.error.code === 'VALIDATION_FAILED') {
+        const split = splitArmErrors(error.error.fieldErrors ?? []);
+        if (split.method) {
+          setRejected({ method: bill.transferMethod, message: split.method });
+          setArmFields([]);
+          return;
+        }
+        if (split.fields.length > 0) {
+          setArmFields(split.fields);
+          return;
+        }
+      }
       setProblem(messageOf(error));
       onError(error);
     } finally {
@@ -300,7 +320,13 @@ export function BillIntake({
                     key={gap}
                     size="sm"
                     variant="secondary"
-                    onClick={() => setTarget(offsetTarget(bill.lastPrice ?? '0', gap))}
+                    onClick={() => {
+                      const price = offsetTarget(bill.lastPrice ?? '0', gap);
+                      setTarget(price);
+                      if (modeChoice === 'MAX_COST') {
+                        setMaxCost(roundToPayout(bill.pair.quote, decimalString(D(bill.amount).mul(D(price)))));
+                      }
+                    }}
                   >
                     {label}
                   </Button>
@@ -333,7 +359,11 @@ export function BillIntake({
             <TransferMethodPicker
               value={bill.transferMethod}
               onValueChange={changeMethod}
-              options={METHODS}
+              options={armMethodOptions(
+                bill.pair.base,
+                bill.beneficiary?.transferMethods,
+                rejected,
+              )}
               amount={bill.amount}
             />
           ) : null}
@@ -353,6 +383,15 @@ export function BillIntake({
               bill={{ ...bill, targetPrice: target || bill.targetPrice }}
               cutoffLabel={cutoffLabel}
               loading={busy}
+              blocked={Boolean(
+                methodUnavailable(
+                  bill.transferMethod,
+                  bill.pair.base,
+                  bill.beneficiary?.transferMethods,
+                  rejected,
+                ),
+              )}
+              messages={armFields}
               onArm={() => void saveTarget()}
             />
           )}
