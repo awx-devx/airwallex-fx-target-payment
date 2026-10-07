@@ -10,8 +10,8 @@
 - Background work runs through BullMQ with deterministic `jobId`s. Nothing time-based depends on BullMQ delayed jobs; timers live in MongoDB and the sweeper enqueues them.
 - Every Airwallex `POST` create carries a deterministic `request_id`.
 - `decimal.js` for all money and rates. Round to currency precision at the edges.
-- Each external dependency has a `mock` adapter. `pnpm test` does not need credentials, Docker, or a database the user started.
-- **Do not set up hosting.** No Docker, Compose, Caddy, Dockerfiles, image builds, or deploy scripts. The user deploys by hand. [10](../10-deployment.md) is not a task on this track.
+- Each external dependency has a `mock` adapter. `pnpm test` does not need credentials or a database the user started.
+- **Do not set up hosting.** The user deploys by hand. [10](../10-deployment.md) is not a task on this track.
 
 ## Environment
 
@@ -33,7 +33,7 @@ Estimates are for one engineer.
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| B0.1 | `.env.example` (see [02 §8](../02-architecture.md#8-environment-variables)) and zod env validation at boot. Test harness: `mongodb-memory-server` in replica-set mode and `redis-memory-server`, started and stopped by Vitest. No Docker. | A service test boots both, runs the execution-create transaction, and runs a BullMQ job. The real process fails fast when a required variable is missing. Tests inject the memory URIs and do not read the user's `.env`. |
+| B0.1 | `.env.example` (see [02 §8](../02-architecture.md#8-environment-variables)) and zod env validation at boot. Test harness: `mongodb-memory-server` in replica-set mode and `redis-memory-server`, started and stopped by Vitest. | A service test boots both, runs the execution-create transaction, and runs a BullMQ job. The real process fails fast when a required variable is missing. Tests inject the memory URIs and do not read the user's `.env`. |
 | B0.2 | Mongoose connection singleton (safe for Next.js hot reload), `Decimal128` ↔ string `toJSON` plugin, all models in [03 §4](../03-domain-model.md#4-data-model-mongodb--mongoose) incl. the `rate_ticks` time-series collection; `pnpm db:indexes` runs `syncIndexes()` | The index sync runs against the memory replica set; partial unique indexes are verified by a test |
 | B0.3 | Worker entry (`pnpm worker`): BullMQ queues/workers per [02 §9.2](../02-architecture.md#92-queues-srcserverqueue), sweeper loop, Redis leader lock for the poller and sweeper, graceful shutdown (drain workers, close Redis/Mongo) | Against the memory Redis: the worker starts and stops cleanly, a second worker does not take the lock, and a job remains after the worker process restarts |
 | B0.4 | Event bus: `publish(event)` → Redis `PUBLISH app_events`; the SSE route (`/api/stream`) holds one shared subscriber connection per process and fans out | An event published in the worker shows up in the browser |
@@ -167,6 +167,6 @@ Ask for the Airwallex values in the Environment table before B2.1. Do not call t
 | Layer | Tool | Scope |
 | --- | --- | --- |
 | Domain unit | Vitest (+ fast-check) | rate math, state machine, deadline/tz, trigger |
-| Service | Vitest + `mongodb-memory-server` (replica-set mode) + `redis-memory-server` | transitions under concurrency, partial unique indexes, BullMQ jobs, sweeper, webhook processing. The test process starts and stops both. No Docker, and no MongoDB or Redis the user installed. |
+| Service | Vitest + `mongodb-memory-server` (replica-set mode) + `redis-memory-server` | transitions under concurrency, partial unique indexes, BullMQ jobs, sweeper, webhook processing. The test process starts and stops both. No MongoDB or Redis the user installed. |
 | Adapter contract | Vitest, `AIRWALLEX_E2E=1` | real sandbox calls ([04 §5](../04-airwallex-integration.md#5-contract-tests)) |
 | E2E | Playwright | demo scenarios on mocks (CI) and on sandbox (manual/nightly) |

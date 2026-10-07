@@ -108,7 +108,7 @@ Every shortcut is tagged in code with `DEMO-ONLY:` + `PROD:` or `SANDBOX:` (see 
 | Standing instruction is attributed to one demo user | `DEMO-ONLY` | `src/server/services/bills.ts` `demoUserId` | The authenticated user id |
 | Seeded bills use cached extraction results | `DEMO-ONLY` | `scripts/seed-demo.ts`, `src/server/services/seed.ts` | Live extraction; human review is always required |
 | Generated vendors, bank accounts and invoices; mock extractor returns truth by file hash | `DEMO-ONLY` | `src/mocks/generators`, `scripts/generate`, mock `BillExtractor` | Real vendor onboarding and live extraction |
-| Uploads on a local Docker volume | `DEMO-ONLY` | `src/server/adapters/storage/local.ts` | Encrypted object storage with retention rules |
+| Uploads on the local disk under `storage/` | `DEMO-ONLY` | `src/server/adapters/storage/local.ts` | Encrypted object storage with retention rules |
 | Single server, one worker (single point of failure). Replit runs Redis, the worker, and Next.js in one Reserved VM | `DEMO-ONLY` | `docs/10`, `scripts/replit-start.sh` | Multi-instance web, managed Redis, `DEADLINE_SAFETY_NET=airwallex` |
 | Transfer status advanced by the simulation endpoint | `SANDBOX` | `src/mocks/mock-data-source.ts`, `src/server/adapters/airwallex/endpoints/simulation.ts`, `src/server/adapters/transfers`, `/api/demo/transfers/:id/advance` | Real payout lifecycle via webhooks + reconciler |
 | Pre-funded wallet topped up by deposit simulation | `SANDBOX` | `src/server/adapters/airwallex/endpoints/simulation.ts`, `/api/demo/scenario`, seed scripts | Real funding; low-balance alerts before the deadline day |

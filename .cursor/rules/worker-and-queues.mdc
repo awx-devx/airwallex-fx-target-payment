@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Worker, Queues and Realtime
 
-Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (deadline rules), `docs/10-deployment.md` §5–7.
+Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (deadline rules), `docs/10-deployment.md` §4–6.
 
 ## Queues (`src/server/queue`)
 - Queue names, job names and **typed payloads** (zod) live in `src/server/queue`. Producers and processors import them from there; no string literals elsewhere.
@@ -36,7 +36,7 @@ Spec: `docs/02-architecture.md` §9 (queues table, consistency), `docs/03` §3 (
 - Write `worker:heartbeat` every 10 s; `/api/health` reads it.
 
 ## Shutdown (SIGTERM/SIGINT)
-Stop the poller and sweeper → release the lock → `await worker.close()` on every BullMQ worker → close Redis and Mongo → exit 0. Must finish within the Compose `stop_grace_period` (60 s).
+Stop the poller and sweeper → release the lock → `await worker.close()` on every BullMQ worker → close Redis and Mongo → exit 0. Must finish within PM2's `kill_timeout` (60 s).
 
 ## SSE (`/api/stream`)
 - `export const runtime = 'nodejs'` and `export const dynamic = 'force-dynamic'`.

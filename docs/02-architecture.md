@@ -72,7 +72,7 @@ flowchart LR
 | Notifications | In-app only (SSE `notification` → toasts + `NotificationCenter`) | Demo scope: no out-of-band channel (Q-05) |
 | Testing | Vitest (unit), Playwright (e2e + visual snapshots of `/dev/ui-kit`) | |
 | Package manager | pnpm | |
-| Local infra | Docker Compose (MongoDB single-node replica set + Redis), cloudflared/ngrok tunnel for webhooks | |
+| Local infra | MongoDB 7 single-node replica set and Redis 7 on the machine (or Atlas + a local Redis). cloudflared/ngrok tunnel for webhooks | |
 
 ## 3. Repository layout
 
@@ -125,7 +125,6 @@ flowchart LR
 │     ├─ reconciler.ts
 │     └─ demoSim.ts               # demo only: Simulate runs (scripted ticks, transfer advance)
 ├─ scripts/                       # seeds, smoke tests, index sync, migrations (migrate-mongo)
-├─ docker-compose.yml
 └─ .env.example
 ```
 
@@ -308,7 +307,7 @@ TRIGGER_BUFFER_BPS=0
 QUOTE_VALIDITY_TARGET=MIN_1              # long enough for the job that creates the transfer
 QUOTE_VALIDITY_DEADLINE=MIN_1
 DEADLINE_AUTOSETTLE_CUTOFF=14:00         # account tz (Q-07)
-RATE_TICKS_TTL_DAYS=30                   # 7 on Atlas M0 (10 §5.2)
+RATE_TICKS_TTL_DAYS=30                   # 7 on Atlas M0 (10 §4.2)
 
 # Integrations
 ANTHROPIC_API_KEY=                        # worker only
@@ -382,22 +381,8 @@ Bill.findOneAndUpdate(
 
 ### 9.5 Local infrastructure
 
-```yaml
-# docker-compose.yml (sketch)
-services:
-  mongo:
-    image: mongo:7
-    command: ["--replSet", "rs0", "--bind_ip_all"]
-    ports: ["27017:27017"]
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }"]
-      interval: 5s
-      retries: 20
-  redis:
-    image: redis:7
-    ports: ["6379:6379"]
-```
+MongoDB 7 must be a replica set (`rs0`) so the execution transaction works. Redis 7 listens on `localhost:6379`. Both match `.env.example` (`MONGODB_URI` with `replicaSet=rs0&directConnection=true`, `REDIS_URL=redis://localhost:6379`). Initialise the set once with `rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] })`.
 
-A hosted option for the demo is MongoDB Atlas (free tier is a replica set) + Upstash or Redis Cloud. BullMQ needs a Redis that supports blocking commands, which rules out HTTP-only Redis APIs.
+A hosted option for the demo is MongoDB Atlas (free tier is a replica set) plus Upstash or Redis Cloud. BullMQ needs a Redis that supports blocking commands, which rules out HTTP-only Redis APIs.
 
-**Production/demo hosting** (web + worker + Redis on one server behind Caddy, MongoDB on Atlas) is specified in [10 — Deployment](./10-deployment.md).
+**Production/demo hosting** (the repo checked out on one VPS, Next.js and the worker under PM2, Redis on the host, MongoDB on Atlas) is specified in [10 — Deployment](./10-deployment.md).

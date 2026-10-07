@@ -25,7 +25,7 @@ We build **UI-first**: contracts and mocks (C0), then the UI kit on `/dev/ui-kit
 | Terminal layout, ticket per state, flows, edge states | `docs/07-pages-spec.md` |
 | Demo mode, warp clock, simulator, scenarios, demo-vs-production inventory | `docs/08-demo-plan.md` |
 | Decisions (D-xx) and open questions (Q-xx) | `docs/09-decisions-and-open-questions.md` |
-| Hosting, Compose, Caddy, deploy, singleton worker | `docs/10-deployment.md` |
+| Hosting, PM2, Caddy, deploy, singleton worker | `docs/10-deployment.md` |
 | Test data generator, seeding profiles, extraction accuracy | `docs/11-test-data-and-seeding.md` |
 | Bill extraction pipeline (XML/QR readers, Claude, validators, review confidence) | `docs/12-bill-extraction.md` |
 | Task IDs and exit criteria | `docs/tracks/U-track.md`, `docs/tracks/B-track.md` |
@@ -64,8 +64,7 @@ Audit with `rg -n "DEMO-ONLY:|SANDBOX:" src scripts`.
 ## Commands (once scaffolded)
 
 ```bash
-pnpm infra:up             # MongoDB (rs0) + Redis via docker compose
-pnpm dev                  # Next.js dev server
+pnpm dev                  # Next.js dev server (MongoDB replica set + Redis already running)
 pnpm worker               # worker: BullMQ processors + poller + sweeper
 pnpm db:indexes           # sync Mongoose indexes / time-series collections
 pnpm db:reset             # drop every app collection, empty queues, reset clock and market (DEMO_MODE only); then db:indexes

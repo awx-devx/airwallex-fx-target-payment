@@ -21,7 +21,7 @@ Next.js App Router, MongoDB via Mongoose, Redis and BullMQ, a worker process, Ta
 
 ## Deploy on Replit
 
-Replit imports this repo and publishes one container. That container runs Next.js, the worker, and Redis. MongoDB stays on Atlas. The same steps, and why this host cannot scale out, are in [docs/10-deployment.md](docs/10-deployment.md) §13.
+Replit imports this repo and publishes one container. That container runs Next.js, the worker, and Redis. MongoDB stays on Atlas. The same steps, and why this host cannot scale out, are in [docs/10-deployment.md](docs/10-deployment.md) §12.
 
 1. Create a MongoDB Atlas cluster (M0 is enough). It must be a replica set, which Atlas is. Allow Replit’s egress (`0.0.0.0/0` is the usual sandbox choice) and copy `MONGODB_URI`. On M0 set `RATE_TICKS_TTL_DAYS=7`.
 2. Import the repo: [replit.com/github/awx-devx/airwallex-fx-target-payment](https://replit.com/github/awx-devx/airwallex-fx-target-payment).
@@ -40,7 +40,7 @@ Node 22 or newer, pnpm 10. The UI can run on in-browser mocks (`NEXT_PUBLIC_DATA
 ```bash
 cp .env.example .env         # fill in Mongo, Redis, and Airwallex for a real demo
 pnpm install
-pnpm infra:up                # MongoDB replica set + Redis
+# MongoDB replica set (rs0) and Redis already running — see docs/02 §9.5
 pnpm db:indexes
 pnpm dev                     # http://localhost:3000
 pnpm worker                  # second terminal

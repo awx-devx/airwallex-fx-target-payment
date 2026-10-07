@@ -26,4 +26,4 @@ Full spec: `docs/04-airwallex-integration.md` §3.
 
 ## Ops
 - Local development: a tunnel URL registered in the sandbox web app with API version `AIRWALLEX_API_VERSION`.
-- Deployed: Caddy only allows the Airwallex webhook IPs on this path (`docs/10` §7).
+- Deployed: the host Caddy only allows the Airwallex webhook IPs on this path (`docs/10` §6).
