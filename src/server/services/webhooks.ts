@@ -2,7 +2,9 @@ import { parseAirwallexJson } from '@/server/adapters/airwallex/json';
 import { mapTransfer } from '@/server/adapters/airwallex/mappers';
 import { isRecord } from '@/server/adapters/airwallex/values';
 import {
+  knownTransferStatus,
   readWebhook,
+  webhookEventFromPayload,
   WebhookVerificationError,
   type AirwallexWebhookEvent,
 } from '@/server/adapters/airwallex/webhooks';
@@ -42,7 +44,10 @@ export async function receiveWebhook(input: {
     await WebhookEvent.create({
       _id: event.id,
       name: event.name,
-      createdAt: parseInstant(event.createdAt),
+      // Deposit and global-account events omit created_at. The receive time stands in.
+      createdAt: event.createdAt
+        ? parseInstant(event.createdAt)
+        : input.clock.now(),
       receivedAt: input.clock.now(),
       payload,
     });
@@ -63,7 +68,10 @@ export async function processWebhook(input: {
   if (!stored || stored.processedAt) return;
   try {
     const event = eventFrom(stored);
-    if (event.version !== input.env.AIRWALLEX_API_VERSION) {
+    if (
+      event.version !== undefined &&
+      event.version !== input.env.AIRWALLEX_API_VERSION
+    ) {
       getLogger().warn(
         { eventId: event.id, version: event.version },
         'webhook version does not match AIRWALLEX_API_VERSION',
@@ -94,10 +102,7 @@ async function dispatch(
     await applyTransferEvent(input, event);
     return;
   }
-  if (
-    event.name === 'balance.ga.top_up' ||
-    event.name === 'balance.adjustment'
-  ) {
+  if (event.name === 'deposit.settled' || event.name === 'deposit.reversed') {
     await invalidateBalanceCache(input.env.REDIS_URL);
     return;
   }
@@ -152,6 +157,13 @@ async function applyTransferEvent(
     );
     return;
   }
+  if (!knownTransferStatus(object)) {
+    getLogger().warn(
+      { name: event.name, transferId, status: object.status },
+      'webhook transfer status is not applied',
+    );
+    return;
+  }
   const summary = mapTransfer(object, execution.mode);
   await applyTransferStatus({
     summary,
@@ -163,23 +175,15 @@ async function applyTransferEvent(
   });
 }
 
-function eventFrom(stored: {
-  name: string;
-  payload: unknown;
-  _id: unknown;
-}): AirwallexWebhookEvent {
-  const payload = stored.payload;
-  if (!isRecord(payload) || !isRecord(payload.data)) {
-    throw new Error('Stored webhook is missing data');
+function eventFrom(stored: { payload: unknown }): AirwallexWebhookEvent {
+  try {
+    return webhookEventFromPayload(stored.payload);
+  } catch (error) {
+    if (error instanceof WebhookVerificationError) {
+      throw new Error('Stored webhook is missing data');
+    }
+    throw error;
   }
-  return {
-    id: String(stored._id),
-    name: stored.name,
-    accountId: typeof payload.account_id === 'string' ? payload.account_id : '',
-    createdAt: typeof payload.created_at === 'string' ? payload.created_at : '',
-    version: typeof payload.version === 'string' ? payload.version : '',
-    object: payload.data.object,
-  };
 }
 
 function isDuplicateKey(error: unknown): boolean {

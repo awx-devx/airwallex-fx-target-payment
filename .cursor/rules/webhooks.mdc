@@ -13,13 +13,14 @@ Full spec: `docs/04-airwallex-integration.md` §3.
 - Read the body with `await req.text()` and verify **before** parsing: HMAC-SHA256 hex of `x-timestamp + rawBody` with `AIRWALLEX_WEBHOOK_SECRET`, `crypto.timingSafeEqual`, and a 5-minute timestamp tolerance. Invalid → 400.
 - Store it: `WebhookEvent.create({ _id: event.id, name, payload, receivedAt })`. Duplicate-key `11000` → return 200 without enqueuing again.
 - Enqueue a BullMQ `webhook` job (`jobId: webhook.{eventId}`) and **return 200 immediately**. Never call Airwallex or run business logic in the route.
-- Normalise payloads in one place (`webhooks.ts`): `data.object ?? data`, `account_id ?? accountId`.
+- Normalise payloads in one place (`webhooks.ts`): `data.object` when it is an object, otherwise `data`; `account_id` or `accountId`. `created_at` and `version` may be absent.
 
 ## Processor
 - Look up the execution by our stored `airwallexTransferId` first, then fall back to `metadata.bill_id`.
 - Apply the status through the **same** function the reconciler uses (`applyTransferStatus`). Never duplicate that logic.
 - Monotonic (status rank) and tolerant of out-of-order delivery: compare the object's `updated_at` with the stored `awxUpdatedAt`, and ignore older ones. `FAILED` beats `PAID`; `CANCELLED` never replaces `FAILED`.
-- `data.object` has the Retrieve response shape: reuse the transfer mapper in `mappers.ts` (`docs/13` §7).
+- The transfer resource has the Retrieve response shape: reuse the transfer mapper in `mappers.ts` (`docs/13` §7). A `status` outside the contract enum is logged and ignored; the reconciler still polls.
+- `deposit.settled` and `deposit.reversed` refresh the balance cache. Dashboard test events are signed with `client-secret-key`, not the subscription secret, so this route returns 400 for them.
 - On failure, record `error` on the `webhook_events` document and let BullMQ retry. The reconciler (every 60 s, and on boot) is the backstop.
 - Mark `processedAt` on success; publish `execution.updated` / `bill.updated`.
 

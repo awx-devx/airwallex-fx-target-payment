@@ -299,7 +299,7 @@ Account verification is **LOCAL only** and covers SEPA countries (Verification o
 
 ## 7. Webhooks
 
-The envelope is `{ id, name, account_id, data: { object }, created_at, version }`. `data.object` has **the same schema as the resource's Retrieve API**, so the webhook processor reuses the retrieve mappers (§4.2). No second mapping exists.
+The envelope is `{ id, name, account_id | accountId, data, created_at?, version? }`. The resource is `data.object` when that is an object, otherwise `data` (current transfer webhooks put the transfer directly under `data`). It has **the same schema as the resource's Retrieve API**, so the webhook processor reuses the retrieve mappers (§4.2). No second mapping exists. A transfer `status` outside our enum is logged and ignored.
 
 - Transfer events: `payout.transfer.{in_approval, approval_recalled, approval_rejected, approval_blocked, scheduled, overdue, processing, sent, paid, failed, cancellation_requested, cancelled}`.
 - Funding events: `payout.transfer.funding.{requires_funding_confirmation, scheduled, processing, funded, failed, cancelled, reversed}`.

@@ -1,7 +1,12 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { TRANSFER_STATUSES, type TransferStatus } from '@/contracts/airwallex';
 import { parseAirwallexJson } from '@/server/adapters/airwallex/json';
 import { toIsoUtc } from '@/server/adapters/airwallex/time';
-import { isRecord, requiredString } from '@/server/adapters/airwallex/values';
+import {
+  isRecord,
+  optionalString,
+  requiredString,
+} from '@/server/adapters/airwallex/values';
 
 export const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -16,9 +21,26 @@ export interface AirwallexWebhookEvent {
   id: string;
   name: string;
   accountId: string;
-  createdAt: string;
-  version: string;
+  /** Omitted by some event families (deposits, Global Accounts). */
+  createdAt?: string;
+  /** Omitted when the subscription payload has no API version. */
+  version?: string;
   object: unknown;
+}
+
+const KNOWN_TRANSFER_STATUSES = new Set<string>(TRANSFER_STATUSES);
+
+/**
+ * Transfer status we know how to apply. Anything else is ignored: a new
+ * Airwallex status must not fail the webhook job.
+ */
+export function knownTransferStatus(
+  object: unknown,
+): TransferStatus | undefined {
+  if (!isRecord(object) || typeof object.status !== 'string') return undefined;
+  return KNOWN_TRANSFER_STATUSES.has(object.status)
+    ? (object.status as TransferStatus)
+    : undefined;
 }
 
 export function webhookSignature(
@@ -71,16 +93,33 @@ export function parseWebhookEvent(rawBody: string): AirwallexWebhookEvent {
   } catch {
     throw new WebhookVerificationError('Webhook body is not JSON');
   }
+  return webhookEventFromPayload(payload);
+}
+
+/**
+ * Transfer webhooks put the transfer on `data` (current API versions) or on
+ * `data.object` (older examples). Deposit and Global Account events use
+ * `accountId` and omit `created_at` and `version`.
+ */
+export function webhookEventFromPayload(
+  payload: unknown,
+): AirwallexWebhookEvent {
   if (!isRecord(payload) || !isRecord(payload.data)) {
     throw new WebhookVerificationError('Webhook envelope is missing data');
   }
+  const createdAt = optionalString(payload, 'created_at');
+  const version = optionalString(payload, 'version');
+  const accountId =
+    optionalString(payload, 'account_id') ??
+    optionalString(payload, 'accountId') ??
+    '';
   return {
     id: requiredString(payload, 'id'),
     name: requiredString(payload, 'name'),
-    accountId: requiredString(payload, 'account_id'),
-    createdAt: toIsoUtc(requiredString(payload, 'created_at')),
-    version: requiredString(payload, 'version'),
-    object: payload.data.object,
+    accountId,
+    ...(createdAt ? { createdAt: toIsoUtc(createdAt) } : {}),
+    ...(version ? { version } : {}),
+    object: isRecord(payload.data.object) ? payload.data.object : payload.data,
   };
 }
 

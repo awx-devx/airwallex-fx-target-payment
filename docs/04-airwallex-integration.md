@@ -197,14 +197,16 @@ Deposits simulation (`POST /simulation/deposit/create` with `global_account_id`,
 - `payout.transfer.scheduled`, `.overdue`, `.processing`, `.sent`, `.paid`, `.failed`, `.cancellation_requested`, `.cancelled`, `.in_approval` (config alert only)
 - `payout.transfer.funding.processing`, `.funded`, `.failed`, `.cancelled`, `.reversed`
 - `conversion.scheduled`, `.settled`, `.cancelled`, `.overdue` (convert-and-hold path)
-- `balance.ga.top_up`, `balance.adjustment` (refresh the balance cache)
+- `deposit.settled`, `deposit.reversed` (refresh the balance cache). `deposit.pending` and `deposit.rejected` do not change the wallet.
 
 **Handler algorithm:**
 1. Read the **raw** body string. Do not parse it yet.
 2. `expected = HMAC_SHA256(secret, x-timestamp + rawBody).hex()`. Constant-time compare with `x-signature`. Reject if `|now − x-timestamp| > 5 min`.
 3. Parse, then `WebhookEvent.create({ _id: event.id, … })`. A duplicate-key error (`11000`) means the event was already received, so return `200`.
 4. **Respond `200` immediately**, then process asynchronously by adding a BullMQ `webhook` job with `jobId: webhook.{eventId}`.
-5. Processor: `data.object` has the same shape as the Retrieve response, so it goes through the **same mapper** as `GET /transfers/{id}`. Find the execution by `data.object.id` (transfer id) or `metadata.bill_id`, then apply the status with the monotonic rank guard, write a `bill_event`, and publish to Redis `app_events`. If the event `version` ≠ `AIRWALLEX_API_VERSION`, log a warning.
+5. Processor: the resource is `data.object` when that value is an object, otherwise `data` itself. Current transfer webhooks put the transfer directly under `data`; it has the same shape as `GET /transfers/{id}` either way, so it goes through the **same mapper**. Find the execution by the transfer id or `metadata.bill_id`, then apply the status with the monotonic rank guard, write a `bill_event`, and publish to Redis `app_events`. A transfer `status` outside our enum is logged and ignored (the reconciler still polls). If `version` is present and ≠ `AIRWALLEX_API_VERSION`, log a warning. Some event families omit `version`, `created_at`, and send `accountId` instead of `account_id`.
+
+Dashboard **test** events are signed with the secret in the `client-secret-key` header, not `AIRWALLEX_WEBHOOK_SECRET`. This route returns 400 for those on purpose.
 6. Ordering: never rely on delivery order. Compare the object's `updated_at` with the stored value.
 
 **Airwallex IP allowlist:** if we run behind a firewall, allow the sandbox and production webhook IPs listed on the "Listen for webhook events" page.

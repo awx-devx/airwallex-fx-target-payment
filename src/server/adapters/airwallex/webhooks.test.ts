@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  knownTransferStatus,
   parseWebhookEvent,
   readWebhook,
   webhookSignature,
@@ -83,5 +84,53 @@ describe('webhook signature', () => {
     const event = parseWebhookEvent(body);
     const object = event.object as { source_amount: string };
     expect(object.source_amount).toBe('9007199254740993');
+  });
+
+  it('reads a transfer placed directly under data', () => {
+    const flat = JSON.stringify({
+      id: 'evt_flat',
+      name: 'payout.transfer.scheduled',
+      account_id: 'acct_flat',
+      created_at: '2025-07-09T15:41:51+0000',
+      version: '2025-06-30',
+      data: {
+        id: 't-flat',
+        short_reference_id: 'P250709-K61UKW4',
+        request_id: 'tr:bill:1',
+        status: 'SCHEDULED',
+        transfer_method: 'LOCAL',
+        source_amount: 68.14,
+        source_currency: 'SGD',
+        transfer_amount: 50,
+        transfer_currency: 'USD',
+        conversion: { rate: 1.285682, currency_pair: 'USDSGD' },
+        updated_at: '2025-07-09T15:41:50+0000',
+      },
+    });
+    const event = parseWebhookEvent(flat);
+    expect(event.accountId).toBe('acct_flat');
+    expect(event.version).toBe('2025-06-30');
+    expect(mapTransfer(event.object, 'TARGET').transferId).toBe('t-flat');
+    expect(knownTransferStatus(event.object)).toBe('SCHEDULED');
+  });
+
+  it('accepts a deposit envelope with a camelCase account id and no version', () => {
+    const deposit = JSON.stringify({
+      id: 'evt_dep',
+      name: 'deposit.settled',
+      accountId: 'acct_dep',
+      data: { id: 'dep_1', status: 'SETTLED', amount: 100 },
+    });
+    const event = parseWebhookEvent(deposit);
+    expect(event.accountId).toBe('acct_dep');
+    expect(event.createdAt).toBeUndefined();
+    expect(event.version).toBeUndefined();
+    expect(event.object).toMatchObject({ id: 'dep_1', status: 'SETTLED' });
+  });
+
+  it('does not treat an unknown transfer status as one we apply', () => {
+    expect(knownTransferStatus({ status: 'PROCESSING' })).toBe('PROCESSING');
+    expect(knownTransferStatus({ status: 'SOMETHING_NEW' })).toBeUndefined();
+    expect(knownTransferStatus({})).toBeUndefined();
   });
 });

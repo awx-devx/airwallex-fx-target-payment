@@ -26,7 +26,7 @@ Endpoint reference: `docs/04-airwallex-integration.md` §2. Field, enum and erro
 - Send amounts as decimal **major-unit strings** rounded to `payoutPrecision` (`src/contracts/currencies.ts`: 0 dp CLP/ISK/JPY/KES/KRW/PYG/RWF/SAR/VND/XAF/XOF, 3 dp BHD/JOD/KWD/OMR/TND; KES and SAR differ from ISO). Never multiply by 100.
 - Responses carry amounts as JSON **numbers**: `client.ts` parses bodies losslessly (numbers → strings); never `JSON.parse` an Airwallex body directly.
 - Rates: always pass `buy_amount` = the bill amount (the default is 10,000, and pricing is size-aware). Derive `price = sell_amount / buy_amount` from the `CLIENT` level in `mappers.ts`, not from `rate`/`client_rate`/`conversion.rate` (these follow the `currency_pair` market convention; use `orient()` to display them).
-- Parse every amount with `decimal.js` in `mappers.ts`. Airwallex payloads never leak past the adapter; map them to contracts. Webhook `data.object` goes through the same mapper as the Retrieve response.
+- Parse every amount with `decimal.js` in `mappers.ts`. Airwallex payloads never leak past the adapter; map them to contracts. Webhook resources (`data.object` when present, otherwise `data`) go through the same mapper as the Retrieve response.
 
 ## Execution path
 - Primary: one `POST /api/v1/transfers/create` with `source_currency = H`, `transfer_currency = F`, `quote_id`, `reason` (required enum, the bill's `transferReason`, default `bill_payment`), `reference` (required), `fee_paid_by: PAYER`, SWIFT `swift_charge_option: PAYER` (D-18), `metadata.bill_id`, no `transfer_date`. This works for buy-only currencies (INR, PHP, IDR, …), which can't convert-and-hold.
