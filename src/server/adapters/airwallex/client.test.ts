@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { AirwallexClient } from '@/server/adapters/airwallex/client';
+import { createDeposit } from '@/server/adapters/airwallex/endpoints/simulation';
 import {
   createScheduledTransfer,
   createTransfer,
 } from '@/server/adapters/airwallex/endpoints/transfers';
+import { transferRequestId } from '@/server/adapters/airwallex/requestIds';
 import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import {
   jsonNumber,
@@ -170,6 +172,26 @@ describe('AirwallexClient', () => {
         (call) => call.url.pathname !== '/api/v1/authentication/login',
       ),
     ).toHaveLength(3);
+  });
+
+  it('sends a simulated deposit amount as a JSON number', async () => {
+    const { client, calls } = harness(() => json(201, '{"id":"dep-1"}'));
+    await createDeposit(client, {
+      globalAccountId: '7f687fe6-dcf4-4462-92fa-80335301d9d2',
+      amount: '100.00',
+    });
+    const body = String(
+      calls.find((call) =>
+        call.url.pathname.endsWith('/simulation/deposit/create'),
+      )?.init.body,
+    );
+    expect(body).toContain('"amount":100.00');
+    expect(body).not.toContain('"amount":"100.00"');
+  });
+
+  it('rejects a request_id longer than the sandbox accepted', () => {
+    expect(transferRequestId('a'.repeat(42), 1)).toHaveLength(47);
+    expect(() => transferRequestId('a'.repeat(43), 1)).toThrow(/47/);
   });
 
   it('does not retry a create that has no request_id', async () => {

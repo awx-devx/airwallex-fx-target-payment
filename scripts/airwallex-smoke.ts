@@ -4,7 +4,7 @@ import { AirwallexClient, airwallexUrl } from '@/server/adapters/airwallex/clien
 import { AirwallexError } from '@/server/adapters/airwallex/errors';
 import { jsonNumber } from '@/server/adapters/airwallex/json';
 import { mapCurrentRate, mapQuote, mapTransfer, orient } from '@/server/adapters/airwallex/mappers';
-import { transferRequestId } from '@/server/adapters/airwallex/requestIds';
+import { MAX_REQUEST_ID_LENGTH, transferRequestId } from '@/server/adapters/airwallex/requestIds';
 import { transitionTransfer } from '@/server/adapters/airwallex/endpoints/simulation';
 import { isRecord } from '@/server/adapters/airwallex/values';
 import { EnvError, parseEnv } from '@/server/env';
@@ -221,7 +221,7 @@ async function main(): Promise<number> {
         method: 'POST',
         path: '/fx/conversions/create',
         body: {
-          request_id: `cv:smoke-v3:${attempt}`.slice(0, 64),
+          request_id: `cv:smoke-v3:${attempt}`.slice(0, MAX_REQUEST_ID_LENGTH),
           buy_currency: 'EUR',
           buy_amount: '10.00',
           sell_currency: 'USD',
@@ -355,11 +355,11 @@ async function main(): Promise<number> {
   await run('V15', async () => {
     if (!eurBeneficiary) return { status: 'fail', detail: 'EUR beneficiary was not created' };
     const recorded: string[] = [];
-    for (const failureType of FAILURE_TYPES) {
+    for (const [index, failureType] of FAILURE_TYPES.entries()) {
       try {
         const locked = await lockQuote(client, fixtures, `v15-${failureType.toLowerCase()}-quote`, 'EUR', 'USD', '2.00');
         const created = await createRawTransfer(client, fixtures, `v15-${failureType.toLowerCase()}`, {
-          billId: `smoke-v15-${failureType.toLowerCase()}`,
+          billId: `v15-${index}`,
           attempt,
           beneficiaryId: eurBeneficiary,
           amount: '2.00',

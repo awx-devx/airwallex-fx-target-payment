@@ -17,7 +17,7 @@ Endpoint reference: `docs/04-airwallex-integration.md` §2. Field, enum and erro
 - **Retry `GET` and `POST …/validate` on `429`/`5xx`.** Retry a create only for `POST /transfers/create` and `POST /fx/conversions/create`, and only with the same `request_id`. Do not retry simulation transitions, cancel, quote create, or beneficiary create.
 
 ## Idempotency
-- `request_id` (max 64 chars) comes from the shared builders only: `tr:{billId}:{attempt}`, `cv:{billId}:{attempt}`. `POST /beneficiaries/create` has no `request_id`; `bf:{billId}` is a local label and the app dedupes with `matchExisting`. `attempt` increments only after a **terminal** failure.
+- `request_id` comes from the shared builders only: `tr:{billId}:{attempt}`, `cv:{billId}:{attempt}`. Cap is 47 characters (V15: 47 accepted, 54+ rejected with field 018; the reference says 64). `POST /beneficiaries/create` has no `request_id`; `bf:{billId}` is a local label and the app dedupes with `matchExisting`. `attempt` increments only after a **terminal** failure.
 - On `duplicate_request_id` (legacy `request_id_duplicate`), treat it as success: `details.id` is the existing transfer, so retrieve it. On `409 request_pending`, back off and retry with the same `request_id`.
 - `request_id` dedupe on transfers lasts 7 days; conversions reject any reused `request_id`.
 - If the outcome is unknown after retries, leave the execution `EXECUTING` and let the reconciler discover it. Never "just try again" with a new `request_id`.

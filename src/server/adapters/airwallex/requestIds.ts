@@ -1,8 +1,12 @@
-const MAX_LENGTH = 64;
+/**
+ * Longest `request_id` the sandbox accepted (V15, 2026-10-04).
+ * 54 characters and longer failed field code 018. The API reference says 64.
+ */
+export const MAX_REQUEST_ID_LENGTH = 47;
 
 function bounded(id: string): string {
-  if (id.length > MAX_LENGTH) {
-    throw new Error(`request_id exceeds ${MAX_LENGTH} characters`);
+  if (id.length > MAX_REQUEST_ID_LENGTH) {
+    throw new Error(`request_id exceeds ${MAX_REQUEST_ID_LENGTH} characters`);
   }
   return id;
 }
@@ -34,6 +38,7 @@ export function conversionRequestId(billId: string, attempt: number): string {
   return bounded(`cv:${billId}:${attempt}`);
 }
 
+/** Local label only. Beneficiary create does not accept `request_id`. */
 export function beneficiaryRequestId(billId: string): string {
   return bounded(`bf:${billId}`);
 }

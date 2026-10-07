@@ -49,7 +49,7 @@ Legend: ✅ native · ⚠️ partial or beta · 🛠 we build it
 
 ### 2.3 Conversions
 
-- `POST /api/v1/fx/conversions/create`. `request_id` (idempotency key, max 64 chars) is required, plus exactly one of `buy_amount`/`sell_amount`, and optionally `quote_id` and `conversion_date`.
+- `POST /api/v1/fx/conversions/create`. `request_id` (idempotency key) is required, plus exactly one of `buy_amount`/`sell_amount`, and optionally `quote_id` and `conversion_date`. The API reference says 64 characters. Sandbox V15 accepted 47 and rejected 54 or longer (field code 018), so our builders cap at 47.
 - Minimum USD 1 per conversion. The sandbox default maximum is USD 5,000,000 per trade (configurable).
 - Statuses: `SCHEDULED`, `OVERDUE`, `CANCELLED`, `SETTLED`. Webhooks: `conversion.scheduled | .overdue | .settled | .cancelled`.
 - Booked-but-unsettled conversions can be cancelled through `POST /api/v1/conversion_amendments/create` (`type: CANCEL`). A cancellation delta fee usually applies.

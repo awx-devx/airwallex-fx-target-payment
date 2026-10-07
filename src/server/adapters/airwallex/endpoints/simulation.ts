@@ -1,4 +1,5 @@
 import type { AirwallexClient } from '@/server/adapters/airwallex/client';
+import { jsonNumber } from '@/server/adapters/airwallex/json';
 
 export const SIMULATION_STATUSES = [
   'PROCESSING',
@@ -41,7 +42,9 @@ export async function createDeposit(
     path: '/simulation/deposit/create',
     body: {
       global_account_id: input.globalAccountId,
-      amount: input.amount,
+      // AIRWALLEX: deposit amount is a JSON number, not a decimal string.
+      // https://www.airwallex.com/docs/api/simulation/deposits/create
+      amount: jsonNumber(input.amount),
     },
   });
 }

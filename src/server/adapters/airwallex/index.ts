@@ -34,6 +34,7 @@ export { parseAwxTimestamp } from '@/server/adapters/airwallex/time';
 export {
   beneficiaryRequestId,
   conversionRequestId,
+  MAX_REQUEST_ID_LENGTH,
   transferRequestId,
 } from '@/server/adapters/airwallex/requestIds';
 export {

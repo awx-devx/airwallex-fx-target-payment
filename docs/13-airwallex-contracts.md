@@ -155,7 +155,7 @@ Error names **differ by endpoint** for the same condition (for example, `transfe
 
 | Field | Value | Where it comes from / UI |
 | --- | --- | --- |
-| `request_id` | `tr:{billId}:{attempt}` (≤ 64 chars; deduped for **7 days**) | 04 §1 |
+| `request_id` | `tr:{billId}:{attempt}` (≤ 47 chars, V15; the reference says 64; deduped for **7 days**) | 04 §1 |
 | `beneficiary_id` | the resolved beneficiary | `BeneficiaryCard` |
 | `transfer_currency`, `transfer_amount` | F, A (payout precision) | the bill |
 | `source_currency` | H | settings |

@@ -37,7 +37,7 @@ airwallex/
 **Rules**
 - **Auth:** `POST /authentication/login` with `x-client-id`, `x-api-key` (+ optional `x-login-as`). One `AirwallexClient` per process (`getAirwallexClient`) caches the token and refreshes when `now > expires_at − 60 s`. Callers share that client, so they share one login and one rate limiter. Token expiry and the limiter use the wall clock, not the warp clock. Never log keys or tokens.
 - **Retries:** retry `429` and `5xx` with exponential backoff and jitter (1 s, 2 s, 4 s, 8 s, max 16 s, 5 attempts) for `GET` and `POST …/validate`. A create is retried only for `POST /transfers/create` and `POST /fx/conversions/create`, and only when the body carries the same `request_id` (Airwallex dedupes on it). Do not retry simulation transitions, cancel, quote create, or beneficiary create: a `500` on a sandbox `FAILED` transition is the result, and repeating beneficiary create can insert a second beneficiary.
-- **Idempotency keys (`request_id`, max 64 chars):**
+- **Idempotency keys (`request_id`):** the API reference says 64 characters. Sandbox V15 accepted 47 and rejected 54 or longer (field code 018), so the builders cap at 47.
   - Transfer: `tr:{billId}:{attemptNo}`
   - Conversion: `cv:{billId}:{attemptNo}`
   - Beneficiary create has **no** `request_id`. `bf:{billId}` is only a local label. The app dedupes with `matchExisting` before create.
@@ -110,7 +110,7 @@ Store `quote_id`, `client_rate`, `awx_rate`, `mid_rate`, `buy_amount`, `sell_amo
 - `fee_paid_by: PAYER` (default). For SWIFT, `swift_charge_option: PAYER` so the vendor receives the full amount (D-18, V17).
 - `quote_id` must match `sell_currency = source_currency` and `buy_currency = transfer_currency`.
 - The cutoff always locks a `MIN_1` quote first and sends `quote_id`. Some accounts return `quote_id_required` if it is omitted.
-- Store `id`, `short_reference_id`, `status`, `funding.status`, `conversion.rate`, `source_amount`, `amount_payer_pays`, `amount_beneficiary_receives`, `fee_amount`, `fee_currency`, `fee_paid_by`, `dispatch_date`, `failure` and `updated_at`. Fee and amounts are **tentative until `SCHEDULED`**.
+- Store `id`, `short_reference_id`, `status`, `funding.status`, `conversion.rate`, `source_amount`, `amount_payer_pays`, `amount_beneficiary_receives`, `fee_amount`, `fee_currency`, `fee_paid_by`, `dispatch_date`, `failure` and `updated_at`. Fee and amounts are tentative only while the transfer is waiting for Airwallex approval (`IN_APPROVAL` and the `APPROVAL_*` statuses). They are confirmed at `SCHEDULED`. That approval workflow stays off (D-23), so a transfer we create has confirmed amounts on the create response.
 
 **Validation at arming:** `POST /transfers/validate` with the same body as create, without `quote_id`, runs when the user arms the bill. The sandbox rejected a body that omitted `request_id` (field code 001) on 2026-10-04, so the call sends one. `validation_failed` field errors, account/method limits and beneficiary problems show up in review, not at trigger time ([13 §4.4](./13-airwallex-contracts.md#44-validation-at-arming)).
 
