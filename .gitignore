@@ -26,6 +26,7 @@
 /generated
 /uploads
 /storage
+/.data
 /scripts/spike/out
 
 # misc

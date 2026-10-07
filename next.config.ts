@@ -8,7 +8,8 @@ const nextConfig: NextConfig = {
   agentRules: false,
   // Cross-origin hosts that may hit the dev server (HMR, RSC, assets).
   // Playwright uses 127.0.0.1; quick tunnels use *.trycloudflare.com.
-  allowedDevOrigins: ['127.0.0.1', '*.trycloudflare.com'],
+  // Replit's editor preview is *.replit.dev; the published host is *.replit.app.
+  allowedDevOrigins: ['127.0.0.1', '*.trycloudflare.com', '*.replit.dev', '*.replit.app'],
 };
 
 export default nextConfig;

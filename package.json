@@ -4,9 +4,11 @@
   "private": true,
   "packageManager": "pnpm@10.13.1",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0 --port ${PORT:-3000}",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}",
+    "replit:dev": "bash scripts/replit-start.sh dev",
+    "replit:start": "bash scripts/replit-start.sh start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",

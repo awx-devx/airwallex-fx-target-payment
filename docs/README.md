@@ -20,7 +20,7 @@ The product is presented like a **perps trading terminal**: every bill is a "pos
 | 07 | [Pages spec](./07-pages-spec.md) | Terminal layout, flows, screens assembled from the kit |
 | 08 | [Demo plan](./08-demo-plan.md) | Demo mode, market simulator, scripted scenarios, run-of-show, demo-vs-production inventory |
 | 09 | [Decisions & open questions](./09-decisions-and-open-questions.md) | ADR-style log, open items to confirm with Airwallex |
-| 10 | [Deployment](./10-deployment.md) | Single-server Docker Compose (web + worker + Redis) behind Caddy, MongoDB Atlas, deploy/rollback, monitoring |
+| 10 | [Deployment](./10-deployment.md) | Single-server Docker Compose (web + worker + Redis) behind Caddy, MongoDB Atlas, deploy/rollback, monitoring. Replit Reserved VM in §13 |
 | 11 | [Test data & seeding](./11-test-data-and-seeding.md) | Seeded generator for vendors, bank accounts, sandbox beneficiaries, invoice PDFs and bills in any state; profiles, extraction accuracy tests |
 | 12 | [Bill extraction](./12-bill-extraction.md) | Deterministic readers (e-invoice XML, payment QR, text layer) + Claude structured output + validators + review; options compared; accuracy gates |
 | 13 | [Airwallex → Contracts & UI](./13-airwallex-contracts.md) | Field-level map from the Airwallex API to our contracts and components: wire conventions, precision, error codes, transfer/funding statuses, fees, beneficiary form schemas and verification, reference data |

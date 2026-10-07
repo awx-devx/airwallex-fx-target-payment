@@ -1,6 +1,6 @@
 # 10 — Deployment
 
-**Target:** a single Linux server running the **Next.js app**, the **worker** and **Redis** in Docker Compose, behind **Caddy** (reverse proxy + automatic HTTPS). **MongoDB** runs on **MongoDB Atlas** by default; a same-server option is described in §5.2.
+**Target:** a single Linux server running the **Next.js app**, the **worker** and **Redis** in Docker Compose, behind **Caddy** (reverse proxy + automatic HTTPS). **MongoDB** runs on **MongoDB Atlas** by default; a same-server option is described in §5.2. A Replit Reserved VM (§13) is the other demo host: the same three processes in one container, Mongo still on Atlas.
 
 This is appropriate for a demo. It keeps operations simple, and the design already tolerates restarts: timers live in MongoDB, jobs persist in Redis, and payment calls are idempotent.
 
@@ -409,3 +409,22 @@ What users see during a deploy: web is unavailable for about 2–5 s while its c
 - [ ] No deploys are scheduled; `IMAGE_TAG` is pinned
 - [ ] A backup was taken after seeding
 - [ ] `DEMO_MODE=true` and basic auth are configured as intended for the audience
+
+---
+
+## 13. Replit
+
+Replit imports the repo and publishes one container. [`.replit`](../.replit) builds with pnpm and runs [`scripts/replit-start.sh`](../scripts/replit-start.sh), which starts Redis (unless `REDIS_URL` is already an external URL), syncs indexes, starts the worker, then binds Next.js to `0.0.0.0` and `PORT`. MongoDB stays on **Atlas**. The numbered steps are also in the [README](../README.md).
+
+Publish as a **Reserved VM with one instance**. Autoscale is the wrong target for this app:
+
+- It can scale to zero. The worker stops, so nothing watches rates or pays at the cutoff, and a webhook that arrives during a cold start is missed until Airwallex retries.
+- It can scale past one instance. The script's Redis is local to the container, so each copy is its own leader and can pay the same bill twice.
+
+Leave `REDIS_URL` unset on that VM. The script listens on `127.0.0.1:6379` with `maxmemory-policy noeviction` and an AOF under `.data/redis` (gitignored). Set `REDIS_URL` only when Redis is hosted elsewhere (Upstash, Redis Cloud); the script then skips the local server. A hosted Redis still needs a single worker, so the VM stays at one instance.
+
+`NEXT_PUBLIC_DATA_SOURCE=api` is inlined at **build** time. Set it on the deployment before the first publish, and again after any change, or the UI stays on the in-browser mock. On Atlas M0 set `RATE_TICKS_TTL_DAYS=7` (§5.2).
+
+Workspace Secrets are not copied into a deployment. Put the same values in both. The editor Run button (`pnpm replit:dev`) starts Redis, the worker, and `next dev` when `MONGODB_URI` is set, and Next.js alone when it is not.
+
+Seed from a machine that has the repo, not from the Replit shell. Point `.env` at the same Atlas URI and run `pnpm seed:beneficiaries` and `pnpm seed:demo`. Register the webhook on the published host: `https://<slug>.replit.app/api/webhooks/airwallex`. The `*.replit.dev` editor URL is not that host.

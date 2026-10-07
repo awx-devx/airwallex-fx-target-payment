@@ -1,0 +1,20 @@
+run = "sh -c 'export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; command -v pnpm >/dev/null 2>&1 || { corepack enable && corepack prepare pnpm@10.13.1 --activate; }; [ -d node_modules/tsx ] || NODE_ENV=development pnpm install --frozen-lockfile; pnpm replit:dev'"
+entrypoint = "package.json"
+hidden = [".config", ".next", ".data", "node_modules"]
+modules = ["nodejs-22"]
+
+[nix]
+channel = "stable-24_11"
+packages = ["redis"]
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
+
+[deployment]
+build = ["sh", "-c", "export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; corepack enable && corepack prepare pnpm@10.13.1 --activate && NODE_ENV=development pnpm install --frozen-lockfile && pnpm run build"]
+run = ["sh", "-c", "export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; corepack enable && corepack prepare pnpm@10.13.1 --activate && pnpm replit:start"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
