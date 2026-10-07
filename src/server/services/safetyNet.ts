@@ -1,6 +1,9 @@
 import type { TransferMethod, TransferReason } from '@/contracts/airwallex';
-import { createAirwallexClient } from '@/server/adapters/airwallex/client';
-import { cancelTransfer, createScheduledTransfer } from '@/server/adapters/airwallex/endpoints/transfers';
+import { getAirwallexClient } from '@/server/adapters/airwallex/client';
+import {
+  cancelTransfer,
+  createScheduledTransfer,
+} from '@/server/adapters/airwallex/endpoints/transfers';
 import type { Env } from '@/server/env';
 import { getLogger } from '@/server/logging/logger';
 
@@ -26,11 +29,14 @@ export function safetyNetGateway(env: Env): SafetyNetGateway | null {
   if (env.DEADLINE_SAFETY_NET !== 'airwallex') return null;
   return {
     async schedule(input) {
-      const created = await createScheduledTransfer(createAirwallexClient(env), input);
+      const created = await createScheduledTransfer(
+        getAirwallexClient(env),
+        input,
+      );
       return created.transferId;
     },
     async cancel(transferId) {
-      await cancelTransfer(createAirwallexClient(env), transferId);
+      await cancelTransfer(getAirwallexClient(env), transferId);
     },
   };
 }

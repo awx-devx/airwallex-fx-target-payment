@@ -35,7 +35,7 @@ airwallex/
 ```
 
 **Rules**
-- **Auth:** `POST /authentication/login` with `x-client-id`, `x-api-key` (+ optional `x-login-as`). Cache the token in memory per process and refresh when `now > expires_at − 60 s`. Use single-flight so concurrent callers share one login. Never log keys or tokens.
+- **Auth:** `POST /authentication/login` with `x-client-id`, `x-api-key` (+ optional `x-login-as`). One `AirwallexClient` per process (`getAirwallexClient`) caches the token and refreshes when `now > expires_at − 60 s`. Callers share that client, so they share one login and one rate limiter. Token expiry and the limiter use the wall clock, not the warp clock. Never log keys or tokens.
 - **Retries:** retry `429` and `5xx` with exponential backoff and jitter (1 s, 2 s, 4 s, 8 s, max 16 s, 5 attempts). **Never retry a `POST` create unless it carries the same `request_id`.** Airwallex dedupes on it.
 - **Idempotency keys (`request_id`, max 64 chars):**
   - Transfer: `tr:{billId}:{attemptNo}`

@@ -363,6 +363,41 @@ export function createAirwallexClient(
   });
 }
 
+const sharedClients = new Map<string, AirwallexClient>();
+
+/**
+ * One client per process for a given account. Token expiry and the limiter
+ * use the wall clock: the warp clock must not stretch a 30-minute token or
+ * the sandbox rate limit.
+ */
+export function getAirwallexClient(env: Env): AirwallexClient {
+  const key = sharedClientKey(env);
+  const existing = sharedClients.get(key);
+  if (existing) return existing;
+  const client = createAirwallexClient(env, { clock: new SystemClock() });
+  sharedClients.set(key, client);
+  return client;
+}
+
+/** Tests drop the memoised client so a later call can log in again. */
+export function resetSharedAirwallexClients(): void {
+  sharedClients.clear();
+}
+
+function sharedClientKey(env: Env): string {
+  return [
+    env.AIRWALLEX_ENV,
+    env.AIRWALLEX_BASE_URL,
+    env.AIRWALLEX_FILES_BASE_URL,
+    env.AIRWALLEX_API_VERSION,
+    env.AIRWALLEX_CLIENT_ID ?? '',
+    env.AIRWALLEX_API_KEY ?? '',
+    env.AIRWALLEX_LOGIN_AS ?? '',
+    env.SPEND_SYNC ? '1' : '0',
+    env.FILES_UPLOAD ? '1' : '0',
+  ].join('\0');
+}
+
 function canRetry(input: AirwallexRequest): boolean {
   if (input.method !== 'POST' || !input.path.endsWith('/create')) return true;
   return (

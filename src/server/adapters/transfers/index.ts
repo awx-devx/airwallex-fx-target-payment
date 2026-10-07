@@ -2,7 +2,7 @@ import {
   executionSummarySchema,
   type ExecutionSummary,
 } from '@/contracts/airwallex';
-import { createAirwallexClient } from '@/server/adapters/airwallex/client';
+import { getAirwallexClient } from '@/server/adapters/airwallex/client';
 import {
   transitionTransfer,
   type SimulationStatus,
@@ -59,7 +59,7 @@ export function transferGateway(env: Env, clock: Clock): TransferGateway {
 }
 
 function airwallexTransfers(env: Env): TransferGateway {
-  const client = createAirwallexClient(env);
+  const client = getAirwallexClient(env);
   return {
     create: (input) => createTransfer(client, input),
     get: (transferId, mode) => getTransfer(client, transferId, mode),

@@ -7,7 +7,7 @@ import {
   type HealthQueue,
   type HealthReport,
 } from '@/contracts/health';
-import { createAirwallexClient } from '@/server/adapters/airwallex/client';
+import { getAirwallexClient } from '@/server/adapters/airwallex/client';
 import type { Clock } from '@/server/adapters/clock';
 import { Bill } from '@/server/db/models';
 import type { Env } from '@/server/env';
@@ -131,8 +131,7 @@ async function airwallexStatus(input: {
   if (!input.env.AIRWALLEX_CLIENT_ID || !input.env.AIRWALLEX_API_KEY)
     return 'down';
   try {
-    const client = createAirwallexClient(input.env, { clock: input.clock });
-    await client.confirmToken();
+    await getAirwallexClient(input.env).confirmToken();
     return 'ok';
   } catch {
     return 'down';

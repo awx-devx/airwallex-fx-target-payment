@@ -1,9 +1,8 @@
 import type { RateSourceKind } from '@/contracts/sse';
-import { createAirwallexClient } from '@/server/adapters/airwallex/client';
+import { getAirwallexClient } from '@/server/adapters/airwallex/client';
 import { getCurrentRate } from '@/server/adapters/airwallex/endpoints/rates';
 import { DEMO_ANCHORS, SimulatedMarket } from '@/mocks/market';
 import type { Env } from '@/server/env';
-import { createLogger } from '@/server/logging/logger';
 
 export interface IndicativeRequest {
   buy: string;
@@ -78,9 +77,7 @@ function clientFor(env: Env) {
   if (!env.AIRWALLEX_CLIENT_ID || !env.AIRWALLEX_API_KEY) {
     throw new Error('Airwallex credentials are not set');
   }
-  return createAirwallexClient(env, {
-    logger: createLogger({ level: 'silent' }),
-  });
+  return getAirwallexClient(env);
 }
 
 function airwallexRates(env: Env): RateSource {

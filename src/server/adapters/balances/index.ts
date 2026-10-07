@@ -1,4 +1,4 @@
-import { createAirwallexClient } from '@/server/adapters/airwallex/client';
+import { getAirwallexClient } from '@/server/adapters/airwallex/client';
 import { getCurrentBalances } from '@/server/adapters/airwallex/endpoints/balances';
 import { shortWallet } from '@/server/adapters/demo/store';
 import type { Env } from '@/server/env';
@@ -35,7 +35,7 @@ export function currentBalances(env: Env): {
   }
   return {
     async getBalances() {
-      const rows = await getCurrentBalances(createAirwallexClient(env));
+      const rows = await getCurrentBalances(getAirwallexClient(env));
       return rows.map(({ currency, available, pending, reserved, total }) => ({
         currency,
         available,

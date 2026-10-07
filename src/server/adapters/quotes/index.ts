@@ -1,7 +1,11 @@
-import { quoteSummarySchema, type QuoteSummary, type QuoteValidity } from '@/contracts/airwallex';
+import {
+  quoteSummarySchema,
+  type QuoteSummary,
+  type QuoteValidity,
+} from '@/contracts/airwallex';
 import { D } from '@/contracts/money';
 import type { Clock } from '@/server/adapters/clock';
-import { createAirwallexClient } from '@/server/adapters/airwallex/client';
+import { getAirwallexClient } from '@/server/adapters/airwallex/client';
 import { createQuote } from '@/server/adapters/airwallex/endpoints/quotes';
 import type { Env } from '@/server/env';
 
@@ -18,8 +22,7 @@ export function quoteLock(env: Env, clock: Clock): QuoteLock {
   if (env.PAYMENTS_GATEWAY === 'mock') return mockQuoteLock(clock);
   return {
     async lock(input) {
-      const client = createAirwallexClient(env);
-      return createQuote(client, {
+      return createQuote(getAirwallexClient(env), {
         buyCurrency: input.buy,
         sellCurrency: input.sell,
         buyAmount: input.buyAmount,

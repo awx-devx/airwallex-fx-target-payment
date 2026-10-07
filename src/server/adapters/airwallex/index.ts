@@ -3,6 +3,8 @@ export {
   AirwallexClient,
   airwallexUrl,
   createAirwallexClient,
+  getAirwallexClient,
+  resetSharedAirwallexClients,
   endpointGroup,
   endpointKey,
 } from '@/server/adapters/airwallex/client';
